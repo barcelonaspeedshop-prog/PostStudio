@@ -1,5 +1,5 @@
 export async function callClaude(prompt: string, system?: string): Promise<string> {
-  const res = await fetch('/api/claude', {
+  const res = await fetch('/api/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt, system, max_tokens: 1000 }),
