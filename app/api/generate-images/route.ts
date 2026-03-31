@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
         })
         return {
           index: i,
-          url: response.data[0]?.url || null,
+          url: response.data?.[0]?.url || null,
           error: null,
         }
       } catch (err: unknown) {
