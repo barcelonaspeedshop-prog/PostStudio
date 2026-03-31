@@ -155,12 +155,150 @@ export default function CarouselPage() {
     }
   }
 
+  const renderSlideToCanvas = async (slide: Slide): Promise<string> => {
+    const W = 1080, H = 1350
+    const canvas = document.createElement('canvas')
+    canvas.width = W
+    canvas.height = H
+    const ctx = canvas.getContext('2d')!
+    const colors = ACCENT_COLORS[slide.accent] || ACCENT_COLORS.red
+
+    // Background
+    ctx.fillStyle = colors.bg
+    ctx.fillRect(0, 0, W, H)
+
+    // Draw image if present
+    if (slide.image) {
+      await new Promise<void>((resolve) => {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => {
+          const scale = Math.max(W / img.width, H / img.height)
+          const sw = img.width * scale, sh = img.height * scale
+          const sx = (W - sw) / 2, sy = (H - sh) / 2
+          ctx.drawImage(img, sx, sy, sw, sh)
+          resolve()
+        }
+        img.onerror = () => resolve()
+        img.src = slide.image!
+      })
+    }
+
+    // Gradient overlay bottom
+    const grad = ctx.createLinearGradient(0, H * 0.2, 0, H)
+    grad.addColorStop(0, 'rgba(0,0,0,0)')
+    grad.addColorStop(0.4, 'rgba(0,0,0,0.5)')
+    grad.addColorStop(1, 'rgba(0,0,0,0.88)')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, W, H)
+
+    // Top vignette
+    const topGrad = ctx.createLinearGradient(0, 0, 0, 180)
+    topGrad.addColorStop(0, 'rgba(0,0,0,0.5)')
+    topGrad.addColorStop(1, 'rgba(0,0,0,0)')
+    ctx.fillStyle = topGrad
+    ctx.fillRect(0, 0, W, 180)
+
+    const pad = 80
+
+    // Tag
+    ctx.font = '500 32px sans-serif'
+    ctx.fillStyle = colors.text
+    ctx.globalAlpha = 0.85
+    ctx.fillText(slide.tag, pad, 80)
+    ctx.globalAlpha = 1
+
+    // Slide number
+    ctx.font = '400 36px sans-serif'
+    ctx.fillStyle = 'rgba(255,255,255,0.4)'
+    ctx.fillText(slide.num, pad, 130)
+
+    // Headline — large
+    ctx.font = '500 96px sans-serif'
+    ctx.fillStyle = '#ffffff'
+    const hedWords = slide.headline.split(' ')
+    let hedLines: string[] = []
+    let currentLine = ''
+    for (const word of hedWords) {
+      const test = currentLine ? `${currentLine} ${word}` : word
+      if (ctx.measureText(test).width <= W - pad * 2) {
+        currentLine = test
+      } else {
+        if (currentLine) hedLines.push(currentLine)
+        currentLine = word
+      }
+    }
+    if (currentLine) hedLines.push(currentLine)
+
+    // Position text from bottom
+    const badgeH = 70
+    const bodyLines = wrapText(ctx, slide.body, W - pad * 2, '400 40px sans-serif')
+    const bodyH = bodyLines.length * 52
+    const hedH = hedLines.length * 108
+    const totalTextH = hedH + 40 + bodyH + 40 + badgeH
+    let textY = H - pad - totalTextH
+
+    // Draw headline
+    ctx.font = '500 96px sans-serif'
+    ctx.fillStyle = '#ffffff'
+    for (const line of hedLines) {
+      ctx.fillText(line, pad, textY)
+      textY += 108
+    }
+
+    // Divider
+    textY += 20
+    ctx.fillStyle = 'rgba(255,255,255,0.3)'
+    ctx.fillRect(pad, textY, 240, 2)
+    textY += 32
+
+    // Body
+    ctx.font = '400 40px sans-serif'
+    ctx.fillStyle = 'rgba(240,240,240,0.8)'
+    for (const line of bodyLines) {
+      ctx.fillText(line, pad, textY)
+      textY += 52
+    }
+
+    // Badge
+    textY += 20
+    ctx.font = '500 28px sans-serif'
+    const badgeText = slide.badge
+    const badgeW = ctx.measureText(badgeText).width + 48
+    ctx.fillStyle = colors.badge
+    ctx.beginPath()
+    ctx.roundRect(pad, textY, badgeW, 52, 8)
+    ctx.fill()
+    ctx.fillStyle = colors.text
+    ctx.fillText(badgeText, pad + 24, textY + 36)
+
+    return canvas.toDataURL('image/jpeg', 0.92)
+  }
+
+  function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number, font: string): string[] {
+    ctx.font = font
+    const words = text.split(' ')
+    const lines: string[] = []
+    let cur = ''
+    for (const word of words) {
+      const test = cur ? `${cur} ${word}` : word
+      if (ctx.measureText(test).width <= maxW) { cur = test }
+      else { if (cur) lines.push(cur); cur = word }
+    }
+    if (cur) lines.push(cur)
+    return lines
+  }
+
   const generateVideo = async () => {
     if (!slides.length) { showToast('Generate slides first', 'error'); return }
     setGeneratingVideo(true)
     setVideoUrl(null)
-    showToast('Generating video — this takes about 60 seconds...')
+    showToast('Compositing slides — this takes about 60 seconds...')
     try {
+      // Render each slide to canvas with text overlay
+      const composited = await Promise.all(slides.map(renderSlideToCanvas))
+      const compositedSlides = slides.map((s, i) => ({ ...s, image: composited[i] }))
+
       let audioDataUrl: string | null = null
       if (audioFile) {
         const reader = new FileReader()
@@ -173,7 +311,7 @@ export default function CarouselPage() {
       const res = await fetch('/api/video-export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slides, slideDuration, audioUrl: audioDataUrl }),
+        body: JSON.stringify({ slides: compositedSlides, slideDuration, audioUrl: audioDataUrl }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
