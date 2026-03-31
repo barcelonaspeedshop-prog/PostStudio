@@ -79,6 +79,8 @@ export default function CarouselPage() {
   const [slides, setSlides] = useState<Slide[]>([])
   const [generating, setGenerating] = useState(false)
   const [selectedSlide, setSelectedSlide] = useState<number | null>(null)
+  const [generatingImages, setGeneratingImages] = useState(false)
+  const [imageStyle, setImageStyle] = useState('vintage cinematic')
   const [toast, setToast] = useState<{ msg: string; type?: 'error' | 'success' } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -105,6 +107,35 @@ export default function CarouselPage() {
       showToast(e instanceof Error ? e.message : 'Error generating slides', 'error')
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const generateImages = async () => {
+    if (!slides.length) { showToast('Generate slides first', 'error'); return }
+    setGeneratingImages(true)
+    showToast('Generating images — this takes about 30 seconds...')
+    try {
+      const res = await fetch('/api/generate-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slides, style: imageStyle }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+
+      // Apply returned image URLs to slides
+      const updated = [...slides]
+      data.images.forEach((img: { index: number; url: string | null }) => {
+        if (img.url && updated[img.index]) {
+          updated[img.index] = { ...updated[img.index], image: img.url }
+        }
+      })
+      setSlides(updated)
+      showToast('Images generated!')
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Error generating images', 'error')
+    } finally {
+      setGeneratingImages(false)
     }
   }
 
@@ -253,6 +284,43 @@ export default function CarouselPage() {
                 <><span className="text-[11px]">✦</span> Generate carousel</>
               )}
             </button>
+
+            {/* Image generation */}
+            {slides.length > 0 && (
+              <div className="bg-white border border-stone-100 rounded-xl p-4 flex flex-col gap-3">
+                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">AI image style</p>
+                <select
+                  value={imageStyle}
+                  onChange={(e) => setImageStyle(e.target.value)}
+                  className="w-full text-[13px] border border-stone-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-stone-400 text-stone-900"
+                >
+                  <option value="vintage cinematic">Vintage cinematic</option>
+                  <option value="modern editorial photography">Modern editorial</option>
+                  <option value="dramatic motorsport photography">Motorsport</option>
+                  <option value="luxury lifestyle photography">Luxury lifestyle</option>
+                  <option value="black and white film photography">Black and white film</option>
+                  <option value="golden hour outdoor photography">Golden hour</option>
+                </select>
+                <button
+                  onClick={generateImages}
+                  disabled={generatingImages}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-stone-100 text-stone-900 text-[13px] font-medium rounded-xl hover:bg-stone-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-stone-200"
+                >
+                  {generatingImages ? (
+                    <>
+                      <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                      </svg>
+                      Generating images...
+                    </>
+                  ) : (
+                    <><span className="text-[11px]">✦</span> Generate images with AI</>
+                  )}
+                </button>
+                <p className="text-[10px] text-stone-400">~$0.40 per carousel · 30 seconds</p>
+              </div>
+            )}
 
             {/* Image upload tip */}
             {slides.length > 0 && (
