@@ -128,13 +128,24 @@ export default function CarouselPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
 
-      // Apply returned image URLs to slides
+      // Apply returned image URLs to slides — convert to base64 for portability
       const updated = [...slides]
-      data.images.forEach((img: { index: number; url: string | null }) => {
+      await Promise.all(data.images.map(async (img: { index: number; url: string | null }) => {
         if (img.url && updated[img.index]) {
-          updated[img.index] = { ...updated[img.index], image: img.url }
+          try {
+            const response = await fetch(img.url)
+            const blob = await response.blob()
+            const base64 = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.readAsDataURL(blob)
+            })
+            updated[img.index] = { ...updated[img.index], image: base64 }
+          } catch {
+            updated[img.index] = { ...updated[img.index], image: img.url }
+          }
         }
-      })
+      }))
       setSlides(updated)
       showToast('Images generated!')
     } catch (e: unknown) {
