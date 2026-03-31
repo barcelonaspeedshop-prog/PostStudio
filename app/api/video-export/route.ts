@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       if (slide.image && slide.image.startsWith('http')) {
         // Download from URL
         await downloadImage(slide.image, imgPath)
-      } else if (slide.image && slide.image.startsWith('data:')) {
+      } else if (slide.image && (slide.image.startsWith('data:') || slide.image.startsWith('blob:'))) {
         // Base64 image
         const base64Data = slide.image.replace(/^data:image\/\w+;base64,/, '')
         await writeFile(imgPath, Buffer.from(base64Data, 'base64'))
@@ -76,7 +76,12 @@ export async function POST(req: NextRequest) {
 
     if (audioUrl) {
       const audioPath = path.join(tmpDir, 'audio.mp3')
-      await downloadImage(audioUrl, audioPath)
+      if (audioUrl.startsWith('data:')) {
+        const base64Data = audioUrl.replace(/^data:audio\/\w+;base64,/, '')
+        await writeFile(audioPath, Buffer.from(base64Data, 'base64'))
+      } else {
+        await downloadImage(audioUrl, audioPath)
+      }
       const totalDuration = slides.length * slideDuration
       ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -i ${audioPath} -vf "scale=1080:1350:force_original_aspect_ratio=decrease,pad=1080:1350:(ow-iw)/2:(oh-ih)/2,setsar=1" -c:v libx264 -preset fast -crf 23 -c:a aac -b:a 128k -t ${totalDuration} -shortest -movflags +faststart -y ${outputPath}`
     } else {
