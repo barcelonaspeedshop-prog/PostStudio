@@ -83,9 +83,9 @@ export async function POST(req: NextRequest) {
         await downloadImage(audioUrl, audioPath)
       }
       const totalDuration = slides.length * slideDuration
-      ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -i ${audioPath} -vf "scale=1080:1350:force_original_aspect_ratio=decrease,pad=1080:1350:(ow-iw)/2:(oh-ih)/2,setsar=1" -c:v libx264 -preset fast -crf 23 -c:a aac -b:a 128k -t ${totalDuration} -shortest -movflags +faststart -y ${outputPath}`
+      ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -i ${audioPath} -vf "scale=1080:1350:force_original_aspect_ratio=decrease,pad=1080:1350:(ow-iw)/2:(oh-ih)/2,setsar=1" -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -t ${totalDuration} -shortest -movflags +faststart -y ${outputPath}`
     } else {
-      ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -vf "scale=1080:1350:force_original_aspect_ratio=decrease,pad=1080:1350:(ow-iw)/2:(oh-ih)/2,setsar=1" -c:v libx264 -preset fast -crf 23 -an -movflags +faststart -y ${outputPath}`
+      ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -vf "scale=1080:1350:force_original_aspect_ratio=decrease,pad=1080:1350:(ow-iw)/2:(oh-ih)/2,setsar=1" -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -preset fast -crf 23 -an -movflags +faststart -y ${outputPath}`
     }
 
     await execAsync(ffmpegCmd)
