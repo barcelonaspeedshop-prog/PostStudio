@@ -3,18 +3,17 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
 export async function POST(req: NextRequest) {
   try {
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({ error: 'OPENAI_API_KEY not set' }, { status: 500 })
+    }
+
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
     const { slides, style = 'vintage cinematic' } = await req.json()
 
     if (!slides || !Array.isArray(slides)) {
       return NextResponse.json({ error: 'slides array is required' }, { status: 400 })
-    }
-
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json({ error: 'OPENAI_API_KEY not set' }, { status: 500 })
     }
 
     // Generate images in parallel, one per slide
