@@ -81,8 +81,13 @@ export default function CarouselPage() {
   const [selectedSlide, setSelectedSlide] = useState<number | null>(null)
   const [generatingImages, setGeneratingImages] = useState(false)
   const [imageStyle, setImageStyle] = useState('vintage cinematic')
+  const [generatingVideo, setGeneratingVideo] = useState(false)
+  const [slideDuration, setSlideDuration] = useState(3)
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; type?: 'error' | 'success' } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const audioInputRef = useRef<HTMLInputElement>(null)
+  const [audioFile, setAudioFile] = useState<File | null>(null)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -136,6 +141,37 @@ export default function CarouselPage() {
       showToast(e instanceof Error ? e.message : 'Error generating images', 'error')
     } finally {
       setGeneratingImages(false)
+    }
+  }
+
+  const generateVideo = async () => {
+    if (!slides.length) { showToast('Generate slides first', 'error'); return }
+    setGeneratingVideo(true)
+    setVideoUrl(null)
+    showToast('Generating video — this takes about 60 seconds...')
+    try {
+      let audioDataUrl: string | null = null
+      if (audioFile) {
+        const reader = new FileReader()
+        audioDataUrl = await new Promise((resolve) => {
+          reader.onload = (e) => resolve(e.target?.result as string)
+          reader.readAsDataURL(audioFile)
+        })
+      }
+
+      const res = await fetch('/api/video-export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slides, slideDuration, audioUrl: audioDataUrl }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setVideoUrl(data.video)
+      showToast('Video ready!')
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Error generating video', 'error')
+    } finally {
+      setGeneratingVideo(false)
     }
   }
 
@@ -215,6 +251,17 @@ export default function CarouselPage() {
           accept="image/*"
           className="hidden"
           onChange={handleImageUpload}
+        />
+
+        <input
+          ref={audioInputRef}
+          type="file"
+          accept="audio/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) { setAudioFile(file); showToast(`Audio: ${file.name}`) }
+          }}
         />
 
         <div className="flex flex-1 overflow-hidden">
@@ -319,6 +366,60 @@ export default function CarouselPage() {
                   )}
                 </button>
                 <p className="text-[10px] text-stone-400">~$0.40 per carousel · 30 seconds</p>
+              </div>
+            )}
+
+            {/* Video export */}
+            {slides.length > 0 && (
+              <div className="bg-white border border-stone-100 rounded-xl p-4 flex flex-col gap-3">
+                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Export video</p>
+                
+                <div>
+                  <p className="text-[11px] text-stone-400 mb-1">Seconds per slide — {slideDuration}s</p>
+                  <input
+                    type="range" min={2} max={6} step={1} value={slideDuration}
+                    onChange={(e) => setSlideDuration(Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-[10px] text-stone-400 mt-0.5">
+                    <span>2s</span><span>Total: {slides.length * slideDuration}s</span><span>6s</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => audioInputRef.current?.click()}
+                  className="w-full px-3 py-2 text-[12px] border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors text-stone-600 text-left"
+                >
+                  {audioFile ? `✓ ${audioFile.name}` : '+ Add music track (optional)'}
+                </button>
+
+                <button
+                  onClick={generateVideo}
+                  disabled={generatingVideo}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-stone-900 text-white text-[13px] font-medium rounded-xl hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {generatingVideo ? (
+                    <>
+                      <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                      </svg>
+                      Generating video...
+                    </>
+                  ) : (
+                    <><span className="text-[11px]">▶</span> Export as MP4</>
+                  )}
+                </button>
+
+                {videoUrl && (
+                  <a
+                    href={videoUrl}
+                    download={`${channel.replace(/\s+/g, '_')}_carousel.mp4`}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white text-[13px] font-medium rounded-xl hover:bg-green-700 transition-colors"
+                  >
+                    ↓ Download MP4
+                  </a>
+                )}
               </div>
             )}
 
