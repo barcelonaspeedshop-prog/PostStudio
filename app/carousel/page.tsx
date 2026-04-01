@@ -133,18 +133,20 @@ export default function CarouselPage() {
       await Promise.all(data.images.map(async (img: { index: number; url: string | null }) => {
         if (img.url && updated[img.index]) {
           try {
-            // Proxy through server to avoid CORS issues with external URLs
             const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(img.url)}`
             const response = await fetch(proxyUrl)
+            if (!response.ok) throw new Error('Proxy failed')
             const blob = await response.blob()
-            const base64 = await new Promise<string>((resolve) => {
+            const base64 = await new Promise<string>((resolve, reject) => {
               const reader = new FileReader()
               reader.onload = () => resolve(reader.result as string)
+              reader.onerror = reject
               reader.readAsDataURL(blob)
             })
             updated[img.index] = { ...updated[img.index], image: base64 }
           } catch {
-            updated[img.index] = { ...updated[img.index], image: img.url }
+            // Don't set raw URL — leave image empty to avoid canvas taint
+            showToast(`Image ${img.index + 1} failed to load`, 'error')
           }
         }
       }))
