@@ -133,7 +133,9 @@ export default function CarouselPage() {
       await Promise.all(data.images.map(async (img: { index: number; url: string | null }) => {
         if (img.url && updated[img.index]) {
           try {
-            const response = await fetch(img.url)
+            // Proxy through server to avoid CORS issues with external URLs
+            const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(img.url)}`
+            const response = await fetch(proxyUrl)
             const blob = await response.blob()
             const base64 = await new Promise<string>((resolve) => {
               const reader = new FileReader()
