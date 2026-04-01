@@ -123,7 +123,7 @@ export default function CarouselPage() {
       const res = await fetch('/api/generate-images', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slides, style: imageStyle }),
+        body: JSON.stringify({ slides, style: imageStyle, channel }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -486,7 +486,8 @@ export default function CarouselPage() {
             {/* Image generation */}
             {slides.length > 0 && (
               <div className="bg-white border border-stone-100 rounded-xl p-4 flex flex-col gap-3">
-                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">AI image style</p>
+                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Stock images (free)</p>
+                <p className="text-[11px] text-stone-400">Pulls relevant photos from Pexels based on your slide content.</p>
                 <select
                   value={imageStyle}
                   onChange={(e) => setImageStyle(e.target.value)}
