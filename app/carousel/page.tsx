@@ -341,8 +341,13 @@ export default function CarouselPage() {
     setVideoUrl(null)
     showToast('Compositing slides — this takes about 60 seconds...')
     try {
-      // Render each slide to canvas with text overlay
-      const composited = await Promise.all(slides.map(renderSlideToCanvas))
+      // Render each slide to canvas with text overlay — sequential with small delay
+      const composited: string[] = []
+      for (const slide of slides) {
+        const rendered = await renderSlideToCanvas(slide)
+        composited.push(rendered)
+        await new Promise(r => setTimeout(r, 50))
+      }
       const compositedSlides = slides.map((s, i) => ({ ...s, image: composited[i] }))
 
       let audioDataUrl: string | null = null
