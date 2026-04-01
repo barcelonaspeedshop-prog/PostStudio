@@ -81,6 +81,7 @@ export default function CarouselPage() {
   const [selectedSlide, setSelectedSlide] = useState<number | null>(null)
   const [generatingImages, setGeneratingImages] = useState(false)
   const [imageStyle, setImageStyle] = useState('vintage cinematic')
+  const [imageSource, setImageSource] = useState<'dalle' | 'pexels'>('dalle')
   const [generatingVideo, setGeneratingVideo] = useState(false)
   const [slideDuration, setSlideDuration] = useState(3)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
@@ -115,20 +116,19 @@ export default function CarouselPage() {
     }
   }
 
-  const generateImages = async () => {
+  const generateImages = async (source: 'dalle' | 'pexels' = 'dalle') => {
     if (!slides.length) { showToast('Generate slides first', 'error'); return }
     setGeneratingImages(true)
-    showToast('Generating images — this takes about 30 seconds...')
+    showToast(source === 'dalle' ? 'Generating AI images (~30s)...' : 'Searching Pexels...')
     try {
-      const res = await fetch('/api/generate-images', {
+      const endpoint = source === 'dalle' ? '/api/generate-images-dalle' : '/api/generate-images'
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slides, style: imageStyle, channel }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-
-      // Apply returned image URLs to slides — convert to base64 for portability
       const updated = [...slides]
       await Promise.all(data.images.map(async (img: { index: number; url: string | null }) => {
         if (img.url && updated[img.index]) {
@@ -147,11 +147,53 @@ export default function CarouselPage() {
         }
       }))
       setSlides(updated)
-      showToast('Images generated!')
+      showToast('Images added!')
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Error generating images', 'error')
     } finally {
       setGeneratingImages(false)
+    }
+  }
+
+  const generateImageForSlide = async (slideIndex: number) => {
+    if (!slides[slideIndex]) return
+    setSlides(prev => {
+      const u = [...prev]
+      u[slideIndex] = { ...u[slideIndex], image: 'loading' }
+      return u
+    })
+    try {
+      const res = await fetch('/api/generate-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slide: slides[slideIndex], slideIndex, style: imageStyle }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      if (data.url) {
+        try {
+          const response = await fetch(data.url)
+          const blob = await response.blob()
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.readAsDataURL(blob)
+          })
+          setSlides(prev => {
+            const u = [...prev]; u[slideIndex] = { ...u[slideIndex], image: base64 }; return u
+          })
+        } catch {
+          setSlides(prev => {
+            const u = [...prev]; u[slideIndex] = { ...u[slideIndex], image: data.url }; return u
+          })
+        }
+        showToast(data.cached ? 'Loaded from cache — free!' : 'Image generated!')
+      }
+    } catch (e: unknown) {
+      setSlides(prev => {
+        const u = [...prev]; u[slideIndex] = { ...u[slideIndex], image: undefined }; return u
+      })
+      showToast(e instanceof Error ? e.message : 'Error generating image', 'error')
     }
   }
 
@@ -483,44 +525,6 @@ export default function CarouselPage() {
               )}
             </button>
 
-            {/* Image generation */}
-            {slides.length > 0 && (
-              <div className="bg-white border border-stone-100 rounded-xl p-4 flex flex-col gap-3">
-                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Stock images (free)</p>
-                <p className="text-[11px] text-stone-400">Pulls relevant photos from Pexels based on your slide content.</p>
-                <select
-                  value={imageStyle}
-                  onChange={(e) => setImageStyle(e.target.value)}
-                  className="w-full text-[13px] border border-stone-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-stone-400 text-stone-900"
-                >
-                  <option value="vintage cinematic">Vintage cinematic</option>
-                  <option value="modern editorial photography">Modern editorial</option>
-                  <option value="dramatic motorsport photography">Motorsport</option>
-                  <option value="luxury lifestyle photography">Luxury lifestyle</option>
-                  <option value="black and white film photography">Black and white film</option>
-                  <option value="golden hour outdoor photography">Golden hour</option>
-                </select>
-                <button
-                  onClick={generateImages}
-                  disabled={generatingImages}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-stone-100 text-stone-900 text-[13px] font-medium rounded-xl hover:bg-stone-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-stone-200"
-                >
-                  {generatingImages ? (
-                    <>
-                      <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
-                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-                      </svg>
-                      Generating images...
-                    </>
-                  ) : (
-                    <><span className="text-[11px]">✦</span> Generate images with AI</>
-                  )}
-                </button>
-                <p className="text-[10px] text-stone-400">~$0.40 per carousel · 30 seconds</p>
-              </div>
-            )}
-
             {/* Video export */}
             {slides.length > 0 && (
               <div className="bg-white border border-stone-100 rounded-xl p-4 flex flex-col gap-3">
@@ -575,11 +579,64 @@ export default function CarouselPage() {
               </div>
             )}
 
-            {/* Image upload tip */}
+            {/* Image source picker */}
             {slides.length > 0 && (
-              <div className="bg-stone-50 border border-stone-100 rounded-xl p-4">
-                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-1">Images</p>
-                <p className="text-[12px] text-stone-500">Select a slide then click <strong>Add images</strong> to assign a background photo. Upload multiple to fill slides in order.</p>
+              <div className="bg-white border border-stone-100 rounded-xl p-4 flex flex-col gap-3">
+                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Add images</p>
+                
+                {/* Manual upload */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex items-center gap-3 px-4 py-3 border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors text-left"
+                >
+                  <div className="w-8 h-8 bg-stone-100 rounded-lg flex items-center justify-center shrink-0">
+                    <svg className="w-4 h-4 text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-medium text-stone-800">Upload manually</p>
+                    <p className="text-[11px] text-stone-400">Your own photos · Free</p>
+                  </div>
+                </button>
+
+                {/* DALL-E */}
+                <button
+                  onClick={() => generateImages('dalle')}
+                  disabled={generatingImages}
+                  className="w-full flex items-center gap-3 px-4 py-3 border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="w-8 h-8 bg-stone-900 rounded-lg flex items-center justify-center shrink-0">
+                    <span className="text-white text-[12px]">✦</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[13px] font-medium text-stone-800">
+                      {generatingImages ? 'Generating...' : 'Generate with DALL-E'}
+                    </p>
+                    <p className="text-[11px] text-stone-400">Story-specific AI images · ~$0.18</p>
+                  </div>
+                  {generatingImages && (
+                    <svg className="w-3.5 h-3.5 animate-spin text-stone-400" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                    </svg>
+                  )}
+                </button>
+
+                {/* Pexels */}
+                <button
+                  disabled={generatingImages}
+                  className="w-full flex items-center gap-3 px-4 py-3 border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => generateImages('pexels')}
+                >
+                  <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center shrink-0">
+                    <span className="text-white text-[11px] font-medium">P</span>
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-medium text-stone-800">Search Pexels</p>
+                    <p className="text-[11px] text-stone-400">Stock photography · Free</p>
+                  </div>
+                </button>
               </div>
             )}
           </div>
@@ -694,10 +751,27 @@ export default function CarouselPage() {
 
                 {/* Add image to this slide */}
                 <button
+                  onClick={() => generateImageForSlide(selectedSlide!)}
+                  disabled={sel.image === 'loading'}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[12px] bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors disabled:opacity-50"
+                >
+                  {sel.image === 'loading' ? (
+                    <>
+                      <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                      </svg>
+                      Generating...
+                    </>
+                  ) : (
+                    <><span className="text-[10px]">✦</span> {sel.image ? 'Regenerate image' : 'Generate image'} (~$0.02)</>
+                  )}
+                </button>
+                <button
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full px-3 py-2 text-[12px] border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors text-stone-600"
                 >
-                  {sel.image ? 'Change image' : '+ Add background image'}
+                  {sel.image && sel.image !== 'loading' ? 'Replace with own photo' : '+ Upload photo instead'}
                 </button>
 
                 {/* Nav between slides */}
