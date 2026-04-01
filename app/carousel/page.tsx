@@ -171,7 +171,9 @@ export default function CarouselPage() {
     if (slide.image) {
       await new Promise<void>((resolve) => {
         const img = new Image()
-        img.crossOrigin = 'anonymous'
+        if (!slide.image!.startsWith('data:')) {
+          img.crossOrigin = 'anonymous'
+        }
         img.onload = () => {
           const scale = Math.max(W / img.width, H / img.height)
           const sw = img.width * scale, sh = img.height * scale
