@@ -212,21 +212,21 @@ export default function CarouselPage() {
     ctx.fillRect(0, 0, W, H)
 
     // Draw image if present
-    if (slide.image) {
+    if (slide.image && slide.image !== 'loading') {
       await new Promise<void>((resolve) => {
         const img = new Image()
-        if (!slide.image!.startsWith('data:')) {
-          img.crossOrigin = 'anonymous'
-        }
         img.onload = () => {
-          const scale = Math.max(W / img.width, H / img.height)
-          const sw = img.width * scale, sh = img.height * scale
-          const sx = (W - sw) / 2, sy = (H - sh) / 2
-          ctx.drawImage(img, sx, sy, sw, sh)
+          try {
+            const scale = Math.max(W / img.width, H / img.height)
+            const sw = img.width * scale, sh = img.height * scale
+            const sx = (W - sw) / 2, sy = (H - sh) / 2
+            ctx.drawImage(img, sx, sy, sw, sh)
+          } catch {}
           resolve()
         }
         img.onerror = () => resolve()
-        img.src = slide.image!
+        // Small delay to ensure base64 is ready
+        setTimeout(() => { img.src = slide.image! }, 10)
       })
     }
 
