@@ -42,6 +42,10 @@ function wrapText(text: string, maxCharsPerLine: number): string[] {
   return lines
 }
 
+// Font stack that works across Docker/Alpine (fontconfig) and local dev.
+// DejaVu Sans ships with most Alpine font packages; Noto Sans is another common pick.
+const FONT_STACK = 'DejaVu Sans, Noto Sans, Liberation Sans, Arial, Helvetica, sans-serif'
+
 function buildSvgOverlay(slide: {
   num: string
   tag: string
@@ -101,31 +105,31 @@ function buildSvgOverlay(slide: {
   // Bottom gradient
   svgContent += `<rect width="${W}" height="${H}" fill="url(#grad)"/>`
 
-  // Slide number top left
-  svgContent += `<text x="${pad}" y="90" font-family="sans-serif" font-size="32" fill="rgba(255,255,255,0.35)">${slide.num}</text>`
+  // Slide number top left — use fill-opacity instead of rgba() for librsvg compat
+  svgContent += `<text x="${pad}" y="90" font-family="${FONT_STACK}" font-size="32" fill="white" fill-opacity="0.35">${slide.num}</text>`
 
   // Tag
   tagLines.forEach((line, i) => {
-    svgContent += `<text x="${pad}" y="${130 + i * 36}" font-family="sans-serif" font-size="26" font-weight="500" fill="rgb(${tr},${tg},${tb})" opacity="0.85">${escapeXml(line)}</text>`
+    svgContent += `<text x="${pad}" y="${130 + i * 36}" font-family="${FONT_STACK}" font-size="26" font-weight="500" fill="rgb(${tr},${tg},${tb})" opacity="0.85">${escapeXml(line)}</text>`
   })
 
   // Headline
   hedLines.forEach((line, i) => {
-    svgContent += `<text x="${pad}" y="${hedY + hedLineH + i * hedLineH}" font-family="sans-serif" font-size="88" font-weight="500" fill="white">${escapeXml(line)}</text>`
+    svgContent += `<text x="${pad}" y="${hedY + hedLineH + i * hedLineH}" font-family="${FONT_STACK}" font-size="88" font-weight="500" fill="white">${escapeXml(line)}</text>`
   })
 
-  // Divider
-  svgContent += `<rect x="${pad}" y="${dividerY}" width="200" height="2" fill="rgba(255,255,255,0.3)"/>`
+  // Divider — use fill-opacity instead of rgba()
+  svgContent += `<rect x="${pad}" y="${dividerY}" width="200" height="2" fill="white" fill-opacity="0.3"/>`
 
-  // Body
+  // Body — use fill-opacity instead of rgba()
   bodyLines.forEach((line, i) => {
-    svgContent += `<text x="${pad}" y="${bodyY + 44 + i * bodyLineH}" font-family="sans-serif" font-size="38" fill="rgba(240,240,240,0.8)">${escapeXml(line)}</text>`
+    svgContent += `<text x="${pad}" y="${bodyY + 44 + i * bodyLineH}" font-family="${FONT_STACK}" font-size="38" fill="rgb(240,240,240)" fill-opacity="0.8">${escapeXml(line)}</text>`
   })
 
   // Badge background
   svgContent += `<rect x="${pad}" y="${badgeY}" width="${badgeWidth}" height="${badgeH}" rx="8" fill="rgb(${tr},${tg},${tb})" opacity="0.4"/>`
   // Badge text
-  svgContent += `<text x="${pad + 20}" y="${badgeY + 40}" font-family="sans-serif" font-size="26" font-weight="500" fill="rgb(${tr},${tg},${tb})">${escapeXml(badgeText)}</text>`
+  svgContent += `<text x="${pad + 20}" y="${badgeY + 40}" font-family="${FONT_STACK}" font-size="26" font-weight="500" fill="rgb(${tr},${tg},${tb})">${escapeXml(badgeText)}</text>`
 
   return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${svgContent}</svg>`
 }
