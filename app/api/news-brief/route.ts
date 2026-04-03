@@ -12,7 +12,42 @@ const CHANNEL_TOPICS: Record<string, string> = {
 
 const VALID_CHANNELS = Object.keys(CHANNEL_TOPICS)
 
-export const maxDuration = 60
+export const maxDuration = 120
+
+async function fetchArticleImage(url: string): Promise<string | null> {
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8000)
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'PostStudio/1.0 (news image fetcher)' },
+    })
+    clearTimeout(timeout)
+    if (!res.ok) return null
+
+    const html = await res.text()
+
+    // Try og:image first (most reliable for article featured images)
+    const ogMatch = html.match(
+      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i
+    ) || html.match(
+      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i
+    )
+    if (ogMatch?.[1]) return ogMatch[1]
+
+    // Try twitter:image
+    const twMatch = html.match(
+      /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i
+    ) || html.match(
+      /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i
+    )
+    if (twMatch?.[1]) return twMatch[1]
+
+    return null
+  } catch {
+    return null
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,35 +61,47 @@ export async function POST(req: NextRequest) {
     }
 
     const topicKeywords = CHANNEL_TOPICS[channel]
+    const today = new Date().toISOString().split('T')[0]
 
-    // Step 1: Ask Claude to identify today's top trending story
-    const trendMessage = await client.messages.create({
+    // Step 1: Use Claude with web search to find today's top story
+    const searchMessage = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 300,
-      system: `You are a news researcher. Today's date is ${new Date().toISOString().split('T')[0]}. Respond with ONLY a JSON object, no markdown, no backticks.`,
+      max_tokens: 1024,
+      tools: [{ type: 'web_search_20250305' as unknown as Anthropic.Tool }],
       messages: [{
         role: 'user',
-        content: `What is the single most trending or newsworthy story RIGHT NOW in the world of ${topicKeywords}? Consider recent race results, transfers, launches, controversies, or breaking news.
+        content: `Search the web for the most trending or breaking news story TODAY (${today}) in ${topicKeywords}. Look for recent race results, transfers, car launches, controversies, or major breaking news.
 
-Return a JSON object with:
-- "topic": a concise but descriptive topic string (15-25 words) that captures the story with enough detail to generate engaging carousel content
+After searching, respond with ONLY a JSON object (no markdown, no backticks) containing:
+- "topic": a concise but descriptive topic string (15-25 words) that captures the story
 - "headline": a short 5-8 word headline summary
+- "articleUrl": the URL of the best source article you found
+- "searchTerms": an array of 5 short image search terms related to different aspects of this story (e.g. specific people, cars, teams, venues mentioned)
 
 Return only the JSON object.`,
       }],
     })
 
-    const trendText = trendMessage.content
+    // Extract the final text response (after tool use)
+    const searchText = searchMessage.content
       .filter((b) => b.type === 'text')
       .map((b) => (b as { type: 'text'; text: string }).text)
       .join('')
 
-    const trend = JSON.parse(trendText.replace(/```json|```/g, '').trim())
+    const trend = JSON.parse(searchText.replace(/```json|```/g, '').trim())
 
-    // Step 2: Generate the carousel slides using the same logic as carousel-generate
+    // Step 2: Fetch the article's featured image
+    let articleImageUrl: string | null = null
+    if (trend.articleUrl) {
+      articleImageUrl = await fetchArticleImage(trend.articleUrl)
+    }
+
+    // Step 3: Generate the carousel slides
     const slideCount = 5
     const system = `You are a social media content expert specialising in carousel posts.
 Always respond with valid JSON only — no markdown, no backticks, no preamble.`
+
+    const searchTerms: string[] = trend.searchTerms || []
 
     const prompt = `Create a ${slideCount}-slide carousel post about: "${trend.topic}"
 Channel: ${channel}
@@ -66,6 +113,7 @@ Return a JSON array of exactly ${slideCount} slide objects. Each object must hav
 - "body": 2-3 sentence description (max 40 words)
 - "badge": short badge label in CAPS (max 5 words)
 - "accent": one of these color names: "red", "amber", "blue", "green", "purple", "teal"
+- "imageQuery": a specific image search term for this slide's visual (2-5 words, e.g. a specific car model, stadium, driver name)
 
 Make slide 1 a hook/intro, slides 2-4 tell the story, slide 5 is a CTA/verdict.
 Return only the JSON array, nothing else.`
@@ -84,14 +132,34 @@ Return only the JSON array, nothing else.`
 
     const slides = JSON.parse(text.replace(/```json|```/g, '').trim())
 
+    // Step 4: Attach article image URL to slides
+    // Use the article's featured image for the first slide, and provide
+    // imageQuery for all slides so the client can fetch more via Pexels/DALL-E
+    if (articleImageUrl) {
+      // Set the article image on slide 1 (hero/hook slide)
+      if (slides[0]) {
+        slides[0].imageUrl = articleImageUrl
+      }
+    }
+
+    // Ensure every slide has an imageQuery even if Claude didn't provide one
+    for (let i = 0; i < slides.length; i++) {
+      if (!slides[i].imageQuery && searchTerms[i]) {
+        slides[i].imageQuery = searchTerms[i]
+      }
+    }
+
     return NextResponse.json({
       channel,
       story: trend.headline,
       topic: trend.topic,
+      articleUrl: trend.articleUrl || null,
+      articleImageUrl,
       slides,
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
+    console.error('[news-brief] Error:', message)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

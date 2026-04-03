@@ -158,12 +158,53 @@ export default function CarouselPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setSlides(data.slides)
+
+      // Load slides immediately so user sees content while images load
+      const newSlides = data.slides as Slide[]
+      setSlides(newSlides)
       setSlideCount(5)
       setTopic(data.topic)
       setChannel(newsChannel)
       setSelectedSlide(0)
       showToast(`Loaded: ${data.story}`)
+
+      // Fetch article images in the background via proxy
+      const slidesWithImages = [...newSlides]
+      const imagePromises = slidesWithImages.map(async (slide, i) => {
+        const imageUrl = (slide as Slide & { imageUrl?: string }).imageUrl
+        if (!imageUrl) return
+        try {
+          const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`
+          // Mark slide as loading
+          setSlides(prev => {
+            const u = [...prev]
+            if (u[i]) u[i] = { ...u[i], image: 'loading' }
+            return u
+          })
+          const imgRes = await fetch(proxyUrl)
+          if (!imgRes.ok) return
+          const blob = await imgRes.blob()
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.onerror = reject
+            reader.readAsDataURL(blob)
+          })
+          setSlides(prev => {
+            const u = [...prev]
+            if (u[i]) u[i] = { ...u[i], image: base64 }
+            return u
+          })
+        } catch {
+          // Clear loading state on failure
+          setSlides(prev => {
+            const u = [...prev]
+            if (u[i]) u[i] = { ...u[i], image: undefined }
+            return u
+          })
+        }
+      })
+      await Promise.all(imagePromises)
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Error loading news', 'error')
     } finally {
