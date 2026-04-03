@@ -67,7 +67,8 @@ export async function POST(req: NextRequest) {
     const searchMessage = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1024,
-      tools: [{ type: 'web_search_20250305' as unknown as Anthropic.Tool }],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tools: [{ type: 'web_search_20250305', name: 'web_search' }] as any,
       messages: [{
         role: 'user',
         content: `Search the web for the most trending or breaking news story TODAY (${today}) in ${topicKeywords}. Look for recent race results, transfers, car launches, controversies, or major breaking news.
