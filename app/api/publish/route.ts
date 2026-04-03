@@ -82,7 +82,12 @@ export async function POST(req: NextRequest) {
           formData.append('platforms[youtube][title]', videoTitle.slice(0, 100))
           formData.append('platforms[youtube][privacy_status]', 'public')
           break
-        // tiktok, facebook, twitter: standard video post, no extra params needed
+        case 'tiktok':
+          formData.append('platforms[tiktok][privacy_status]', 'PUBLIC_TO_EVERYONE')
+          break
+        case 'facebook':
+          formData.append('platforms[facebook][format]', 'post')
+          break
       }
     }
 
