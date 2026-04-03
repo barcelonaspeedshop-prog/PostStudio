@@ -159,6 +159,7 @@ export default function CarouselPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setSlides(data.slides)
+      setSlideCount(5)
       setTopic(data.topic)
       setChannel(newsChannel)
       setSelectedSlide(0)

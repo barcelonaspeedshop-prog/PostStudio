@@ -52,7 +52,7 @@ Return only the JSON object.`,
     const trend = JSON.parse(trendText.replace(/```json|```/g, '').trim())
 
     // Step 2: Generate the carousel slides using the same logic as carousel-generate
-    const slideCount = 10
+    const slideCount = 5
     const system = `You are a social media content expert specialising in carousel posts.
 Always respond with valid JSON only — no markdown, no backticks, no preamble.`
 
@@ -67,7 +67,7 @@ Return a JSON array of exactly ${slideCount} slide objects. Each object must hav
 - "badge": short badge label in CAPS (max 5 words)
 - "accent": one of these color names: "red", "amber", "blue", "green", "purple", "teal"
 
-Make slide 1 a hook/intro, slides 2-9 tell the story, slide 10 is a CTA/verdict.
+Make slide 1 a hook/intro, slides 2-4 tell the story, slide 5 is a CTA/verdict.
 Return only the JSON array, nothing else.`
 
     const message = await client.messages.create({
