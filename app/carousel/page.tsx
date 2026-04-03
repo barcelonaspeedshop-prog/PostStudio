@@ -89,6 +89,37 @@ export default function CarouselPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
   const [audioFile, setAudioFile] = useState<File | null>(null)
+  const [loadingNews, setLoadingNews] = useState(false)
+
+  const NEWS_CHANNELS = [
+    'Gentlemen of Fuel',
+    'Omnira F1',
+    'Road & Trax',
+    'Omnira Football',
+  ]
+  const [newsChannel, setNewsChannel] = useState(NEWS_CHANNELS[0])
+
+  const loadTodaysNews = async () => {
+    setLoadingNews(true)
+    try {
+      const res = await fetch('/api/news-brief', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: newsChannel }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setSlides(data.slides)
+      setTopic(data.topic)
+      setChannel(newsChannel)
+      setSelectedSlide(0)
+      showToast(`Loaded: ${data.story}`)
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Error loading news', 'error')
+    } finally {
+      setLoadingNews(false)
+    }
+  }
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -469,6 +500,37 @@ export default function CarouselPage() {
         <div className="flex flex-1 overflow-hidden">
           {/* Left panel — controls */}
           <div className="w-72 border-r border-stone-100 overflow-y-auto p-5 flex flex-col gap-4 shrink-0">
+
+            {/* Load today's news */}
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col gap-2.5">
+              <p className="text-[10px] font-medium text-amber-700 uppercase tracking-widest">Today&apos;s news</p>
+              <select
+                value={newsChannel}
+                onChange={(e) => setNewsChannel(e.target.value)}
+                className="w-full text-[13px] border border-amber-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-amber-400 text-stone-900"
+              >
+                {NEWS_CHANNELS.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <button
+                onClick={loadTodaysNews}
+                disabled={loadingNews}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-600 text-white text-[13px] font-medium rounded-xl hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingNews ? (
+                  <>
+                    <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                    </svg>
+                    Finding today&apos;s story...
+                  </>
+                ) : (
+                  'Load today\u2019s news'
+                )}
+              </button>
+            </div>
 
             {/* Topic */}
             <div className="bg-stone-50 border border-stone-100 rounded-xl p-4">
