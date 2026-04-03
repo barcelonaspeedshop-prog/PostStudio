@@ -86,10 +86,19 @@ export async function POST(req: NextRequest) {
           formData.append('platforms[tiktok][privacy_status]', 'PUBLIC_TO_EVERYONE')
           break
         case 'facebook':
-          formData.append('platforms[facebook][format]', 'post')
+          formData.append('platforms[facebook][format]', 'reel')
+          formData.append('platforms[facebook][title]', videoTitle.slice(0, 100))
+          formData.append('platforms[facebook][description]', (content || '').slice(0, 500))
           break
       }
     }
+
+    // Log outbound request details for debugging
+    const formEntries: Record<string, string> = {}
+    formData.forEach((value, key) => {
+      formEntries[key] = value instanceof Blob ? `[Blob ${value.size} bytes ${value.type}]` : String(value)
+    })
+    console.log('[publish] Sending to Postproxy:', JSON.stringify(formEntries, null, 2))
 
     // --- Send to Postproxy ---
     const res = await fetch(`${POSTPROXY_BASE}/api/posts`, {
