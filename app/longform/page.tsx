@@ -504,9 +504,9 @@ export default function LongFormPage() {
                       <p className="text-[12px] text-stone-500">{chapter.visual}</p>
                     </div>
 
-                    {/* Image upload */}
+                    {/* Media upload */}
                     <div className="border border-dashed border-stone-200 rounded-lg p-3">
-                      <p className="text-[10px] font-medium text-stone-400 uppercase tracking-widest mb-2">Images</p>
+                      <p className="text-[10px] font-medium text-stone-400 uppercase tracking-widest mb-2">Media</p>
                       {(chapterImages[chapter.id] || []).length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-2">
                           {(chapterImages[chapter.id] || []).map((media, j) => {
@@ -531,11 +531,19 @@ export default function LongFormPage() {
                           })}
                         </div>
                       )}
-                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors text-stone-500 cursor-pointer">
-                        + Add media
+                      <label
+                        className="block border border-dashed border-stone-300 rounded-lg p-4 text-center cursor-pointer hover:bg-stone-50 transition-colors"
+                        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('bg-stone-50') }}
+                        onDragLeave={(e) => e.currentTarget.classList.remove('bg-stone-50')}
+                        onDrop={(e) => { e.preventDefault(); e.currentTarget.classList.remove('bg-stone-50'); handleChapterImageUpload(chapter.id, e.dataTransfer.files) }}
+                      >
                         <input type="file" accept="video/mp4,.mp4,video/quicktime,.mov,video/webm,.webm,image/jpeg,.jpg,.jpeg,image/png,.png,image/webp,.webp" multiple className="hidden" onChange={(e) => handleChapterImageUpload(chapter.id, e.target.files)} />
+                        <svg className="w-6 h-6 mx-auto mb-1.5 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <p className="text-[11px] text-stone-500">Drop images or video</p>
+                        <p className="text-[10px] text-stone-400 mt-0.5">MP4, MOV, JPG, PNG, WEBP</p>
                       </label>
-                      <p className="text-[10px] text-stone-400 mt-1">Images and video files supported</p>
                     </div>
 
                     {/* Audio controls */}
