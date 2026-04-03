@@ -123,6 +123,7 @@ export default function CarouselPage() {
           content: caption,
           mediaUrl: videoUrl,
           platforms: publishPlatforms,
+          firstSlideHeadline: slides[0]?.headline || '',
         }),
       })
       const data = await res.json()

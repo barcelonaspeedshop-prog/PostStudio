@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { content, mediaUrl, platforms, scheduleAt } = await req.json()
+    const { content, mediaUrl, platforms, scheduleAt, firstSlideHeadline } = await req.json()
 
     if (!platforms || !Array.isArray(platforms) || platforms.length === 0) {
       return NextResponse.json(
@@ -24,130 +24,111 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const invalidPlatforms = platforms.filter((p: string) => !VALID_PLATFORMS.includes(p as Platform))
+    const invalidPlatforms = platforms.filter(
+      (p: string) => !VALID_PLATFORMS.includes(p as Platform)
+    )
     if (invalidPlatforms.length > 0) {
       return NextResponse.json(
-        { error: `Invalid platforms: ${invalidPlatforms.join(', ')}. Valid options: ${VALID_PLATFORMS.join(', ')}` },
+        { error: `Invalid platforms: ${invalidPlatforms.join(', ')}` },
         { status: 400 }
       )
     }
 
-    // Build platform-specific parameters for video publishing
-    const platformParams: Record<string, Record<string, string>> = {}
+    // --- Build multipart/form-data request ---
+    const formData = new FormData()
+
+    // Post body text
+    formData.append('post[body]', content || '')
+
+    // Schedule if provided
+    if (scheduleAt) {
+      formData.append('post[scheduled_at]', scheduleAt)
+    }
+
+    // Profiles — one entry per platform
     for (const p of platforms as string[]) {
-      if (p === 'instagram') {
-        platformParams.instagram = { format: 'reel' }
-      } else if (p === 'youtube') {
-        platformParams.youtube = {
-          title: content ? content.split('\n')[0].slice(0, 100) : 'Carousel Video',
-          privacy_status: 'public',
-        }
+      formData.append('profiles[]', p)
+    }
+
+    // Media — convert base64 data URL to binary Buffer and attach as file
+    if (mediaUrl && typeof mediaUrl === 'string') {
+      if (mediaUrl.startsWith('data:')) {
+        const commaIndex = mediaUrl.indexOf(',')
+        const header = mediaUrl.substring(0, commaIndex)
+        const b64 = mediaUrl.substring(commaIndex + 1)
+        const mimeMatch = header.match(/data:([^;]+)/)
+        const mimeType = mimeMatch ? mimeMatch[1] : 'video/mp4'
+        const ext = mimeType === 'video/mp4' ? 'mp4' : 'webm'
+
+        // Use Node.js Buffer for server-side base64 decoding
+        const buffer = Buffer.from(b64, 'base64')
+        const blob = new Blob([buffer], { type: mimeType })
+
+        formData.append('media[]', blob, `carousel.${ext}`)
+      } else {
+        // External URL — still use media[] field
+        formData.append('media[]', mediaUrl)
       }
     }
 
-    // Determine if media is a base64 data URL or an external URL
-    const isDataUrl = mediaUrl && typeof mediaUrl === 'string' && mediaUrl.startsWith('data:')
-
-    if (isDataUrl) {
-      // Use multipart/form-data for base64 data URL uploads
-      // Convert data URL to a Blob/File for the upload
-      const [header, b64data] = mediaUrl.split(',')
-      const mimeMatch = header.match(/data:([^;]+)/)
-      const mimeType = mimeMatch ? mimeMatch[1] : 'video/mp4'
-      const binaryStr = atob(b64data)
-      const bytes = new Uint8Array(binaryStr.length)
-      for (let i = 0; i < binaryStr.length; i++) {
-        bytes[i] = binaryStr.charCodeAt(i)
+    // Platform-specific parameters
+    const videoTitle = firstSlideHeadline || 'Carousel Video'
+    for (const p of platforms as string[]) {
+      switch (p) {
+        case 'instagram':
+          formData.append('platforms[instagram][format]', 'reel')
+          break
+        case 'youtube':
+          formData.append('platforms[youtube][title]', videoTitle.slice(0, 100))
+          formData.append('platforms[youtube][privacy_status]', 'public')
+          break
+        // tiktok, facebook, twitter: standard video post, no extra params needed
       }
-      const blob = new Blob([bytes], { type: mimeType })
-
-      const formData = new FormData()
-      formData.append('post[body]', content || '')
-      if (scheduleAt) {
-        formData.append('post[scheduled_at]', scheduleAt)
-      }
-      for (const p of platforms as string[]) {
-        formData.append('profiles[]', p)
-      }
-      formData.append('media[]', blob, 'carousel.mp4')
-
-      // Add platform-specific params as form fields
-      for (const [platform, params] of Object.entries(platformParams)) {
-        for (const [key, value] of Object.entries(params)) {
-          formData.append(`platforms[${platform}][${key}]`, value)
-        }
-      }
-
-      const res = await fetch(`${POSTPROXY_BASE}/api/posts`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          // Do NOT set Content-Type — fetch sets it with the boundary for multipart
-        },
-        body: formData,
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        console.error('[publish] Postproxy error:', res.status, JSON.stringify(data))
-        return NextResponse.json(
-          {
-            error: data.message || data.error || `Postproxy returned ${res.status}`,
-            details: data,
-          },
-          { status: res.status }
-        )
-      }
-
-      return NextResponse.json({
-        id: data.id,
-        status: data.status,
-        platforms: data.platforms,
-      })
-    } else {
-      // Use JSON body for external URL media
-      const body: Record<string, unknown> = {
-        post: {
-          body: content || '',
-          ...(scheduleAt ? { scheduled_at: scheduleAt } : {}),
-        },
-        profiles: platforms,
-        ...(mediaUrl ? { media: [mediaUrl] } : {}),
-        ...(Object.keys(platformParams).length > 0 ? { platforms: platformParams } : {}),
-      }
-
-      const res = await fetch(`${POSTPROXY_BASE}/api/posts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        console.error('[publish] Postproxy error:', res.status, JSON.stringify(data))
-        return NextResponse.json(
-          {
-            error: data.message || data.error || `Postproxy returned ${res.status}`,
-            details: data,
-          },
-          { status: res.status }
-        )
-      }
-
-      return NextResponse.json({
-        id: data.id,
-        status: data.status,
-        platforms: data.platforms,
-      })
     }
+
+    // --- Send to Postproxy ---
+    const res = await fetch(`${POSTPROXY_BASE}/api/posts`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        // Content-Type is set automatically by fetch for FormData with boundary
+      },
+      body: formData,
+    })
+
+    // Parse response — handle non-JSON responses gracefully
+    let data: Record<string, unknown>
+    const responseText = await res.text()
+    try {
+      data = JSON.parse(responseText)
+    } catch {
+      console.error('[publish] Postproxy non-JSON response:', res.status, responseText)
+      return NextResponse.json(
+        { error: `Postproxy returned ${res.status}`, details: responseText },
+        { status: res.status }
+      )
+    }
+
+    if (!res.ok) {
+      console.error('[publish] Postproxy error:', res.status, JSON.stringify(data, null, 2))
+      return NextResponse.json(
+        {
+          error: data.message || data.error || `Postproxy returned ${res.status}`,
+          details: data,
+        },
+        { status: res.status }
+      )
+    }
+
+    return NextResponse.json({
+      id: data.id,
+      status: data.status,
+      platforms: data.platforms,
+    })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
-    console.error('[publish] Unexpected error:', message)
+    const stack = err instanceof Error ? err.stack : undefined
+    console.error('[publish] Unexpected error:', message, stack)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
