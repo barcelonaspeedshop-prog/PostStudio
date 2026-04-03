@@ -168,35 +168,79 @@ export default function CarouselPage() {
       setSelectedSlide(0)
       showToast(`Loaded: ${data.story}`)
 
-      // Fetch article images in the background via proxy
-      const slidesWithImages = [...newSlides]
-      const imagePromises = slidesWithImages.map(async (slide, i) => {
-        const imageUrl = (slide as Slide & { imageUrl?: string }).imageUrl
-        if (!imageUrl) return
+      // Mark all slides as loading
+      setSlides(newSlides.map(s => ({ ...s, image: 'loading' })))
+
+      // Helper: fetch an image URL through proxy and return base64
+      const fetchImageAsBase64 = async (url: string): Promise<string | null> => {
         try {
-          const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`
-          // Mark slide as loading
-          setSlides(prev => {
-            const u = [...prev]
-            if (u[i]) u[i] = { ...u[i], image: 'loading' }
-            return u
-          })
+          const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`
           const imgRes = await fetch(proxyUrl)
-          if (!imgRes.ok) return
+          if (!imgRes.ok) return null
           const blob = await imgRes.blob()
-          const base64 = await new Promise<string>((resolve, reject) => {
+          return await new Promise<string>((resolve, reject) => {
             const reader = new FileReader()
             reader.onload = () => resolve(reader.result as string)
             reader.onerror = reject
             reader.readAsDataURL(blob)
           })
+        } catch {
+          return null
+        }
+      }
+
+      // Fetch images for all slides in parallel
+      const imagePromises = newSlides.map(async (slide, i) => {
+        const extSlide = slide as Slide & { imageUrl?: string; imageQuery?: string }
+
+        // Slide 1: use the article's featured image if available
+        if (i === 0 && extSlide.imageUrl) {
+          const base64 = await fetchImageAsBase64(extSlide.imageUrl)
           setSlides(prev => {
             const u = [...prev]
-            if (u[i]) u[i] = { ...u[i], image: base64 }
+            if (u[i]) u[i] = { ...u[i], image: base64 || undefined }
             return u
           })
+          return
+        }
+
+        // Slides 2-5: search Pexels via /api/generate-images using imageQuery
+        const query = extSlide.imageQuery || extSlide.headline
+        if (!query) {
+          setSlides(prev => {
+            const u = [...prev]
+            if (u[i]) u[i] = { ...u[i], image: undefined }
+            return u
+          })
+          return
+        }
+
+        try {
+          const imgRes = await fetch('/api/generate-images', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              slide: { ...slide, headline: query, tag: query, body: slide.body },
+              slideIndex: i,
+              style: imageStyle,
+            }),
+          })
+          const imgData = await imgRes.json()
+          if (imgData.url) {
+            const base64 = await fetchImageAsBase64(imgData.url)
+            setSlides(prev => {
+              const u = [...prev]
+              if (u[i]) u[i] = { ...u[i], image: base64 || undefined }
+              return u
+            })
+          } else {
+            setSlides(prev => {
+              const u = [...prev]
+              if (u[i]) u[i] = { ...u[i], image: undefined }
+              return u
+            })
+          }
         } catch {
-          // Clear loading state on failure
           setSlides(prev => {
             const u = [...prev]
             if (u[i]) u[i] = { ...u[i], image: undefined }
