@@ -237,25 +237,56 @@ export default function LongFormPage() {
 
       // Append background music if present
       if (bgMusic) {
-        // bgMusic is still a data URL (audio files are small), convert to blob
         const bgRes = await fetch(bgMusic)
         const bgBlob = await bgRes.blob()
         formData.append('bgMusic', bgBlob, 'bg_music.mp3')
       }
 
-      setAssemblyProgress('Rendering video (this may take a few minutes)...')
-
-      const res = await fetch('/api/story-video', {
+      // Start background job
+      const startRes = await fetch('/api/story-video/start', {
         method: 'POST',
         body: formData,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      const startData = await startRes.json()
+      if (!startRes.ok) throw new Error(startData.error)
 
-      setLandscapeVideo(data.landscape)
-      setPortraitVideo(data.portrait)
-      setChapterTimestamps(data.chapterTimestamps || [])
-      showToast(`Video ready — ${Math.round(data.duration)}s`)
+      const jobId = startData.jobId
+      setAssemblyProgress('Rendering video...')
+
+      // Poll for status every 3 seconds
+      const result = await new Promise<{ landscape: string; portrait: string; duration: number; chapterTimestamps: Array<{ chapterId: number; startTime: number; endTime: number }> }>((resolve, reject) => {
+        const poll = async () => {
+          try {
+            const statusRes = await fetch(`/api/story-video/status/${jobId}`)
+            const statusData = await statusRes.json()
+
+            if (statusData.status === 'complete') {
+              resolve(statusData)
+              return
+            }
+            if (statusData.status === 'error') {
+              reject(new Error(statusData.error || 'Video assembly failed'))
+              return
+            }
+
+            // Update progress text from server
+            if (statusData.progress) {
+              setAssemblyProgress(statusData.progress)
+            }
+
+            // Continue polling
+            setTimeout(poll, 3000)
+          } catch (e) {
+            reject(e)
+          }
+        }
+        poll()
+      })
+
+      setLandscapeVideo(result.landscape)
+      setPortraitVideo(result.portrait)
+      setChapterTimestamps(result.chapterTimestamps || [])
+      showToast(`Video ready — ${Math.round(result.duration)}s`)
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Error assembling video', 'error')
     } finally {
