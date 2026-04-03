@@ -90,6 +90,51 @@ export default function CarouselPage() {
   const audioInputRef = useRef<HTMLInputElement>(null)
   const [audioFile, setAudioFile] = useState<File | null>(null)
   const [loadingNews, setLoadingNews] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [showPublish, setShowPublish] = useState(false)
+  const [publishPlatforms, setPublishPlatforms] = useState<string[]>([])
+
+  const PUBLISH_PLATFORMS = [
+    { id: 'instagram', label: 'Instagram', icon: 'IG' },
+    { id: 'tiktok', label: 'TikTok', icon: 'TT' },
+    { id: 'twitter', label: 'X', icon: 'X' },
+    { id: 'facebook', label: 'Facebook', icon: 'FB' },
+    { id: 'youtube', label: 'YouTube', icon: 'YT' },
+  ]
+
+  const togglePlatform = (id: string) => {
+    setPublishPlatforms((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
+    )
+  }
+
+  const publishNow = async () => {
+    if (publishPlatforms.length === 0) {
+      showToast('Select at least one platform', 'error')
+      return
+    }
+    setPublishing(true)
+    try {
+      const caption = slides.map((s) => `${s.headline} — ${s.body}`).join('\n\n')
+      const res = await fetch('/api/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: caption,
+          mediaUrl: videoUrl,
+          platforms: publishPlatforms,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      showToast(`Published to ${publishPlatforms.length} platform${publishPlatforms.length > 1 ? 's' : ''}!`)
+      setShowPublish(false)
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Error publishing', 'error')
+    } finally {
+      setPublishing(false)
+    }
+  }
 
   const NEWS_CHANNELS = [
     'Gentlemen of Fuel',
@@ -639,13 +684,61 @@ export default function CarouselPage() {
                 </button>
 
                 {videoUrl && (
-                  <a
-                    href={videoUrl}
-                    download={`${channel.replace(/\s+/g, '_')}_carousel.mp4`}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white text-[13px] font-medium rounded-xl hover:bg-green-700 transition-colors"
-                  >
-                    ↓ Download MP4
-                  </a>
+                  <>
+                    <a
+                      href={videoUrl}
+                      download={`${channel.replace(/\s+/g, '_')}_carousel.mp4`}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white text-[13px] font-medium rounded-xl hover:bg-green-700 transition-colors"
+                    >
+                      ↓ Download MP4
+                    </a>
+
+                    {/* Publish button */}
+                    <button
+                      onClick={() => setShowPublish(!showPublish)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-[13px] font-medium rounded-xl hover:bg-blue-700 transition-colors"
+                    >
+                      <span className="text-[11px]">↗</span> Publish
+                    </button>
+
+                    {showPublish && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex flex-col gap-2.5">
+                        <p className="text-[10px] font-medium text-blue-700 uppercase tracking-widest">Platforms</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {PUBLISH_PLATFORMS.map((p) => (
+                            <button
+                              key={p.id}
+                              onClick={() => togglePlatform(p.id)}
+                              className={`px-2.5 py-1.5 text-[11px] font-medium rounded-lg border transition-colors ${
+                                publishPlatforms.includes(p.id)
+                                  ? 'bg-blue-600 text-white border-blue-600'
+                                  : 'bg-white text-stone-600 border-stone-200 hover:border-blue-300'
+                              }`}
+                            >
+                              {p.label}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          onClick={publishNow}
+                          disabled={publishing || publishPlatforms.length === 0}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-[13px] font-medium rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {publishing ? (
+                            <>
+                              <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                              </svg>
+                              Publishing...
+                            </>
+                          ) : (
+                            `Publish now${publishPlatforms.length ? ` to ${publishPlatforms.length}` : ''}`
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
