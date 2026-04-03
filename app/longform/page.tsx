@@ -533,7 +533,7 @@ export default function LongFormPage() {
                       )}
                       <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors text-stone-500 cursor-pointer">
                         + Add images or video
-                        <input type="file" accept="image/*,video/mp4,video/quicktime,video/mov" multiple className="hidden" onChange={(e) => handleChapterImageUpload(chapter.id, e.target.files)} />
+                        <input type="file" accept="image/*,video/*,.mov,.mp4,.m4v,.avi" multiple className="hidden" onChange={(e) => handleChapterImageUpload(chapter.id, e.target.files)} />
                       </label>
                     </div>
 
