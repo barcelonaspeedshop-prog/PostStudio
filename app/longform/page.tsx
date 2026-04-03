@@ -57,7 +57,7 @@ export default function LongFormPage() {
   const audioRefs = useRef<Record<number, HTMLAudioElement | null>>({})
 
   // Video assembly state
-  const [chapterImages, setChapterImages] = useState<Record<number, string[]>>({})
+  const [chapterImages, setChapterImages] = useState<Record<number, File[]>>({})
   const [bgMusic, setBgMusic] = useState<string | null>(null)
   const [bgMusicName, setBgMusicName] = useState('')
   const [musicVolume, setMusicVolume] = useState(0.15)
@@ -174,28 +174,22 @@ export default function LongFormPage() {
     combineParts()
   }
 
-  // --- Image upload per chapter ---
+  // --- Media upload per chapter ---
   const handleChapterImageUpload = (chapterId: number, files: FileList | null) => {
     if (!files || files.length === 0) return
-    Array.from(files).forEach(file => {
-      const reader = new FileReader()
-      reader.onload = (ev) => {
-        const dataUrl = ev.target?.result as string
-        setChapterImages(prev => ({
-          ...prev,
-          [chapterId]: [...(prev[chapterId] || []), dataUrl],
-        }))
-      }
-      reader.readAsDataURL(file)
-    })
-    showToast(`${files.length} image${files.length > 1 ? 's' : ''} added`)
+    const newFiles = Array.from(files)
+    setChapterImages(prev => ({
+      ...prev,
+      [chapterId]: [...(prev[chapterId] || []), ...newFiles],
+    }))
+    showToast(`${newFiles.length} file${newFiles.length > 1 ? 's' : ''} added`)
   }
 
   const removeChapterImage = (chapterId: number, index: number) => {
-    setChapterImages(prev => ({
-      ...prev,
-      [chapterId]: (prev[chapterId] || []).filter((_, i) => i !== index),
-    }))
+    setChapterImages(prev => {
+      const files = prev[chapterId] || []
+      return { ...prev, [chapterId]: files.filter((_, i) => i !== index) }
+    })
   }
 
   // --- Background music ---
@@ -227,25 +221,33 @@ export default function LongFormPage() {
         audioBase64: ch.audio || '',
       }))
 
-      const imagesPayload: Array<{ chapterId: number; imageBase64: string }> = []
-      for (const [chIdStr, imgs] of Object.entries(chapterImages)) {
-        const chId = parseInt(chIdStr)
-        for (const img of imgs) {
-          imagesPayload.push({ chapterId: chId, imageBase64: img })
+      setAssemblyProgress('Uploading media files...')
+
+      const formData = new FormData()
+      formData.append('chapters', JSON.stringify(chaptersPayload))
+      formData.append('musicVolume', String(musicVolume))
+
+      // Append media files with chapter ID metadata
+      for (const [chIdStr, files] of Object.entries(chapterImages)) {
+        for (const file of files) {
+          formData.append('media', file, `ch${chIdStr}_${file.name}`)
+          formData.append('mediaChapterIds', chIdStr)
         }
+      }
+
+      // Append background music if present
+      if (bgMusic) {
+        // bgMusic is still a data URL (audio files are small), convert to blob
+        const bgRes = await fetch(bgMusic)
+        const bgBlob = await bgRes.blob()
+        formData.append('bgMusic', bgBlob, 'bg_music.mp3')
       }
 
       setAssemblyProgress('Rendering video (this may take a few minutes)...')
 
       const res = await fetch('/api/story-video', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chapters: chaptersPayload,
-          images: imagesPayload,
-          backgroundMusicBase64: bgMusic || undefined,
-          musicVolume,
-        }),
+        body: formData,
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -308,7 +310,7 @@ export default function LongFormPage() {
 
   const allChaptersHaveAudio = script?.chapters.every(c => c.audio) ?? false
   const someChaptersHaveAudio = script?.chapters.some(c => c.audio) ?? false
-  const hasAnyImages = Object.values(chapterImages).some(imgs => imgs.length > 0)
+  const hasAnyImages = Object.values(chapterImages).some(files => files.length > 0)
   const canAssemble = allChaptersHaveAudio && hasAnyImages
 
   return (
@@ -513,16 +515,14 @@ export default function LongFormPage() {
                       <p className="text-[10px] font-medium text-stone-400 uppercase tracking-widest mb-2">Media</p>
                       {(chapterImages[chapter.id] || []).length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-2">
-                          {(chapterImages[chapter.id] || []).map((media, j) => {
-                            const isVideo = media.startsWith('data:video/')
+                          {(chapterImages[chapter.id] || []).map((file, j) => {
+                            const isVideo = file.type.startsWith('video/')
                             return (
                               <div key={j} className="relative group">
                                 {isVideo ? (
-                                  <div className="w-16 h-16 rounded-lg bg-stone-800 flex items-center justify-center">
-                                    <span className="text-white text-[10px] font-medium">&#9654; VID</span>
-                                  </div>
+                                  <video src={URL.createObjectURL(file)} className="w-16 h-16 rounded-lg object-cover" muted playsInline />
                                 ) : (
-                                  <img src={media} alt="" className="w-16 h-16 rounded-lg object-cover" />
+                                  <img src={URL.createObjectURL(file)} alt="" className="w-16 h-16 rounded-lg object-cover" />
                                 )}
                                 <button
                                   onClick={() => removeChapterImage(chapter.id, j)}

@@ -46,33 +46,91 @@ async function probeDuration(filePath: string): Promise<number> {
   return parseFloat(stdout.trim()) || 10
 }
 
+function extFromMime(mime: string): string {
+  if (mime.includes('mp4')) return 'mp4'
+  if (mime.includes('quicktime') || mime.includes('mov')) return 'mov'
+  if (mime.includes('webm')) return 'webm'
+  if (mime.includes('png')) return 'png'
+  if (mime.includes('webp')) return 'webp'
+  if (mime.includes('mp3') || mime.includes('mpeg')) return 'mp3'
+  return 'jpg'
+}
+
 export async function POST(req: NextRequest) {
   const tmpDir = `/tmp/story_video_${Date.now()}`
   try {
-    const { chapters, images, backgroundMusicBase64, musicVolume = 0.15 } = await req.json() as {
-      chapters: ChapterInput[]
-      images: ImageInput[]
-      backgroundMusicBase64?: string
-      musicVolume?: number
+    const contentType = req.headers.get('content-type') || ''
+    const isFormData = contentType.includes('multipart/form-data')
+
+    let chapters: ChapterInput[]
+    let musicVolume = 0.15
+    type MediaItem = { path: string; isVideo: boolean }
+    const mediaByChapter: Record<number, MediaItem[]> = {}
+    let bgMusicPath: string | null = null
+
+    await mkdir(tmpDir, { recursive: true })
+
+    if (isFormData) {
+      // --- New FormData path: files sent as binary, no base64 ---
+      const formData = await req.formData()
+      chapters = JSON.parse(formData.get('chapters') as string)
+      musicVolume = parseFloat(formData.get('musicVolume') as string) || 0.15
+
+      // Process media files
+      const mediaFiles = formData.getAll('media') as File[]
+      const chapterIds = formData.getAll('mediaChapterIds') as string[]
+      for (let i = 0; i < mediaFiles.length; i++) {
+        const file = mediaFiles[i]
+        const chId = parseInt(chapterIds[i])
+        if (!mediaByChapter[chId]) mediaByChapter[chId] = []
+        const isVideo = file.type.startsWith('video/')
+        const ext = extFromMime(file.type)
+        const idx = mediaByChapter[chId].length
+        const prefix = isVideo ? 'vid' : 'img'
+        const mediaPath = path.join(tmpDir, `${prefix}_ch${chId}_${idx}.${ext}`)
+        const arrayBuf = await file.arrayBuffer()
+        await writeFile(mediaPath, Buffer.from(arrayBuf))
+        mediaByChapter[chId].push({ path: mediaPath, isVideo })
+      }
+
+      // Background music (sent as file)
+      const bgMusicFile = formData.get('bgMusic') as File | null
+      if (bgMusicFile) {
+        bgMusicPath = path.join(tmpDir, 'bg_music.mp3')
+        const buf = await bgMusicFile.arrayBuffer()
+        await writeFile(bgMusicPath, Buffer.from(buf))
+      }
+    } else {
+      // --- Legacy JSON path (base64 data URLs) ---
+      const body = await req.json() as {
+        chapters: ChapterInput[]
+        images: ImageInput[]
+        backgroundMusicBase64?: string
+        musicVolume?: number
+      }
+      chapters = body.chapters
+      musicVolume = body.musicVolume ?? 0.15
+
+      for (const img of (body.images || [])) {
+        const chId = img.chapterId
+        if (!mediaByChapter[chId]) mediaByChapter[chId] = []
+        const { buffer, ext, isVideo } = stripDataUrl(img.imageBase64)
+        const idx = mediaByChapter[chId].length
+        const prefix = isVideo ? 'vid' : 'img'
+        const mediaPath = path.join(tmpDir, `${prefix}_ch${chId}_${idx}.${ext}`)
+        await writeFile(mediaPath, buffer)
+        mediaByChapter[chId].push({ path: mediaPath, isVideo })
+      }
+
+      if (body.backgroundMusicBase64) {
+        const { buffer } = stripDataUrl(body.backgroundMusicBase64)
+        bgMusicPath = path.join(tmpDir, 'bg_music.mp3')
+        await writeFile(bgMusicPath, buffer)
+      }
     }
 
     if (!chapters || !Array.isArray(chapters) || chapters.length === 0) {
       return NextResponse.json({ error: 'chapters array is required' }, { status: 400 })
-    }
-
-    await mkdir(tmpDir, { recursive: true })
-
-    // Group media by chapter, tracking which are videos
-    type MediaItem = { path: string; isVideo: boolean }
-    const mediaByChapter: Record<number, MediaItem[]> = {}
-    for (const img of (images || [])) {
-      if (!mediaByChapter[img.chapterId]) mediaByChapter[img.chapterId] = []
-      const { buffer, ext, isVideo } = stripDataUrl(img.imageBase64)
-      const idx = mediaByChapter[img.chapterId].length
-      const prefix = isVideo ? 'vid' : 'img'
-      const mediaPath = path.join(tmpDir, `${prefix}_ch${img.chapterId}_${idx}.${ext}`)
-      await writeFile(mediaPath, buffer)
-      mediaByChapter[img.chapterId].push({ path: mediaPath, isVideo })
     }
 
     // Write audio files and probe durations
@@ -86,14 +144,6 @@ export async function POST(req: NextRequest) {
       } else {
         chapterDurations[ch.id] = 10 // fallback
       }
-    }
-
-    // Write background music if provided
-    let bgMusicPath: string | null = null
-    if (backgroundMusicBase64) {
-      const { buffer } = stripDataUrl(backgroundMusicBase64)
-      bgMusicPath = path.join(tmpDir, 'bg_music.mp3')
-      await writeFile(bgMusicPath, buffer)
     }
 
     // Build videos for both orientations
