@@ -64,11 +64,12 @@ export default function ComposerPage() {
     if (!files) return
     const arr = Array.from(files)
     setMediaFiles((prev) => [...prev, ...arr])
-    const img = arr.find((f) => f.type.startsWith('image'))
-    if (img) {
+    // Read the first media file (image, video, or audio) as a data URL for preview and publish
+    const media = arr.find((f) => f.type.startsWith('image') || f.type.startsWith('video') || f.type.startsWith('audio'))
+    if (media) {
       const reader = new FileReader()
       reader.onload = (e) => setMediaSrc(e.target?.result as string)
-      reader.readAsDataURL(img)
+      reader.readAsDataURL(media)
     }
   }
 
@@ -246,10 +247,10 @@ export default function ComposerPage() {
                     <div key={i} className="aspect-square rounded-lg bg-stone-100 border border-stone-200 relative flex items-center justify-center overflow-hidden">
                       {f.type.startsWith('image') ? (
                         <img src={URL.createObjectURL(f)} alt="" className="w-full h-full object-cover" />
+                      ) : f.type.startsWith('video') ? (
+                        <video src={URL.createObjectURL(f)} className="w-full h-full object-cover" muted playsInline />
                       ) : (
-                        <span className="text-[9px] font-medium text-stone-500">
-                          {f.type.startsWith('video') ? 'VID' : 'AUD'}
-                        </span>
+                        <span className="text-[9px] font-medium text-stone-500">AUD</span>
                       )}
                       <button
                         onClick={() => setMediaFiles((prev) => prev.filter((_, idx) => idx !== i))}
