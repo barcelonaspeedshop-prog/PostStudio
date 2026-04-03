@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { promisify } from 'util'
 import { exec } from 'child_process'
-import { writeFile, mkdir, readFile, rm } from 'fs/promises'
-import { existsSync } from 'fs'
+import { writeFile, mkdir, rm } from 'fs/promises'
+import { createWriteStream, existsSync } from 'fs'
+import { Readable } from 'stream'
+import { pipeline } from 'stream/promises'
 import path from 'path'
 import { createJob, updateJob, cleanOldJobs } from '../jobs'
 
@@ -52,7 +54,15 @@ async function probeDuration(filePath: string): Promise<number> {
   return parseFloat(stdout.trim()) || 10
 }
 
-// The actual video assembly — runs in the background after the request returns
+/** Stream a Web API File/Blob to disk without loading into memory */
+async function streamFileToDisk(file: File, destPath: string): Promise<void> {
+  const webStream = file.stream()
+  const nodeReadable = Readable.fromWeb(webStream as Parameters<typeof Readable.fromWeb>[0])
+  const writeStream = createWriteStream(destPath)
+  await pipeline(nodeReadable, writeStream)
+}
+
+// The actual video assembly — runs in the background
 async function assembleVideoInBackground(
   jobId: string,
   chapters: ChapterInput[],
@@ -77,13 +87,14 @@ async function assembleVideoInBackground(
       }
     }
 
-    const results: Record<string, string> = {}
     const formats = [
       { name: 'landscape', width: 1920, height: 1080 },
       { name: 'portrait', width: 1080, height: 1920 },
     ]
     const chapterTimestamps: Array<{ chapterId: number; startTime: number; endTime: number }> = []
     let totalDuration = 0
+    // Store output file paths (not base64)
+    const outputPaths: Record<string, string> = {}
 
     for (const fmt of formats) {
       updateJob(jobId, { progress: `Rendering ${fmt.name} video...` })
@@ -201,23 +212,25 @@ async function assembleVideoInBackground(
         await execAsync(`cp "${masterNoMixPath}" "${masterFinalPath}"`)
       }
 
-      const videoBuffer = await readFile(masterFinalPath)
-      results[fmt.name] = `data:video/mp4;base64,${videoBuffer.toString('base64')}`
+      // Store the file path — do NOT read into memory or convert to base64
+      outputPaths[fmt.name] = masterFinalPath
     }
 
     updateJob(jobId, {
       status: 'complete',
       progress: 'Complete',
-      landscape: results.landscape,
-      portrait: results.portrait,
+      landscapePath: outputPaths.landscape,
+      portraitPath: outputPaths.portrait,
       duration: totalDuration,
       chapterTimestamps,
+      tmpDir, // keep tmpDir reference so we don't clean up yet
     })
+    // Note: tmpDir cleanup happens after download or after 1 hour via cleanOldJobs
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error(`[story-video] Job ${jobId} error:`, message)
     updateJob(jobId, { status: 'error', error: message, progress: 'Failed' })
-  } finally {
+    // Clean up on error
     try {
       if (existsSync(tmpDir)) await rm(tmpDir, { recursive: true, force: true })
     } catch { /* ignore */ }
@@ -245,6 +258,7 @@ export async function POST(req: NextRequest) {
       chapters = JSON.parse(formData.get('chapters') as string)
       musicVolume = parseFloat(formData.get('musicVolume') as string) || 0.15
 
+      // Stream media files directly to disk — never load fully into memory
       const mediaFiles = formData.getAll('media') as File[]
       const chapterIds = formData.getAll('mediaChapterIds') as string[]
       for (let i = 0; i < mediaFiles.length; i++) {
@@ -256,18 +270,18 @@ export async function POST(req: NextRequest) {
         const idx = mediaByChapter[chId].length
         const prefix = isVideo ? 'vid' : 'img'
         const mediaPath = path.join(tmpDir, `${prefix}_ch${chId}_${idx}.${ext}`)
-        const arrayBuf = await file.arrayBuffer()
-        await writeFile(mediaPath, Buffer.from(arrayBuf))
+        await streamFileToDisk(file, mediaPath)
         mediaByChapter[chId].push({ path: mediaPath, isVideo })
       }
 
+      // Stream background music to disk
       const bgMusicFile = formData.get('bgMusic') as File | null
       if (bgMusicFile) {
         bgMusicPath = path.join(tmpDir, 'bg_music.mp3')
-        const buf = await bgMusicFile.arrayBuffer()
-        await writeFile(bgMusicPath, Buffer.from(buf))
+        await streamFileToDisk(bgMusicFile, bgMusicPath)
       }
     } else {
+      // Legacy JSON path for small files
       const body = await req.json() as {
         chapters: ChapterInput[]
         images: { chapterId: number; imageBase64: string }[]
@@ -299,10 +313,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'chapters array is required' }, { status: 400 })
     }
 
-    // Create job and start assembly in background
+    // Create job and start assembly in background (don't await)
     const job = createJob()
-
-    // Fire and forget — don't await
     assembleVideoInBackground(job.id, chapters, mediaByChapter, bgMusicPath, musicVolume, tmpDir)
 
     return NextResponse.json({ jobId: job.id })

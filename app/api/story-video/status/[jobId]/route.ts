@@ -14,7 +14,6 @@ export async function GET(
     return NextResponse.json({ error: 'Job not found' }, { status: 404 })
   }
 
-  // Return job status — only include video data when complete
   const response: Record<string, unknown> = {
     jobId: job.id,
     status: job.status,
@@ -22,8 +21,9 @@ export async function GET(
   }
 
   if (job.status === 'complete') {
-    response.landscape = job.landscape
-    response.portrait = job.portrait
+    // Return download URLs instead of base64 data
+    response.landscapeUrl = `/api/story-video/download/${jobId}/landscape`
+    response.portraitUrl = `/api/story-video/download/${jobId}/portrait`
     response.duration = job.duration
     response.chapterTimestamps = job.chapterTimestamps
   }

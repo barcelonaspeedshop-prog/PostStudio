@@ -254,7 +254,7 @@ export default function LongFormPage() {
       setAssemblyProgress('Rendering video...')
 
       // Poll for status every 3 seconds
-      const result = await new Promise<{ landscape: string; portrait: string; duration: number; chapterTimestamps: Array<{ chapterId: number; startTime: number; endTime: number }> }>((resolve, reject) => {
+      const result = await new Promise<{ landscapeUrl: string; portraitUrl: string; duration: number; chapterTimestamps: Array<{ chapterId: number; startTime: number; endTime: number }> }>((resolve, reject) => {
         const poll = async () => {
           try {
             const statusRes = await fetch(`/api/story-video/status/${jobId}`)
@@ -269,12 +269,10 @@ export default function LongFormPage() {
               return
             }
 
-            // Update progress text from server
             if (statusData.progress) {
               setAssemblyProgress(statusData.progress)
             }
 
-            // Continue polling
             setTimeout(poll, 3000)
           } catch (e) {
             reject(e)
@@ -283,8 +281,8 @@ export default function LongFormPage() {
         poll()
       })
 
-      setLandscapeVideo(result.landscape)
-      setPortraitVideo(result.portrait)
+      setLandscapeVideo(result.landscapeUrl)
+      setPortraitVideo(result.portraitUrl)
       setChapterTimestamps(result.chapterTimestamps || [])
       showToast(`Video ready — ${Math.round(result.duration)}s`)
     } catch (e: unknown) {
@@ -305,13 +303,15 @@ export default function LongFormPage() {
         ...ts,
         title: script.chapters.find(c => c.id === ts.chapterId)?.title || `Chapter ${ts.chapterId}`,
       }))
+      // Fetch the portrait video binary and send as FormData
+      const videoRes = await fetch(portraitVideo)
+      const videoBlob = await videoRes.blob()
+      const formData = new FormData()
+      formData.append('video', videoBlob, 'portrait.mp4')
+      formData.append('chapters', JSON.stringify(chaptersPayload))
       const res = await fetch('/api/story-shorts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          videoBase64: portraitVideo,
-          chapters: chaptersPayload,
-        }),
+        body: formData,
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -324,9 +324,9 @@ export default function LongFormPage() {
     }
   }
 
-  const downloadVideo = (dataUrl: string, suffix: string) => {
+  const downloadVideo = (url: string, suffix: string) => {
     const a = document.createElement('a')
-    a.href = dataUrl
+    a.href = url
     a.download = `${channel.replace(/\s+/g, '_')}_story_${suffix}.mp4`
     a.click()
   }

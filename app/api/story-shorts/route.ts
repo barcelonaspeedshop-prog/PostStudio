@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { promisify } from 'util'
 import { exec } from 'child_process'
 import { writeFile, mkdir, readFile, rm } from 'fs/promises'
-import { existsSync } from 'fs'
+import { createWriteStream, existsSync } from 'fs'
+import { Readable } from 'stream'
+import { pipeline } from 'stream/promises'
 import path from 'path'
 
 const execAsync = promisify(exec)
@@ -20,27 +22,45 @@ type ChapterTimestamp = {
 export async function POST(req: NextRequest) {
   const tmpDir = `/tmp/story_shorts_${Date.now()}`
   try {
-    const { videoBase64, chapters } = await req.json() as {
-      videoBase64: string
-      chapters: ChapterTimestamp[]
-    }
+    const contentType = req.headers.get('content-type') || ''
+    const isFormData = contentType.includes('multipart/form-data')
 
-    if (!videoBase64 || !chapters || chapters.length === 0) {
-      return NextResponse.json(
-        { error: 'videoBase64 and chapters array are required' },
-        { status: 400 }
-      )
-    }
-
+    let chapters: ChapterTimestamp[]
+    const masterPath = path.join(tmpDir, 'master.mp4')
     await mkdir(tmpDir, { recursive: true })
 
-    // Write master video to disk
-    const match = videoBase64.match(/^data:[^;]+;base64,(.+)$/)
-    if (!match) {
-      return NextResponse.json({ error: 'Invalid video data URL' }, { status: 400 })
+    if (isFormData) {
+      // New path: video sent as binary file via FormData
+      const formData = await req.formData()
+      chapters = JSON.parse(formData.get('chapters') as string)
+      const videoFile = formData.get('video') as File
+      if (!videoFile) {
+        return NextResponse.json({ error: 'video file is required' }, { status: 400 })
+      }
+      // Stream video to disk
+      const webStream = videoFile.stream()
+      const nodeReadable = Readable.fromWeb(webStream as Parameters<typeof Readable.fromWeb>[0])
+      await pipeline(nodeReadable, createWriteStream(masterPath))
+    } else {
+      // Legacy JSON path
+      const { videoBase64, chapters: ch } = await req.json() as {
+        videoBase64: string
+        chapters: ChapterTimestamp[]
+      }
+      chapters = ch
+      if (!videoBase64) {
+        return NextResponse.json({ error: 'videoBase64 is required' }, { status: 400 })
+      }
+      const match = videoBase64.match(/^data:[^;]+;base64,(.+)$/)
+      if (!match) {
+        return NextResponse.json({ error: 'Invalid video data URL' }, { status: 400 })
+      }
+      await writeFile(masterPath, Buffer.from(match[1], 'base64'))
     }
-    const masterPath = path.join(tmpDir, 'master.mp4')
-    await writeFile(masterPath, Buffer.from(match[1], 'base64'))
+
+    if (!chapters || chapters.length === 0) {
+      return NextResponse.json({ error: 'chapters array is required' }, { status: 400 })
+    }
 
     // Cut each chapter
     const shorts: Array<{ chapterId: number; title: string; video: string; duration: number }> = []
@@ -56,6 +76,7 @@ export async function POST(req: NextRequest) {
         `-r 30 -movflags +faststart -y "${shortPath}"`
       )
 
+      // Shorts are small enough for base64 (individual chapter clips, typically < 30MB)
       const videoBuffer = await readFile(shortPath)
       shorts.push({
         chapterId: ch.chapterId,
