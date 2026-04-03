@@ -23,12 +23,20 @@ type ImageInput = {
   imageBase64: string
 }
 
-function stripDataUrl(dataUrl: string): { buffer: Buffer; ext: string } {
+function stripDataUrl(dataUrl: string): { buffer: Buffer; ext: string; isVideo: boolean } {
   const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
   if (!match) throw new Error('Invalid data URL')
   const mime = match[1]
-  const ext = mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : mime.includes('mp3') || mime.includes('mpeg') ? 'mp3' : 'jpg'
-  return { buffer: Buffer.from(match[2], 'base64'), ext }
+  const isVideo = mime.startsWith('video/') || mime.includes('quicktime')
+  let ext: string
+  if (mime.includes('mp4')) ext = 'mp4'
+  else if (mime.includes('quicktime') || mime.includes('mov')) ext = 'mov'
+  else if (mime.includes('webm')) ext = 'webm'
+  else if (mime.includes('png')) ext = 'png'
+  else if (mime.includes('webp')) ext = 'webp'
+  else if (mime.includes('mp3') || mime.includes('mpeg')) ext = 'mp3'
+  else ext = 'jpg'
+  return { buffer: Buffer.from(match[2], 'base64'), ext, isVideo }
 }
 
 async function probeDuration(filePath: string): Promise<number> {
@@ -54,14 +62,17 @@ export async function POST(req: NextRequest) {
 
     await mkdir(tmpDir, { recursive: true })
 
-    // Group images by chapter
-    const imagesByChapter: Record<number, string[]> = {}
+    // Group media by chapter, tracking which are videos
+    type MediaItem = { path: string; isVideo: boolean }
+    const mediaByChapter: Record<number, MediaItem[]> = {}
     for (const img of (images || [])) {
-      if (!imagesByChapter[img.chapterId]) imagesByChapter[img.chapterId] = []
-      const { buffer, ext } = stripDataUrl(img.imageBase64)
-      const imgPath = path.join(tmpDir, `img_ch${img.chapterId}_${imagesByChapter[img.chapterId].length}.${ext}`)
-      await writeFile(imgPath, buffer)
-      imagesByChapter[img.chapterId].push(imgPath)
+      if (!mediaByChapter[img.chapterId]) mediaByChapter[img.chapterId] = []
+      const { buffer, ext, isVideo } = stripDataUrl(img.imageBase64)
+      const idx = mediaByChapter[img.chapterId].length
+      const prefix = isVideo ? 'vid' : 'img'
+      const mediaPath = path.join(tmpDir, `${prefix}_ch${img.chapterId}_${idx}.${ext}`)
+      await writeFile(mediaPath, buffer)
+      mediaByChapter[img.chapterId].push({ path: mediaPath, isVideo })
     }
 
     // Write audio files and probe durations
@@ -102,13 +113,13 @@ export async function POST(req: NextRequest) {
 
       for (const ch of chapters) {
         const duration = chapterDurations[ch.id]
-        const chapterImgs = imagesByChapter[ch.id] || []
+        const chapterMedia = mediaByChapter[ch.id] || []
         const audioPath = path.join(tmpDir, `audio_ch${ch.id}.mp3`)
         const hasAudio = ch.audioBase64 && existsSync(audioPath)
         const chapterVideoPath = path.join(tmpDir, `chapter_${ch.id}_${fmt.name}.mp4`)
 
-        if (chapterImgs.length === 0) {
-          // No images — solid color placeholder with audio
+        if (chapterMedia.length === 0) {
+          // No media — solid color placeholder with audio
           if (hasAudio) {
             await execAsync(
               `ffmpeg -f lavfi -i color=c=1a1a1a:size=${fmt.width}x${fmt.height}:rate=30 ` +
@@ -123,32 +134,42 @@ export async function POST(req: NextRequest) {
             )
           }
         } else {
-          // Generate Ken Burns clips for each image
-          const imgDuration = duration / chapterImgs.length
-          const imgClips: string[] = []
+          // Generate clips for each media item
+          const itemDuration = duration / chapterMedia.length
+          const mediaClips: string[] = []
 
-          for (let j = 0; j < chapterImgs.length; j++) {
-            const imgPath = chapterImgs[j]
+          for (let j = 0; j < chapterMedia.length; j++) {
+            const media = chapterMedia[j]
             const clipPath = path.join(tmpDir, `clip_ch${ch.id}_${j}_${fmt.name}.mp4`)
-            const frames = Math.ceil(imgDuration * 30)
 
-            // Alternate zoom in / zoom out for Ken Burns variety
-            const zoomExpr = j % 2 === 0
-              ? `z='min(zoom+0.0008,1.2)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`
-              : `z='if(eq(on,1),1.2,max(zoom-0.0008,1.0))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`
+            if (media.isVideo) {
+              // Video clip — scale/pad to target resolution, trim to allocated duration
+              await execAsync(
+                `ffmpeg -i "${media.path}" ` +
+                `-vf "scale=${fmt.width}:${fmt.height}:force_original_aspect_ratio=decrease,pad=${fmt.width}:${fmt.height}:(ow-iw)/2:(oh-ih)/2,setsar=1" ` +
+                `-t ${itemDuration} -r 30 -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 ` +
+                `-an -movflags +faststart -y "${clipPath}"`
+              )
+            } else {
+              // Image — Ken Burns effect (zoom in/out)
+              const frames = Math.ceil(itemDuration * 30)
+              const zoomExpr = j % 2 === 0
+                ? `z='min(zoom+0.0008,1.2)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`
+                : `z='if(eq(on,1),1.2,max(zoom-0.0008,1.0))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`
 
-            await execAsync(
-              `ffmpeg -loop 1 -i "${imgPath}" ` +
-              `-vf "scale=4000:-1,zoompan=${zoomExpr}:d=${frames}:s=${fmt.width}x${fmt.height}:fps=30" ` +
-              `-t ${imgDuration} -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 ` +
-              `-y "${clipPath}"`
-            )
-            imgClips.push(clipPath)
+              await execAsync(
+                `ffmpeg -loop 1 -i "${media.path}" ` +
+                `-vf "scale=4000:-1,zoompan=${zoomExpr}:d=${frames}:s=${fmt.width}x${fmt.height}:fps=30" ` +
+                `-t ${itemDuration} -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 ` +
+                `-y "${clipPath}"`
+              )
+            }
+            mediaClips.push(clipPath)
           }
 
-          // Concat image clips for this chapter
+          // Concat media clips for this chapter
           const concatListPath = path.join(tmpDir, `concat_ch${ch.id}_${fmt.name}.txt`)
-          const concatContent = imgClips.map(f => `file '${f}'`).join('\n')
+          const concatContent = mediaClips.map(f => `file '${f}'`).join('\n')
           await writeFile(concatListPath, concatContent)
 
           const videoOnlyPath = path.join(tmpDir, `videoonly_ch${ch.id}_${fmt.name}.mp4`)

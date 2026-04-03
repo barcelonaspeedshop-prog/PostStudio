@@ -509,22 +509,31 @@ export default function LongFormPage() {
                       <p className="text-[10px] font-medium text-stone-400 uppercase tracking-widest mb-2">Images</p>
                       {(chapterImages[chapter.id] || []).length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-2">
-                          {(chapterImages[chapter.id] || []).map((img, j) => (
-                            <div key={j} className="relative group">
-                              <img src={img} alt="" className="w-16 h-16 rounded-lg object-cover" />
-                              <button
-                                onClick={() => removeChapterImage(chapter.id, j)}
-                                className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                x
-                              </button>
-                            </div>
-                          ))}
+                          {(chapterImages[chapter.id] || []).map((media, j) => {
+                            const isVideo = media.startsWith('data:video/')
+                            return (
+                              <div key={j} className="relative group">
+                                {isVideo ? (
+                                  <div className="w-16 h-16 rounded-lg bg-stone-800 flex items-center justify-center">
+                                    <span className="text-white text-[10px] font-medium">&#9654; VID</span>
+                                  </div>
+                                ) : (
+                                  <img src={media} alt="" className="w-16 h-16 rounded-lg object-cover" />
+                                )}
+                                <button
+                                  onClick={() => removeChapterImage(chapter.id, j)}
+                                  className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  x
+                                </button>
+                              </div>
+                            )
+                          })}
                         </div>
                       )}
                       <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors text-stone-500 cursor-pointer">
-                        + Add images
-                        <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleChapterImageUpload(chapter.id, e.target.files)} />
+                        + Add images or video
+                        <input type="file" accept="image/*,video/mp4,video/quicktime,video/mov" multiple className="hidden" onChange={(e) => handleChapterImageUpload(chapter.id, e.target.files)} />
                       </label>
                     </div>
 
