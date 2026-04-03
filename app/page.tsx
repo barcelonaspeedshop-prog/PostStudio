@@ -233,7 +233,7 @@ export default function ComposerPage() {
                 onDragLeave={(e) => e.currentTarget.classList.remove('bg-stone-50')}
                 onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files) }}
               >
-                <input type="file" multiple accept="video/*,image/*,audio/*" className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+                <input type="file" multiple accept="video/mp4,.mp4,video/quicktime,.mov,video/webm,.webm,image/jpeg,.jpg,.jpeg,image/png,.png,image/webp,.webp,audio/mpeg,.mp3,audio/wav,.wav,audio/aac,.aac" className="hidden" onChange={(e) => handleFiles(e.target.files)} />
                 <svg className="w-7 h-7 mx-auto mb-2 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>

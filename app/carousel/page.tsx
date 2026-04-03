@@ -616,7 +616,7 @@ export default function CarouselPage() {
           ref={fileInputRef}
           type="file"
           multiple
-          accept="image/*"
+          accept="image/jpeg,.jpg,.jpeg,image/png,.png,image/webp,.webp"
           className="hidden"
           onChange={handleImageUpload}
         />
@@ -624,7 +624,7 @@ export default function CarouselPage() {
         <input
           ref={audioInputRef}
           type="file"
-          accept="audio/*"
+          accept="audio/mpeg,.mp3,audio/wav,.wav,audio/aac,.aac,audio/x-m4a,.m4a"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0]

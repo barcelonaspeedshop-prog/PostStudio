@@ -338,7 +338,7 @@ export default function LongFormPage() {
           </div>
         </div>
 
-        <input ref={bgMusicInputRef} type="file" accept="audio/*" className="hidden" onChange={(e) => handleBgMusicUpload(e.target.files?.[0] || null)} />
+        <input ref={bgMusicInputRef} type="file" accept="audio/mpeg,.mp3,audio/wav,.wav,audio/aac,.aac,audio/x-m4a,.m4a" className="hidden" onChange={(e) => handleBgMusicUpload(e.target.files?.[0] || null)} />
 
         <div className="flex flex-1 overflow-hidden">
           {/* Left panel — controls */}
@@ -533,7 +533,7 @@ export default function LongFormPage() {
                       )}
                       <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors text-stone-500 cursor-pointer">
                         + Add media
-                        <input type="file" accept="*/*" multiple className="hidden" onChange={(e) => handleChapterImageUpload(chapter.id, e.target.files)} />
+                        <input type="file" accept="video/mp4,.mp4,video/quicktime,.mov,video/webm,.webm,image/jpeg,.jpg,.jpeg,image/png,.png,image/webp,.webp" multiple className="hidden" onChange={(e) => handleChapterImageUpload(chapter.id, e.target.files)} />
                       </label>
                       <p className="text-[10px] text-stone-400 mt-1">Images and video files supported</p>
                     </div>
