@@ -20,7 +20,7 @@ async function fetchArticleImage(url: string): Promise<string | null> {
     const timeout = setTimeout(() => controller.abort(), 8000)
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: { 'User-Agent': 'PostStudio/1.0 (news image fetcher)' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
     })
     clearTimeout(timeout)
     if (!res.ok) return null
@@ -28,20 +28,14 @@ async function fetchArticleImage(url: string): Promise<string | null> {
     const html = await res.text()
 
     // Try og:image first (most reliable for article featured images)
-    const ogMatch = html.match(
-      /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i
-    ) || html.match(
-      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i
-    )
-    if (ogMatch?.[1]) return ogMatch[1]
+    const ogMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
+      || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i)
+    if (ogMatch) return ogMatch[1]
 
     // Try twitter:image
-    const twMatch = html.match(
-      /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i
-    ) || html.match(
-      /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i
-    )
-    if (twMatch?.[1]) return twMatch[1]
+    const twMatch = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i)
+      || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']twitter:image["']/i)
+    if (twMatch) return twMatch[1]
 
     return null
   } catch {
