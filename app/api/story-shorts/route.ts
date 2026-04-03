@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { promisify } from 'child_process'
+import { promisify } from 'util'
 import { exec } from 'child_process'
 import { writeFile, mkdir, readFile, rm } from 'fs/promises'
 import { existsSync } from 'fs'
