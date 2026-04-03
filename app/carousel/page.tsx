@@ -126,7 +126,10 @@ export default function CarouselPage() {
         }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      if (!res.ok) {
+        const detail = data.details ? ` — ${JSON.stringify(data.details)}` : ''
+        throw new Error((data.error || `Publish failed (${res.status})`) + detail)
+      }
       showToast(`Published to ${publishPlatforms.length} platform${publishPlatforms.length > 1 ? 's' : ''}!`)
       setShowPublish(false)
     } catch (e: unknown) {
