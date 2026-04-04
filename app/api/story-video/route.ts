@@ -208,7 +208,7 @@ export async function POST(req: NextRequest) {
                 : `z='if(eq(on,1),1.2,max(zoom-0.0008,1.0))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`
 
               await execAsync(
-                `ffmpeg -loop 1 -i "${media.path}" ` +
+                `ffmpeg -stream_loop -1 -i "${media.path}" ` +
                 `-vf "scale=4000:-1,zoompan=${zoomExpr}:d=${frames}:s=${fmt.width}x${fmt.height}:fps=30" ` +
                 `-t ${itemDuration} -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 ` +
                 `-y "${clipPath}"`
