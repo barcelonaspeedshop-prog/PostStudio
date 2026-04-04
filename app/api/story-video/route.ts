@@ -201,16 +201,12 @@ export async function POST(req: NextRequest) {
                 `-an -movflags +faststart -y "${clipPath}"`
               )
             } else {
-              // Image — Ken Burns effect (zoom in/out)
-              const frames = Math.ceil(itemDuration * 30)
-              const zoomExpr = j % 2 === 0
-                ? `z='min(zoom+0.0008,1.2)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`
-                : `z='if(eq(on,1),1.2,max(zoom-0.0008,1.0))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`
-
+              // Image — static display with scale/pad (no zoompan — too CPU-intensive)
               await execAsync(
-                `ffmpeg -stream_loop -1 -i "${media.path}" ` +
-                `-vf "scale=4000:-1,zoompan=${zoomExpr}:d=${frames}:s=${fmt.width}x${fmt.height}:fps=30" ` +
-                `-t ${itemDuration} -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 ` +
+                `ffmpeg -f lavfi -i color=c=1a1a1a:size=${fmt.width}x${fmt.height}:rate=24:d=${itemDuration} ` +
+                `-i "${media.path}" ` +
+                `-filter_complex "[1:v]scale=${fmt.width}:${fmt.height}:force_original_aspect_ratio=decrease[img];[0:v][img]overlay=(W-w)/2:(H-h)/2:shortest=1" ` +
+                `-t ${itemDuration} -c:v libx264 -pix_fmt yuv420p -preset veryfast -crf 23 ` +
                 `-y "${clipPath}"`
               )
             }

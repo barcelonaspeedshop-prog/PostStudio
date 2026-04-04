@@ -242,19 +242,16 @@ async function assembleVideoInBackground(
               await execAsync(
                 `ffmpeg -i "${media.path}" ` +
                 `-vf "scale=${fmt.width}:${fmt.height}:force_original_aspect_ratio=decrease,pad=${fmt.width}:${fmt.height}:(ow-iw)/2:(oh-ih)/2,setsar=1" ` +
-                `-t ${clipDuration} -r 30 -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 ` +
+                `-t ${clipDuration} -r 24 -c:v libx264 -pix_fmt yuv420p -preset veryfast -crf 23 ` +
                 `-an -movflags +faststart -y "${clipPath}"`
               )
             } else {
-              // Image — scale to fit, pad to output resolution, gentle Ken Burns at 24fps
-              const frames = Math.ceil(clipDuration * 24)
-              const zoomExpr = j % 2 === 0
-                ? `z='min(zoom+0.001,1.1)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`
-                : `z='if(eq(on,1),1.1,max(zoom-0.001,1.0))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`
-
+              // Image — static display: scale to fit, pad with dark background, hold for duration
+              // No zoompan/Ken Burns — too CPU-intensive for VPS servers
               await execAsync(
-                `ffmpeg -stream_loop -1 -i "${media.path}" ` +
-                `-vf "scale=${fmt.width}:${fmt.height}:force_original_aspect_ratio=decrease,pad=${fmt.width}:${fmt.height}:(ow-iw)/2:(oh-ih)/2:color=1a1a1a,zoompan=${zoomExpr}:d=${frames}:s=${fmt.width}x${fmt.height}:fps=24" ` +
+                `ffmpeg -f lavfi -i color=c=1a1a1a:size=${fmt.width}x${fmt.height}:rate=24:d=${clipDuration} ` +
+                `-i "${media.path}" ` +
+                `-filter_complex "[1:v]scale=${fmt.width}:${fmt.height}:force_original_aspect_ratio=decrease[img];[0:v][img]overlay=(W-w)/2:(H-h)/2:shortest=1" ` +
                 `-t ${clipDuration} -c:v libx264 -pix_fmt yuv420p -preset veryfast -crf 23 ` +
                 `-y "${clipPath}"`
               )
