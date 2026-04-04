@@ -267,25 +267,25 @@ async function assembleVideoInBackground(
         `ffmpeg -f concat -safe 0 -i "${masterConcatPath}" -c copy -movflags +faststart -y "${masterConcatRaw}"`
       )
 
-      // Burn subtitles into the concatenated video
-      updateJob(jobId, { progress: `Burning subtitles into ${fmt.name} video...` })
-      const subtitleChunks = buildSubtitles(chapters, chapterDurations, chapterTimestamps)
-      const srtPath = path.join(tmpDir, `subtitles_${fmt.name}.srt`)
-      await writeFile(srtPath, generateSrt(subtitleChunks))
-
+      // Burn subtitles into landscape only — portrait (TikTok) skips subtitles
       const masterNoMixPath = path.join(tmpDir, `master_nomix_${fmt.name}.mp4`)
-      // Font size: 42 for landscape, scale proportionally for portrait
-      const fontSize = fmt.name === 'landscape' ? 42 : 36
-      // Margin from bottom: slightly higher for portrait to avoid UI elements
-      const marginV = fmt.name === 'landscape' ? 50 : 80
-      // Escape the SRT path for ffmpeg filter (colons and backslashes)
-      const escapedSrtPath = srtPath.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "'\\\\\\''")
-      await execAsync(
-        `ffmpeg -i "${masterConcatRaw}" ` +
-        `-vf "subtitles='${escapedSrtPath}':force_style='FontName=DejaVu Sans,FontSize=${fontSize},PrimaryColour=&HFFFFFF&,OutlineColour=&H80000000&,BackColour=&H80000000&,BorderStyle=4,Outline=0,Shadow=0,MarginV=${marginV},Alignment=2'" ` +
-        `-c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 ` +
-        `-c:a copy -movflags +faststart -y "${masterNoMixPath}"`
-      )
+      if (fmt.name === 'landscape') {
+        updateJob(jobId, { progress: `Burning subtitles into ${fmt.name} video...` })
+        const subtitleChunks = buildSubtitles(chapters, chapterDurations, chapterTimestamps)
+        const srtPath = path.join(tmpDir, `subtitles_${fmt.name}.srt`)
+        await writeFile(srtPath, generateSrt(subtitleChunks))
+
+        const escapedSrtPath = srtPath.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "'\\\\\\''")
+        await execAsync(
+          `ffmpeg -i "${masterConcatRaw}" ` +
+          `-vf "subtitles='${escapedSrtPath}':force_style='FontName=DejaVu Sans,FontSize=32,PrimaryColour=&HFFFFFF&,OutlineColour=&H80000000&,BackColour=&H80000000&,BorderStyle=4,Outline=0,Shadow=0,MarginV=40,MarginL=192,MarginR=192,Alignment=2'" ` +
+          `-c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 ` +
+          `-c:a copy -movflags +faststart -y "${masterNoMixPath}"`
+        )
+      } else {
+        // Portrait: no subtitles, just copy
+        await execAsync(`cp "${masterConcatRaw}" "${masterNoMixPath}"`)
+      }
 
       const masterFinalPath = path.join(tmpDir, `master_${fmt.name}.mp4`)
       if (bgMusicPath && existsSync(bgMusicPath)) {
