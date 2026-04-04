@@ -54,6 +54,7 @@ export default function LongFormPage() {
   const [generatingAudio, setGeneratingAudio] = useState<Record<number, boolean>>({})
   const [generatingAll, setGeneratingAll] = useState(false)
   const [testMode, setTestMode] = useState(false)
+  const [testAudioDuration, setTestAudioDuration] = useState(10)
   const [toast, setToast] = useState<{ msg: string; type?: 'error' | 'success' } | null>(null)
   const audioRefs = useRef<Record<number, HTMLAudioElement | null>>({})
 
@@ -142,8 +143,8 @@ export default function LongFormPage() {
       let audioDataUrl: string
 
       if (testMode) {
-        // Generate 30 seconds of silence instead of calling ElevenLabs
-        audioDataUrl = generateSilentAudio(30)
+        // Generate silent audio instead of calling ElevenLabs
+        audioDataUrl = generateSilentAudio(testAudioDuration)
       } else {
         const res = await fetch('/api/story-voiceover', {
           method: 'POST',
@@ -450,10 +451,18 @@ export default function LongFormPage() {
             {script && (
               <div className={`${testMode ? 'bg-amber-50 border-amber-200' : 'bg-purple-50 border-purple-200'} border rounded-xl p-4 flex flex-col gap-3`}>
                 <p className={`text-[10px] font-medium uppercase tracking-widest ${testMode ? 'text-amber-700' : 'text-purple-700'}`}>{testMode ? 'Test Audio' : 'Voiceover'}</p>
+                {testMode && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-amber-600">Duration:</span>
+                    {[10, 30].map(d => (
+                      <button key={d} onClick={() => setTestAudioDuration(d)} className={`px-2.5 py-1 text-[11px] rounded-lg font-medium transition-colors ${testAudioDuration === d ? 'bg-amber-600 text-white' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}>{d}s</button>
+                    ))}
+                  </div>
+                )}
                 <button onClick={generateAllVoiceovers} disabled={generatingAll || allChaptersHaveAudio} className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-white text-[13px] font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${testMode ? 'bg-amber-600 hover:bg-amber-700' : 'bg-purple-600 hover:bg-purple-700'}`}>
-                  {generatingAll ? (<><Spinner /> {testMode ? 'Adding test audio...' : 'Generating all...'}</>) : allChaptersHaveAudio ? ('All audio ready') : (testMode ? 'Use test audio (all chapters)' : 'Generate full voiceover')}
+                  {generatingAll ? (<><Spinner /> {testMode ? 'Adding test audio...' : 'Generating all...'}</>) : allChaptersHaveAudio ? ('All audio ready') : (testMode ? `Use test audio — ${testAudioDuration}s (all chapters)` : 'Generate full voiceover')}
                 </button>
-                <p className="text-[10px] text-purple-500">{script.chapters.filter(c => c.audio).length} / {script.chapters.length} chapters recorded</p>
+                <p className={`text-[10px] ${testMode ? 'text-amber-500' : 'text-purple-500'}`}>{script.chapters.filter(c => c.audio).length} / {script.chapters.length} chapters recorded</p>
               </div>
             )}
 

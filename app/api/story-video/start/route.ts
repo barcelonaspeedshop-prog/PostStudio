@@ -179,11 +179,12 @@ async function assembleVideoInBackground(
         const chapterVideoPath = path.join(tmpDir, `chapter_${ch.id}_${fmt.name}.mp4`)
 
         if (chapterMedia.length === 0) {
+          // No media — solid color placeholder, exact duration from audio
           if (hasAudio) {
             await execAsync(
               `ffmpeg -f lavfi -i color=c=1a1a1a:size=${fmt.width}x${fmt.height}:rate=30 ` +
               `-i "${audioPath}" -t ${duration} -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 ` +
-              `-c:a aac -b:a 128k -shortest -movflags +faststart -y "${chapterVideoPath}"`
+              `-c:a aac -b:a 128k -movflags +faststart -y "${chapterVideoPath}"`
             )
           } else {
             await execAsync(
@@ -193,23 +194,28 @@ async function assembleVideoInBackground(
             )
           }
         } else {
-          const itemDuration = duration / chapterMedia.length
+          // Calculate per-image duration so total exactly equals chapter audio duration
           const mediaClips: string[] = []
+          const baseItemDuration = duration / chapterMedia.length
 
           for (let j = 0; j < chapterMedia.length; j++) {
             const media = chapterMedia[j]
             const clipPath = path.join(tmpDir, `clip_ch${ch.id}_${j}_${fmt.name}.mp4`)
+            // Last clip gets any remaining time to ensure exact total
+            const isLast = j === chapterMedia.length - 1
+            const clipStart = j * baseItemDuration
+            const clipDuration = isLast ? (duration - clipStart) : baseItemDuration
 
             if (media.isVideo) {
               await execAsync(
                 `ffmpeg -i "${media.path}" ` +
                 `-vf "scale=${fmt.width}:${fmt.height}:force_original_aspect_ratio=decrease,pad=${fmt.width}:${fmt.height}:(ow-iw)/2:(oh-ih)/2,setsar=1" ` +
-                `-t ${itemDuration} -r 30 -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 ` +
+                `-t ${clipDuration} -r 30 -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 ` +
                 `-an -movflags +faststart -y "${clipPath}"`
               )
             } else {
-              // Image — scale to fit with aspect ratio preserved, pad to exact frame size, then Ken Burns
-              const frames = Math.ceil(itemDuration * 30)
+              // Image — scale to fit preserving aspect ratio, pad, then Ken Burns
+              const frames = Math.ceil(clipDuration * 30)
               const zoomExpr = j % 2 === 0
                 ? `z='min(zoom+0.0008,1.2)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`
                 : `z='if(eq(on,1),1.2,max(zoom-0.0008,1.0))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`
@@ -217,13 +223,14 @@ async function assembleVideoInBackground(
               await execAsync(
                 `ffmpeg -loop 1 -i "${media.path}" ` +
                 `-vf "scale=${fmt.width * 2}:${fmt.height * 2}:force_original_aspect_ratio=decrease,pad=${fmt.width * 2}:${fmt.height * 2}:(ow-iw)/2:(oh-ih)/2:color=1a1a1a,zoompan=${zoomExpr}:d=${frames}:s=${fmt.width}x${fmt.height}:fps=30" ` +
-                `-t ${itemDuration} -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 ` +
+                `-t ${clipDuration} -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 ` +
                 `-y "${clipPath}"`
               )
             }
             mediaClips.push(clipPath)
           }
 
+          // Concat media clips into one video track for this chapter
           const concatListPath = path.join(tmpDir, `concat_ch${ch.id}_${fmt.name}.txt`)
           const concatContent = mediaClips.map(f => `file '${f}'`).join('\n')
           await writeFile(concatListPath, concatContent)
@@ -233,10 +240,11 @@ async function assembleVideoInBackground(
             `ffmpeg -f concat -safe 0 -i "${concatListPath}" -c copy -y "${videoOnlyPath}"`
           )
 
+          // Mux with chapter audio — use -t to enforce exact duration, never -shortest
           if (hasAudio) {
             await execAsync(
               `ffmpeg -i "${videoOnlyPath}" -i "${audioPath}" ` +
-              `-c:v copy -c:a aac -b:a 128k -shortest -movflags +faststart -y "${chapterVideoPath}"`
+              `-t ${duration} -c:v copy -c:a aac -b:a 128k -movflags +faststart -y "${chapterVideoPath}"`
             )
           } else {
             await execAsync(`cp "${videoOnlyPath}" "${chapterVideoPath}"`)
