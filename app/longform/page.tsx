@@ -53,6 +53,7 @@ export default function LongFormPage() {
   const [generating, setGenerating] = useState(false)
   const [generatingAudio, setGeneratingAudio] = useState<Record<number, boolean>>({})
   const [generatingAll, setGeneratingAll] = useState(false)
+  const [testMode, setTestMode] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type?: 'error' | 'success' } | null>(null)
   const audioRefs = useRef<Record<number, HTMLAudioElement | null>>({})
 
@@ -101,6 +102,35 @@ export default function LongFormPage() {
     }
   }
 
+  // --- Generate silent WAV data URL (for test mode) ---
+  const generateSilentAudio = (durationSec: number): string => {
+    const sampleRate = 22050
+    const numSamples = sampleRate * durationSec
+    const dataSize = numSamples * 2 // 16-bit mono
+    const buffer = new ArrayBuffer(44 + dataSize)
+    const view = new DataView(buffer)
+    // WAV header
+    const writeStr = (offset: number, str: string) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)) }
+    writeStr(0, 'RIFF')
+    view.setUint32(4, 36 + dataSize, true)
+    writeStr(8, 'WAVE')
+    writeStr(12, 'fmt ')
+    view.setUint32(16, 16, true)       // chunk size
+    view.setUint16(20, 1, true)        // PCM
+    view.setUint16(22, 1, true)        // mono
+    view.setUint32(24, sampleRate, true)
+    view.setUint32(28, sampleRate * 2, true) // byte rate
+    view.setUint16(32, 2, true)        // block align
+    view.setUint16(34, 16, true)       // bits per sample
+    writeStr(36, 'data')
+    view.setUint32(40, dataSize, true)
+    // Audio data is already zeros (silent)
+    const bytes = new Uint8Array(buffer)
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+    return `data:audio/wav;base64,${btoa(binary)}`
+  }
+
   // --- Voiceover ---
   const generateVoiceover = async (chapterIndex: number) => {
     if (!script) return
@@ -109,21 +139,29 @@ export default function LongFormPage() {
 
     setGeneratingAudio(prev => ({ ...prev, [chapterIndex]: true }))
     try {
-      const res = await fetch('/api/story-voiceover', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: chapter.narration, voiceId: 'P9S3WZL3JE8uQqgYH5B7' }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      let audioDataUrl: string
+
+      if (testMode) {
+        // Generate 30 seconds of silence instead of calling ElevenLabs
+        audioDataUrl = generateSilentAudio(30)
+      } else {
+        const res = await fetch('/api/story-voiceover', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: chapter.narration, voiceId: 'P9S3WZL3JE8uQqgYH5B7' }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error)
+        audioDataUrl = data.audio
+      }
 
       setScript(prev => {
         if (!prev) return prev
         const updated = { ...prev, chapters: [...prev.chapters] }
-        updated.chapters[chapterIndex] = { ...updated.chapters[chapterIndex], audio: data.audio }
+        updated.chapters[chapterIndex] = { ...updated.chapters[chapterIndex], audio: audioDataUrl }
         return updated
       })
-      showToast(`Chapter ${chapter.id} voiceover ready`)
+      showToast(`Chapter ${chapter.id} ${testMode ? 'test audio' : 'voiceover'} ready`)
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Error generating voiceover', 'error')
     } finally {
@@ -351,7 +389,16 @@ export default function LongFormPage() {
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* Topbar */}
         <div className="h-12 bg-white border-b border-stone-100 flex items-center justify-between px-5 shrink-0">
-          <span className="text-[14px] font-medium text-stone-900">Long form story</span>
+          <div className="flex items-center gap-3">
+            <span className="text-[14px] font-medium text-stone-900">Long form story</span>
+            <label className={`flex items-center gap-2 px-2.5 py-1 rounded-lg cursor-pointer text-[11px] font-medium transition-colors ${testMode ? 'bg-amber-100 text-amber-700' : 'bg-stone-100 text-stone-400 hover:bg-stone-200'}`}>
+              <input type="checkbox" checked={testMode} onChange={(e) => setTestMode(e.target.checked)} className="sr-only" />
+              <div className={`w-7 h-4 rounded-full relative transition-colors ${testMode ? 'bg-amber-500' : 'bg-stone-300'}`}>
+                <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${testMode ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+              </div>
+              {testMode ? 'Test mode — no ElevenLabs charges' : 'Test mode'}
+            </label>
+          </div>
           <div className="flex gap-2">
             {script && someChaptersHaveAudio && (
               <button onClick={downloadFullAudio} className="px-3 py-1.5 text-[12px] font-medium border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors">
@@ -401,10 +448,10 @@ export default function LongFormPage() {
 
             {/* Voiceover controls */}
             {script && (
-              <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 flex flex-col gap-3">
-                <p className="text-[10px] font-medium text-purple-700 uppercase tracking-widest">Voiceover</p>
-                <button onClick={generateAllVoiceovers} disabled={generatingAll || allChaptersHaveAudio} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 text-white text-[13px] font-medium rounded-xl hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                  {generatingAll ? (<><Spinner /> Generating all...</>) : allChaptersHaveAudio ? ('All voiceovers ready') : ('Generate full voiceover')}
+              <div className={`${testMode ? 'bg-amber-50 border-amber-200' : 'bg-purple-50 border-purple-200'} border rounded-xl p-4 flex flex-col gap-3`}>
+                <p className={`text-[10px] font-medium uppercase tracking-widest ${testMode ? 'text-amber-700' : 'text-purple-700'}`}>{testMode ? 'Test Audio' : 'Voiceover'}</p>
+                <button onClick={generateAllVoiceovers} disabled={generatingAll || allChaptersHaveAudio} className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-white text-[13px] font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${testMode ? 'bg-amber-600 hover:bg-amber-700' : 'bg-purple-600 hover:bg-purple-700'}`}>
+                  {generatingAll ? (<><Spinner /> {testMode ? 'Adding test audio...' : 'Generating all...'}</>) : allChaptersHaveAudio ? ('All audio ready') : (testMode ? 'Use test audio (all chapters)' : 'Generate full voiceover')}
                 </button>
                 <p className="text-[10px] text-purple-500">{script.chapters.filter(c => c.audio).length} / {script.chapters.length} chapters recorded</p>
               </div>
@@ -591,8 +638,8 @@ export default function LongFormPage() {
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => generateVoiceover(i)} disabled={generatingAudio[i] || generatingAll} className="flex items-center gap-2 px-3 py-2 text-[12px] font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                          {generatingAudio[i] ? (<><Spinner className="w-3 h-3" /> Generating...</>) : (<>&#9654; Generate voiceover</>)}
+                        <button onClick={() => generateVoiceover(i)} disabled={generatingAudio[i] || generatingAll} className={`flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${testMode ? 'bg-amber-600 hover:bg-amber-700' : 'bg-purple-600 hover:bg-purple-700'}`}>
+                          {generatingAudio[i] ? (<><Spinner className="w-3 h-3" /> {testMode ? 'Adding...' : 'Generating...'}</>) : (testMode ? '&#9654; Use test audio' : <>&#9654; Generate voiceover</>)}
                         </button>
                       )}
                     </div>
