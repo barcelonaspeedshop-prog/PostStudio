@@ -78,7 +78,7 @@ export default function LongFormPage() {
     setVideoUrl(null)
     try {
       const formData = new FormData()
-      formData.append('chapters', JSON.stringify(script.chapters.map(ch => ({ id: ch.id }))))
+      formData.append('chapters', JSON.stringify(script.chapters.map(ch => ({ id: ch.id, narration: ch.narration }))))
 
       for (const [chIdStr, files] of Object.entries(chapterMedia)) {
         for (const file of files) {

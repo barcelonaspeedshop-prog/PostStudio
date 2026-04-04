@@ -48,15 +48,58 @@ async function streamToDisk(file: File, dest: string): Promise<void> {
   console.log(`[story-video] Wrote ${dest} (${(statSync(dest).size / 1024).toFixed(1)} KB)`)
 }
 
+// ─── Subtitle generation ───
+
+type ChapterInfo = { id: number; narration?: string }
+
+function buildAss(chapters: ChapterInfo[], chapterDurations: Record<number, number>, W: number, H: number): string {
+  const fmtTime = (s: number) => {
+    const h = Math.floor(s / 3600)
+    const m = Math.floor((s % 3600) / 60)
+    const sec = Math.floor(s % 60)
+    const cs = Math.round((s % 1) * 100)
+    return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}.${String(cs).padStart(2, '0')}`
+  }
+
+  const events: string[] = []
+  let offset = 0
+  for (const ch of chapters) {
+    const dur = chapterDurations[ch.id] || 5
+    if (ch.narration) {
+      const words = ch.narration.split(/\s+/).filter(w => w.length > 0)
+      const chunks: string[] = []
+      for (let i = 0; i < words.length; i += 10) chunks.push(words.slice(i, i + 10).join(' '))
+      if (chunks.length > 0) {
+        const chunkDur = dur / chunks.length
+        for (let i = 0; i < chunks.length; i++) {
+          events.push(`Dialogue: 0,${fmtTime(offset + i * chunkDur)},${fmtTime(offset + (i + 1) * chunkDur)},Default,,0,0,0,,${chunks[i]}`)
+        }
+      }
+    }
+    offset += dur
+  }
+
+  return [
+    '[Script Info]', 'ScriptType: v4.00+', `PlayResX: ${W}`, `PlayResY: ${H}`, '',
+    '[V4+ Styles]',
+    'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
+    `Style: Default,DejaVu Sans,28,&H00FFFFFF,&H000000FF,&H00000000,&H99000000,0,0,0,0,100,100,0,0,4,0,0,2,${Math.round(W * 0.1)},${Math.round(W * 0.1)},${Math.round(H * 0.04)}`,
+    '', '[Events]',
+    'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
+    ...events,
+  ].join('\n')
+}
+
 // ─── Background assembly ───
 
 async function assembleInBackground(
   jobId: string,
-  chapterIds: number[],
+  chapters: ChapterInfo[],
   mediaByChapter: Record<number, MediaItem[]>,
   tmpDir: string,
 ) {
   const W = 1920, H = 1080, IMAGE_DUR = 5
+  const chapterIds = chapters.map(c => c.id)
 
   try {
     updateJob(jobId, { status: 'processing', progress: 'Starting assembly...' })
@@ -120,21 +163,40 @@ async function assembleInBackground(
       chapterVideos.push(chapterVideoPath)
     }
 
-    // Concat all chapters into final video
+    // Concat all chapters into raw video
     updateJob(jobId, { progress: 'Joining chapters...' })
     const masterConcat = path.join(tmpDir, 'master_concat.txt')
     await writeFile(masterConcat, chapterVideos.map(f => `file '${f}'`).join('\n'))
-    const masterFinal = path.join(tmpDir, 'master_final.mp4')
+    const masterRaw = path.join(tmpDir, 'master_raw.mp4')
     await runFfmpeg([
       '-f', 'concat', '-safe', '0', '-i', masterConcat,
-      '-c', 'copy', '-movflags', '+faststart', '-y', masterFinal,
+      '-c', 'copy', '-movflags', '+faststart', '-y', masterRaw,
     ])
 
+    // Burn subtitles
+    updateJob(jobId, { progress: 'Burning subtitles...' })
+    const chapterDurations: Record<number, number> = {}
+    for (const ch of chapters) {
+      const media = mediaByChapter[ch.id] || []
+      chapterDurations[ch.id] = media.length > 0 ? media.length * IMAGE_DUR : IMAGE_DUR
+    }
+    const assPath = path.join(tmpDir, 'subtitles.ass')
+    await writeFile(assPath, buildAss(chapters, chapterDurations, W, H))
+    const escapedAss = assPath.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "'\\\\\\''")
+    const masterFinal = path.join(tmpDir, 'master_final.mp4')
+    await runFfmpeg([
+      '-i', masterRaw,
+      '-vf', `ass='${escapedAss}'`,
+      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast', '-crf', '28',
+      '-c:a', 'copy', '-movflags', '+faststart', '-y', masterFinal,
+    ])
+
+    const totalDuration = Object.values(chapterDurations).reduce((a, b) => a + b, 0)
     updateJob(jobId, {
       status: 'complete',
       progress: 'Complete',
       videoPath: masterFinal,
-      duration: chapterIds.length * IMAGE_DUR,
+      duration: totalDuration,
       tmpDir,
     })
   } catch (err: unknown) {
@@ -163,8 +225,7 @@ export async function POST(req: NextRequest) {
     const chaptersRaw = formData.get('chapters') as string
     if (!chaptersRaw) return NextResponse.json({ error: 'chapters is required' }, { status: 400 })
 
-    const chapters: Array<{ id: number }> = JSON.parse(chaptersRaw)
-    const chapterIds = chapters.map(c => c.id)
+    const chapters: ChapterInfo[] = JSON.parse(chaptersRaw)
 
     // Stream media files to disk
     const mediaFiles = formData.getAll('media') as File[]
@@ -186,7 +247,7 @@ export async function POST(req: NextRequest) {
     }
 
     const job = createJob()
-    assembleInBackground(job.id, chapterIds, mediaByChapter, tmpDir)
+    assembleInBackground(job.id, chapters, mediaByChapter, tmpDir)
     return NextResponse.json({ jobId: job.id })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
