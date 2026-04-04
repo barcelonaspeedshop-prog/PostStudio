@@ -5,7 +5,7 @@ import { writeFile, mkdir, readFile, rm } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
 
-const execAsync = promisify(exec)
+const execAsync = (cmd: string) => promisify(exec)(cmd, { maxBuffer: 50 * 1024 * 1024, timeout: 120_000 })
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -201,13 +201,12 @@ export async function POST(req: NextRequest) {
                 `-an -movflags +faststart -y "${clipPath}"`
               )
             } else {
-              // Image — static display with scale/pad (no zoompan — too CPU-intensive)
+              // Image — static display with scale/pad
               await execAsync(
-                `ffmpeg -f lavfi -i color=c=1a1a1a:size=${fmt.width}x${fmt.height}:rate=24:d=${itemDuration} ` +
-                `-i "${media.path}" ` +
-                `-filter_complex "[1:v]scale=${fmt.width}:${fmt.height}:force_original_aspect_ratio=decrease[img];[0:v][img]overlay=(W-w)/2:(H-h)/2:shortest=1" ` +
-                `-t ${itemDuration} -c:v libx264 -pix_fmt yuv420p -preset veryfast -crf 23 ` +
-                `-y "${clipPath}"`
+                `ffmpeg -stream_loop -1 -framerate 2 -i "${media.path}" ` +
+                `-vf "scale=${fmt.width}:${fmt.height}:force_original_aspect_ratio=decrease,pad=${fmt.width}:${fmt.height}:(ow-iw)/2:(oh-ih)/2:color=0x1a1a1a" ` +
+                `-t ${itemDuration} -r 24 -c:v libx264 -pix_fmt yuv420p -preset veryfast -crf 23 ` +
+                `-movflags +faststart -y "${clipPath}"`
               )
             }
             mediaClips.push(clipPath)

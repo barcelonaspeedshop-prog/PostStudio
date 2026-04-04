@@ -7,7 +7,7 @@ import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import path from 'path'
 
-const execAsync = promisify(exec)
+const execAsync = (cmd: string) => promisify(exec)(cmd, { maxBuffer: 50 * 1024 * 1024, timeout: 120_000 })
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
