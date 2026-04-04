@@ -208,6 +208,7 @@ async function assembleVideoInBackground(
                 `-an -movflags +faststart -y "${clipPath}"`
               )
             } else {
+              // Image — scale to fit with aspect ratio preserved, pad to exact frame size, then Ken Burns
               const frames = Math.ceil(itemDuration * 30)
               const zoomExpr = j % 2 === 0
                 ? `z='min(zoom+0.0008,1.2)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'`
@@ -215,7 +216,7 @@ async function assembleVideoInBackground(
 
               await execAsync(
                 `ffmpeg -loop 1 -i "${media.path}" ` +
-                `-vf "scale=4000:-1,zoompan=${zoomExpr}:d=${frames}:s=${fmt.width}x${fmt.height}:fps=30" ` +
+                `-vf "scale=${fmt.width * 2}:${fmt.height * 2}:force_original_aspect_ratio=decrease,pad=${fmt.width * 2}:${fmt.height * 2}:(ow-iw)/2:(oh-ih)/2:color=1a1a1a,zoompan=${zoomExpr}:d=${frames}:s=${fmt.width}x${fmt.height}:fps=30" ` +
                 `-t ${itemDuration} -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 ` +
                 `-y "${clipPath}"`
               )
@@ -275,10 +276,37 @@ async function assembleVideoInBackground(
         const srtPath = path.join(tmpDir, `subtitles_${fmt.name}.srt`)
         await writeFile(srtPath, generateSrt(subtitleChunks))
 
-        const escapedSrtPath = srtPath.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "'\\\\\\''")
+        // Use an ASS subtitle file for reliable bottom positioning
+        const assPath = path.join(tmpDir, `subtitles_${fmt.name}.ass`)
+        const assContent = [
+          '[Script Info]',
+          'ScriptType: v4.00+',
+          `PlayResX: ${fmt.width}`,
+          `PlayResY: ${fmt.height}`,
+          '',
+          '[V4+ Styles]',
+          'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
+          `Style: Default,DejaVu Sans,32,&H00FFFFFF,&H000000FF,&H00000000,&H99000000,0,0,0,0,100,100,0,0,4,0,0,2,${Math.round(fmt.width * 0.1)},${Math.round(fmt.width * 0.1)},${Math.round(fmt.height * 0.04)}`,
+          '',
+          '[Events]',
+          'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
+          ...subtitleChunks.map(c => {
+            const fmtAssTime = (s: number) => {
+              const h = Math.floor(s / 3600)
+              const m = Math.floor((s % 3600) / 60)
+              const sec = Math.floor(s % 60)
+              const cs = Math.round((s % 1) * 100)
+              return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}.${String(cs).padStart(2, '0')}`
+            }
+            return `Dialogue: 0,${fmtAssTime(c.startTime)},${fmtAssTime(c.endTime)},Default,,0,0,0,,${c.text}`
+          }),
+        ].join('\n')
+        await writeFile(assPath, assContent)
+
+        const escapedAssPath = assPath.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "'\\\\\\''")
         await execAsync(
           `ffmpeg -i "${masterConcatRaw}" ` +
-          `-vf "subtitles='${escapedSrtPath}':force_style='FontName=DejaVu Sans,FontSize=32,PrimaryColour=&HFFFFFF&,OutlineColour=&H80000000&,BackColour=&H80000000&,BorderStyle=4,Outline=0,Shadow=0,MarginV=40,MarginL=192,MarginR=192,Alignment=2'" ` +
+          `-vf "ass='${escapedAssPath}'" ` +
           `-c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 ` +
           `-c:a copy -movflags +faststart -y "${masterNoMixPath}"`
         )
@@ -345,7 +373,7 @@ export async function POST(req: NextRequest) {
       chapters = JSON.parse(formData.get('chapters') as string)
       musicVolume = parseFloat(formData.get('musicVolume') as string) || 0.15
 
-      // Stream media files directly to disk — never load fully into memory
+      // Stream media files directly to disk — preserve FormData insertion order
       const mediaFiles = formData.getAll('media') as File[]
       const chapterIds = formData.getAll('mediaChapterIds') as string[]
       for (let i = 0; i < mediaFiles.length; i++) {
@@ -354,7 +382,8 @@ export async function POST(req: NextRequest) {
         if (!mediaByChapter[chId]) mediaByChapter[chId] = []
         const isVideo = file.type.startsWith('video/')
         const ext = extFromMime(file.type)
-        const idx = mediaByChapter[chId].length
+        // Zero-pad index to preserve order in any filesystem listing
+        const idx = String(mediaByChapter[chId].length).padStart(4, '0')
         const prefix = isVideo ? 'vid' : 'img'
         const mediaPath = path.join(tmpDir, `${prefix}_ch${chId}_${idx}.${ext}`)
         await streamFileToDisk(file, mediaPath)
