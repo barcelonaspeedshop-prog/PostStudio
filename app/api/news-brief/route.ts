@@ -13,6 +13,8 @@ const CHANNEL_TOPICS: Record<string, string> = {
 const VALID_CHANNELS = Object.keys(CHANNEL_TOPICS)
 
 export const maxDuration = 120
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 async function fetchArticleImage(url: string): Promise<string | null> {
   try {
@@ -83,7 +85,16 @@ Return only the JSON object.`,
       .map((b) => (b as { type: 'text'; text: string }).text)
       .join('')
 
-    const trend = JSON.parse(searchText.replace(/```json|```/g, '').trim())
+    let trend: { topic: string; headline: string; articleUrl?: string; searchTerms?: string[] }
+    try {
+      trend = JSON.parse(searchText.replace(/```json|```/g, '').trim())
+    } catch {
+      console.error('[news-brief] Failed to parse search response:', searchText.substring(0, 500))
+      return NextResponse.json(
+        { error: 'Failed to parse trending topic response from AI' },
+        { status: 502, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+      )
+    }
 
     // Step 2: Fetch the article's featured image
     let articleImageUrl: string | null = null
@@ -125,7 +136,16 @@ Return only the JSON array, nothing else.`
       .map((b) => (b as { type: 'text'; text: string }).text)
       .join('')
 
-    const slides = JSON.parse(text.replace(/```json|```/g, '').trim())
+    let slides: Array<Record<string, unknown>>
+    try {
+      slides = JSON.parse(text.replace(/```json|```/g, '').trim())
+    } catch {
+      console.error('[news-brief] Failed to parse slides response:', text.substring(0, 500))
+      return NextResponse.json(
+        { error: 'Failed to parse carousel slides from AI' },
+        { status: 502, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+      )
+    }
 
     // Step 4: Attach article image URL to slides
     // Use the article's featured image for the first slide, and provide
@@ -151,10 +171,15 @@ Return only the JSON array, nothing else.`
       articleUrl: trend.articleUrl || null,
       articleImageUrl,
       slides,
+    }, {
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[news-brief] Error:', message)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json(
+      { error: message },
+      { status: 500, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+    )
   }
 }
