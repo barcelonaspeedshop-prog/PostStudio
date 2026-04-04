@@ -101,7 +101,7 @@ async function assembleInBackground(
           } else {
             // Image: static display for 5 seconds — exact command from spec
             await runFfmpeg([
-              '-stream_loop', '-1', '-i', m.path,
+              '-loop', '1', '-framerate', '1', '-i', m.path,
               '-vf', `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=black`,
               '-t', String(IMAGE_DUR), '-r', '24',
               '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast', '-crf', '28',
