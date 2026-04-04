@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { promisify } from 'util'
 import { exec } from 'child_process'
 import { writeFile, mkdir, rm } from 'fs/promises'
-import { createWriteStream, existsSync } from 'fs'
+import { createWriteStream, existsSync, statSync } from 'fs'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import path from 'path'
@@ -60,6 +60,22 @@ async function streamFileToDisk(file: File, destPath: string): Promise<void> {
   const nodeReadable = Readable.fromWeb(webStream as Parameters<typeof Readable.fromWeb>[0])
   const writeStream = createWriteStream(destPath)
   await pipeline(nodeReadable, writeStream)
+  // Verify the file was actually written
+  if (!existsSync(destPath)) {
+    throw new Error(`streamFileToDisk: file was not created at ${destPath}`)
+  }
+  const stat = statSync(destPath)
+  if (stat.size === 0) {
+    throw new Error(`streamFileToDisk: file is empty (0 bytes) at ${destPath}`)
+  }
+  console.log(`[story-video] Wrote ${destPath} (${(stat.size / 1024).toFixed(1)} KB)`)
+}
+
+/** Verify a media file exists on disk before passing to ffmpeg */
+function assertFileExists(filePath: string, context: string): void {
+  if (!existsSync(filePath)) {
+    throw new Error(`${context}: file not found at ${filePath}`)
+  }
 }
 
 // --- Subtitle generation ---
@@ -141,6 +157,18 @@ async function assembleVideoInBackground(
   try {
     updateJob(jobId, { status: 'processing', progress: 'Writing audio files...' })
 
+    // Log the media map for debugging
+    for (const [chId, items] of Object.entries(mediaByChapter)) {
+      for (const item of items) {
+        const exists = existsSync(item.path)
+        const size = exists ? statSync(item.path).size : 0
+        console.log(`[story-video] Job ${jobId} media: ch${chId} ${item.isVideo ? 'video' : 'image'} ${item.path} (exists=${exists}, ${(size/1024).toFixed(1)}KB)`)
+        if (!exists) {
+          throw new Error(`Media file missing before assembly: ${item.path}`)
+        }
+      }
+    }
+
     // Write audio files and probe durations
     const chapterDurations: Record<number, number> = {}
     for (const ch of chapters) {
@@ -181,6 +209,7 @@ async function assembleVideoInBackground(
         if (chapterMedia.length === 0) {
           // No media — solid color placeholder, exact duration from audio
           if (hasAudio) {
+            assertFileExists(audioPath, `ch${ch.id} audio (no-media path)`)
             await execAsync(
               `ffmpeg -f lavfi -i color=c=1a1a1a:size=${fmt.width}x${fmt.height}:rate=30 ` +
               `-i "${audioPath}" -t ${duration} -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 ` +
@@ -205,6 +234,9 @@ async function assembleVideoInBackground(
             const isLast = j === chapterMedia.length - 1
             const clipStart = j * baseItemDuration
             const clipDuration = isLast ? (duration - clipStart) : baseItemDuration
+
+            // Verify media file exists before ffmpeg processes it
+            assertFileExists(media.path, `ch${ch.id} media[${j}] (${media.isVideo ? 'video' : 'image'})`)
 
             if (media.isVideo) {
               await execAsync(
@@ -242,6 +274,8 @@ async function assembleVideoInBackground(
 
           // Mux with chapter audio — use -t to enforce exact duration, never -shortest
           if (hasAudio) {
+            assertFileExists(videoOnlyPath, `ch${ch.id} video-only concat`)
+            assertFileExists(audioPath, `ch${ch.id} audio for mux`)
             await execAsync(
               `ffmpeg -i "${videoOnlyPath}" -i "${audioPath}" ` +
               `-t ${duration} -c:v copy -c:a aac -b:a 128k -movflags +faststart -y "${chapterVideoPath}"`
@@ -352,11 +386,17 @@ async function assembleVideoInBackground(
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error(`[story-video] Job ${jobId} error:`, message)
-    updateJob(jobId, { status: 'error', error: message, progress: 'Failed' })
-    // Clean up on error
+    // Log what files actually exist in tmpDir for debugging
     try {
-      if (existsSync(tmpDir)) await rm(tmpDir, { recursive: true, force: true })
+      if (existsSync(tmpDir)) {
+        const { readdirSync } = require('fs')
+        const files = readdirSync(tmpDir) as string[]
+        console.error(`[story-video] Job ${jobId} tmpDir contents (${files.length} files):`, files.join(', '))
+      }
     } catch { /* ignore */ }
+    updateJob(jobId, { status: 'error', error: message, progress: 'Failed' })
+    // Keep tmpDir for 1 hour for debugging — cleanOldJobs will remove it
+    updateJob(jobId, { tmpDir })
   }
 }
 
