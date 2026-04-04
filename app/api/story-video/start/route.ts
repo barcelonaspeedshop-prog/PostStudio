@@ -422,18 +422,21 @@ export async function POST(req: NextRequest) {
       musicVolume = parseFloat(formData.get('musicVolume') as string) || 0.15
 
       // Stream media files directly to disk — preserve FormData insertion order
+      // Use a single sequential counter per chapter to avoid index gaps
       const mediaFiles = formData.getAll('media') as File[]
       const chapterIds = formData.getAll('mediaChapterIds') as string[]
+      const chapterMediaCounters: Record<number, number> = {}
       for (let i = 0; i < mediaFiles.length; i++) {
         const file = mediaFiles[i]
         const chId = parseInt(chapterIds[i])
         if (!mediaByChapter[chId]) mediaByChapter[chId] = []
+        if (chapterMediaCounters[chId] === undefined) chapterMediaCounters[chId] = 0
         const isVideo = file.type.startsWith('video/')
         const ext = extFromMime(file.type)
-        // Zero-pad index to preserve order in any filesystem listing
-        const idx = String(mediaByChapter[chId].length).padStart(4, '0')
-        const prefix = isVideo ? 'vid' : 'img'
-        const mediaPath = path.join(tmpDir, `${prefix}_ch${chId}_${idx}.${ext}`)
+        const idx = String(chapterMediaCounters[chId]).padStart(4, '0')
+        chapterMediaCounters[chId]++
+        // Use unified 'media_' prefix — isVideo flag tracked in MediaItem, not filename
+        const mediaPath = path.join(tmpDir, `media_ch${chId}_${idx}.${ext}`)
         await streamFileToDisk(file, mediaPath)
         mediaByChapter[chId].push({ path: mediaPath, isVideo })
       }
@@ -455,13 +458,15 @@ export async function POST(req: NextRequest) {
       chapters = body.chapters
       musicVolume = body.musicVolume ?? 0.15
 
+      const legacyCounters: Record<number, number> = {}
       for (const img of (body.images || [])) {
         const chId = img.chapterId
         if (!mediaByChapter[chId]) mediaByChapter[chId] = []
+        if (legacyCounters[chId] === undefined) legacyCounters[chId] = 0
         const { buffer, ext, isVideo } = stripDataUrl(img.imageBase64)
-        const idx = mediaByChapter[chId].length
-        const prefix = isVideo ? 'vid' : 'img'
-        const mediaPath = path.join(tmpDir, `${prefix}_ch${chId}_${idx}.${ext}`)
+        const idx = String(legacyCounters[chId]).padStart(4, '0')
+        legacyCounters[chId]++
+        const mediaPath = path.join(tmpDir, `media_ch${chId}_${idx}.${ext}`)
         await writeFile(mediaPath, buffer)
         mediaByChapter[chId].push({ path: mediaPath, isVideo })
       }
