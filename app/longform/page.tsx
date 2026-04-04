@@ -70,7 +70,13 @@ export default function LongFormPage() {
   const [chapterTimestamps, setChapterTimestamps] = useState<ChapterTimestamp[]>([])
   const [cuttingShorts, setCuttingShorts] = useState(false)
   const [shorts, setShorts] = useState<Short[]>([])
+  const [thumbnail, setThumbnail] = useState<File | null>(null)
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
+  const [publishDescription, setPublishDescription] = useState('')
+  const [publishPlatforms, setPublishPlatforms] = useState<string[]>(['youtube', 'facebook'])
+  const [publishing, setPublishing] = useState(false)
   const bgMusicInputRef = useRef<HTMLInputElement>(null)
+  const thumbnailInputRef = useRef<HTMLInputElement>(null)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -370,6 +376,50 @@ export default function LongFormPage() {
     a.click()
   }
 
+  // --- Thumbnail ---
+  const handleThumbnailUpload = (file: File | null) => {
+    if (!file) return
+    setThumbnail(file)
+    setThumbnailPreview(URL.createObjectURL(file))
+    showToast(`Thumbnail: ${file.name}`)
+  }
+
+  // --- Publish ---
+  const publishVideo = async () => {
+    if (!landscapeVideo || !script) return
+    setPublishing(true)
+    try {
+      // Fetch the landscape video binary
+      const videoRes = await fetch(landscapeVideo)
+      const videoBlob = await videoRes.blob()
+
+      const formData = new FormData()
+      formData.append('video', videoBlob, 'story_video.mp4')
+      formData.append('content', publishDescription || script.summary || '')
+      formData.append('platforms', JSON.stringify(publishPlatforms))
+      formData.append('title', script.title || '')
+      if (thumbnail) {
+        formData.append('thumbnail', thumbnail, thumbnail.name)
+      }
+
+      const res = await fetch('/api/publish-longform', {
+        method: 'POST',
+        body: formData,
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      showToast('Published successfully!')
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Error publishing', 'error')
+    } finally {
+      setPublishing(false)
+    }
+  }
+
+  const togglePublishPlatform = (p: string) => {
+    setPublishPlatforms(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])
+  }
+
   // --- Helpers ---
   const chapterTypeLabel = (type: string) => {
     switch (type) { case 'intro': return 'INTRO'; case 'outro': return 'OUTRO'; default: return 'CHAPTER' }
@@ -514,6 +564,58 @@ export default function LongFormPage() {
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Publish panel */}
+            {(landscapeVideo || portraitVideo) && (
+              <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 flex flex-col gap-3">
+                <p className="text-[10px] font-medium text-sky-700 uppercase tracking-widest">Publish</p>
+
+                {/* Thumbnail */}
+                <div>
+                  <p className="text-[11px] text-sky-600 mb-1.5">Thumbnail</p>
+                  {thumbnailPreview ? (
+                    <div className="relative">
+                      <img src={thumbnailPreview} alt="Thumbnail" className="w-full rounded-lg object-cover aspect-video" />
+                      <button onClick={() => { setThumbnail(null); setThumbnailPreview(null) }} className="absolute top-1 right-1 w-5 h-5 bg-stone-900 text-white rounded-full text-[10px] flex items-center justify-center hover:bg-red-600 transition-colors">x</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => thumbnailInputRef.current?.click()} className="w-full px-3 py-2 text-[12px] border border-sky-200 rounded-lg hover:bg-sky-100 transition-colors text-sky-600">
+                      + Set thumbnail
+                    </button>
+                  )}
+                  <input ref={thumbnailInputRef} type="file" accept="image/jpeg,.jpg,.jpeg,image/png,.png,image/webp,.webp" className="hidden" onChange={(e) => handleThumbnailUpload(e.target.files?.[0] || null)} />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <p className="text-[11px] text-sky-600 mb-1.5">Description</p>
+                  <textarea
+                    value={publishDescription}
+                    onChange={(e) => setPublishDescription(e.target.value)}
+                    placeholder={script?.summary || 'Write a description for your video...'}
+                    className="w-full px-3 py-2 text-[12px] border border-sky-200 rounded-lg bg-white resize-none focus:outline-none focus:ring-1 focus:ring-sky-400"
+                    rows={3}
+                  />
+                </div>
+
+                {/* Platform selection */}
+                <div>
+                  <p className="text-[11px] text-sky-600 mb-1.5">Platforms</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['youtube', 'facebook', 'instagram', 'tiktok'].map(p => (
+                      <button key={p} onClick={() => togglePublishPlatform(p)} className={`px-2.5 py-1 text-[11px] rounded-lg font-medium transition-colors ${publishPlatforms.includes(p) ? 'bg-sky-600 text-white' : 'bg-sky-100 text-sky-600 hover:bg-sky-200'}`}>
+                        {p.charAt(0).toUpperCase() + p.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Publish button */}
+                <button onClick={publishVideo} disabled={publishing || publishPlatforms.length === 0} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-sky-600 text-white text-[13px] font-medium rounded-xl hover:bg-sky-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                  {publishing ? (<><Spinner /> Publishing...</>) : (<>Publish to {publishPlatforms.length} platform{publishPlatforms.length !== 1 ? 's' : ''}</>)}
+                </button>
               </div>
             )}
 
