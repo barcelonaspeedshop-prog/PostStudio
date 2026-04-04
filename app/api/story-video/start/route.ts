@@ -62,6 +62,73 @@ async function streamFileToDisk(file: File, destPath: string): Promise<void> {
   await pipeline(nodeReadable, writeStream)
 }
 
+// --- Subtitle generation ---
+
+type SubtitleChunk = {
+  index: number
+  startTime: number  // seconds from start of master video
+  endTime: number
+  text: string
+}
+
+/** Split narration into chunks of at most maxWords words */
+function splitNarration(text: string, maxWords: number): string[] {
+  const words = text.split(/\s+/).filter(w => w.length > 0)
+  const chunks: string[] = []
+  for (let i = 0; i < words.length; i += maxWords) {
+    chunks.push(words.slice(i, i + maxWords).join(' '))
+  }
+  return chunks
+}
+
+/** Format seconds to SRT timestamp: HH:MM:SS,mmm */
+function formatSrtTime(seconds: number): string {
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = Math.floor(seconds % 60)
+  const ms = Math.round((seconds % 1) * 1000)
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(ms).padStart(3, '0')}`
+}
+
+/** Build subtitle chunks for all chapters with global timestamps */
+function buildSubtitles(
+  chapters: ChapterInput[],
+  chapterDurations: Record<number, number>,
+  chapterTimestamps: Array<{ chapterId: number; startTime: number; endTime: number }>,
+): SubtitleChunk[] {
+  const allChunks: SubtitleChunk[] = []
+  let index = 1
+
+  for (const ts of chapterTimestamps) {
+    const chapter = chapters.find(c => c.id === ts.chapterId)
+    if (!chapter || !chapter.narration) continue
+
+    const duration = chapterDurations[chapter.id] || (ts.endTime - ts.startTime)
+    const textChunks = splitNarration(chapter.narration, 8)
+    if (textChunks.length === 0) continue
+
+    const chunkDuration = duration / textChunks.length
+
+    for (let i = 0; i < textChunks.length; i++) {
+      allChunks.push({
+        index: index++,
+        startTime: ts.startTime + i * chunkDuration,
+        endTime: ts.startTime + (i + 1) * chunkDuration,
+        text: textChunks[i],
+      })
+    }
+  }
+
+  return allChunks
+}
+
+/** Generate SRT file content from subtitle chunks */
+function generateSrt(chunks: SubtitleChunk[]): string {
+  return chunks.map(c =>
+    `${c.index}\n${formatSrtTime(c.startTime)} --> ${formatSrtTime(c.endTime)}\n${c.text}\n`
+  ).join('\n')
+}
+
 // The actual video assembly — runs in the background
 async function assembleVideoInBackground(
   jobId: string,
@@ -195,9 +262,29 @@ async function assembleVideoInBackground(
       const masterConcatContent = chapterVideos.map(f => `file '${f}'`).join('\n')
       await writeFile(masterConcatPath, masterConcatContent)
 
-      const masterNoMixPath = path.join(tmpDir, `master_nomix_${fmt.name}.mp4`)
+      const masterConcatRaw = path.join(tmpDir, `master_concat_raw_${fmt.name}.mp4`)
       await execAsync(
-        `ffmpeg -f concat -safe 0 -i "${masterConcatPath}" -c copy -movflags +faststart -y "${masterNoMixPath}"`
+        `ffmpeg -f concat -safe 0 -i "${masterConcatPath}" -c copy -movflags +faststart -y "${masterConcatRaw}"`
+      )
+
+      // Burn subtitles into the concatenated video
+      updateJob(jobId, { progress: `Burning subtitles into ${fmt.name} video...` })
+      const subtitleChunks = buildSubtitles(chapters, chapterDurations, chapterTimestamps)
+      const srtPath = path.join(tmpDir, `subtitles_${fmt.name}.srt`)
+      await writeFile(srtPath, generateSrt(subtitleChunks))
+
+      const masterNoMixPath = path.join(tmpDir, `master_nomix_${fmt.name}.mp4`)
+      // Font size: 42 for landscape, scale proportionally for portrait
+      const fontSize = fmt.name === 'landscape' ? 42 : 36
+      // Margin from bottom: slightly higher for portrait to avoid UI elements
+      const marginV = fmt.name === 'landscape' ? 50 : 80
+      // Escape the SRT path for ffmpeg filter (colons and backslashes)
+      const escapedSrtPath = srtPath.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "'\\\\\\''")
+      await execAsync(
+        `ffmpeg -i "${masterConcatRaw}" ` +
+        `-vf "subtitles='${escapedSrtPath}':force_style='FontName=DejaVu Sans,FontSize=${fontSize},PrimaryColour=&HFFFFFF&,OutlineColour=&H80000000&,BackColour=&H80000000&,BorderStyle=4,Outline=0,Shadow=0,MarginV=${marginV},Alignment=2'" ` +
+        `-c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 23 ` +
+        `-c:a copy -movflags +faststart -y "${masterNoMixPath}"`
       )
 
       const masterFinalPath = path.join(tmpDir, `master_${fmt.name}.mp4`)
