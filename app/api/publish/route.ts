@@ -5,6 +5,15 @@ const POSTPROXY_BASE = 'https://api.postproxy.dev'
 const VALID_PLATFORMS = ['instagram', 'tiktok', 'twitter', 'facebook', 'youtube'] as const
 type Platform = (typeof VALID_PLATFORMS)[number]
 
+function truncateForTwitter(text: string, max = 280): string {
+  if (text.length <= max) return text
+  const ellipsis = '...'
+  const trimmed = text.slice(0, max - ellipsis.length)
+  // Cut back to the last full word
+  const lastSpace = trimmed.lastIndexOf(' ')
+  return (lastSpace > 0 ? trimmed.slice(0, lastSpace) : trimmed) + ellipsis
+}
+
 export async function POST(req: NextRequest) {
   try {
     const apiKey = process.env.POSTPROXY_API_KEY
@@ -84,6 +93,9 @@ export async function POST(req: NextRequest) {
           break
         case 'tiktok':
           formData.append('platforms[tiktok][privacy_status]', 'PUBLIC_TO_EVERYONE')
+          break
+        case 'twitter':
+          formData.append('platforms[twitter][body]', truncateForTwitter(content || ''))
           break
         case 'facebook':
           formData.append('platforms[facebook][format]', 'reel')
