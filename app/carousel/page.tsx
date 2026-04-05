@@ -179,6 +179,7 @@ export default function CarouselPage() {
 
   const generateSlides = async () => {
     if (!topic.trim()) { showToast('Enter a topic first', 'error'); return }
+    const prevImages = slides.map(s => s.image)
     setGenerating(true)
     try {
       const res = await fetch('/api/carousel-generate', {
@@ -188,9 +189,18 @@ export default function CarouselPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setSlides(data.slides)
+      const newSlides: Slide[] = data.slides
+      // Restore uploaded images when slide count hasn't changed significantly
+      if (prevImages.length > 0 && Math.abs(newSlides.length - prevImages.length) <= 2) {
+        for (let i = 0; i < Math.min(newSlides.length, prevImages.length); i++) {
+          if (prevImages[i] && prevImages[i] !== 'loading') {
+            newSlides[i] = { ...newSlides[i], image: prevImages[i] }
+          }
+        }
+      }
+      setSlides(newSlides)
       setSelectedSlide(0)
-      showToast(`${data.slides.length} slides generated!`)
+      showToast(`${newSlides.length} slides generated!`)
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Error generating slides', 'error')
     } finally {
