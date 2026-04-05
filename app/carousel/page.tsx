@@ -79,9 +79,6 @@ export default function CarouselPage() {
   const [slides, setSlides] = useState<Slide[]>([])
   const [generating, setGenerating] = useState(false)
   const [selectedSlide, setSelectedSlide] = useState<number | null>(null)
-  const [generatingImages, setGeneratingImages] = useState(false)
-  const [imageStyle, setImageStyle] = useState('vintage cinematic')
-  const [imageSource, setImageSource] = useState<'dalle'>('dalle')
   const [generatingVideo, setGeneratingVideo] = useState(false)
   const [slideDuration, setSlideDuration] = useState(3)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
@@ -159,7 +156,7 @@ export default function CarouselPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
 
-      // Load slides immediately so user sees content while images load
+      // Load slides as text-only — user uploads their own images
       const newSlides = data.slides as Slide[]
       setSlides(newSlides)
       setSlideCount(5)
@@ -167,87 +164,6 @@ export default function CarouselPage() {
       setChannel(newsChannel)
       setSelectedSlide(0)
       showToast(`Loaded: ${data.story}`)
-
-      // Mark all slides as loading
-      setSlides(newSlides.map(s => ({ ...s, image: 'loading' })))
-
-      // Helper: fetch an image URL through proxy and return base64
-      const fetchImageAsBase64 = async (url: string): Promise<string | null> => {
-        try {
-          const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`
-          const imgRes = await fetch(proxyUrl)
-          if (!imgRes.ok) return null
-          const blob = await imgRes.blob()
-          return await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader()
-            reader.onload = () => resolve(reader.result as string)
-            reader.onerror = reject
-            reader.readAsDataURL(blob)
-          })
-        } catch {
-          return null
-        }
-      }
-
-      // Fetch images for all slides in parallel
-      const imagePromises = newSlides.map(async (slide, i) => {
-        const extSlide = slide as Slide & { imageUrl?: string; imageQuery?: string }
-
-        // Slide 1: use the article's featured image if available
-        if (i === 0 && extSlide.imageUrl) {
-          const base64 = await fetchImageAsBase64(extSlide.imageUrl)
-          setSlides(prev => {
-            const u = [...prev]
-            if (u[i]) u[i] = { ...u[i], image: base64 || undefined }
-            return u
-          })
-          return
-        }
-
-        // Slides 2-5: generate via DALL-E using imageQuery
-        const query = extSlide.imageQuery || extSlide.headline
-        if (!query) {
-          setSlides(prev => {
-            const u = [...prev]
-            if (u[i]) u[i] = { ...u[i], image: undefined }
-            return u
-          })
-          return
-        }
-
-        try {
-          const imgRes = await fetch('/api/generate-images-dalle', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              slides: [{ ...slide, headline: query, tag: query, body: slide.body }],
-              style: imageStyle,
-            }),
-          })
-          const imgData = await imgRes.json()
-          if (imgData.images?.[0]?.url) {
-            const base64 = await fetchImageAsBase64(imgData.images[0].url)
-            setSlides(prev => {
-              const u = [...prev]
-              if (u[i]) u[i] = { ...u[i], image: base64 || undefined }
-              return u
-            })
-          } else {
-            setSlides(prev => {
-              const u = [...prev]
-              if (u[i]) u[i] = { ...u[i], image: undefined }
-              return u
-            })
-          }
-        } catch {
-          setSlides(prev => {
-            const u = [...prev]
-            if (u[i]) u[i] = { ...u[i], image: undefined }
-            return u
-          })
-        }
-      })
-      await Promise.all(imagePromises)
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Error loading news', 'error')
     } finally {
@@ -278,93 +194,6 @@ export default function CarouselPage() {
       showToast(e instanceof Error ? e.message : 'Error generating slides', 'error')
     } finally {
       setGenerating(false)
-    }
-  }
-
-  const generateImages = async () => {
-    if (!slides.length) { showToast('Generate slides first', 'error'); return }
-    setGeneratingImages(true)
-    showToast('Generating AI images (~30s)...')
-    try {
-      const res = await fetch('/api/generate-images-dalle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slides, style: imageStyle, channel }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      const updated = [...slides]
-      await Promise.all(data.images.map(async (img: { index: number; url: string | null }) => {
-        if (img.url && updated[img.index]) {
-          try {
-            const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(img.url)}`
-            const response = await fetch(proxyUrl)
-            if (!response.ok) throw new Error('Proxy failed')
-            const blob = await response.blob()
-            const base64 = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader()
-              reader.onload = () => resolve(reader.result as string)
-              reader.onerror = reject
-              reader.readAsDataURL(blob)
-            })
-            updated[img.index] = { ...updated[img.index], image: base64 }
-          } catch {
-            // Don't set raw URL — leave image empty to avoid canvas taint
-            showToast(`Image ${img.index + 1} failed to load`, 'error')
-          }
-        }
-      }))
-      setSlides(updated)
-      showToast('Images added!')
-    } catch (e: unknown) {
-      showToast(e instanceof Error ? e.message : 'Error generating images', 'error')
-    } finally {
-      setGeneratingImages(false)
-    }
-  }
-
-  const generateImageForSlide = async (slideIndex: number) => {
-    if (!slides[slideIndex]) return
-    setSlides(prev => {
-      const u = [...prev]
-      u[slideIndex] = { ...u[slideIndex], image: 'loading' }
-      return u
-    })
-    try {
-      const res = await fetch('/api/generate-images-dalle', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slides: [slides[slideIndex]], style: imageStyle }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      if (data.images?.[0]?.url) {
-        try {
-          const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(data.images[0].url)}`
-          const response = await fetch(proxyUrl)
-          if (!response.ok) throw new Error('Proxy failed')
-          const blob = await response.blob()
-          const base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader()
-            reader.onload = () => resolve(reader.result as string)
-            reader.onerror = reject
-            reader.readAsDataURL(blob)
-          })
-          setSlides(prev => {
-            const u = [...prev]; u[slideIndex] = { ...u[slideIndex], image: base64 }; return u
-          })
-        } catch {
-          setSlides(prev => {
-            const u = [...prev]; u[slideIndex] = { ...u[slideIndex], image: undefined }; return u
-          })
-        }
-        showToast('Image generated!')
-      }
-    } catch (e: unknown) {
-      setSlides(prev => {
-        const u = [...prev]; u[slideIndex] = { ...u[slideIndex], image: undefined }; return u
-      })
-      showToast(e instanceof Error ? e.message : 'Error generating image', 'error')
     }
   }
 
@@ -834,51 +663,22 @@ export default function CarouselPage() {
               </div>
             )}
 
-            {/* Image source picker */}
+            {/* Upload images */}
             {slides.length > 0 && (
-              <div className="bg-white border border-stone-100 rounded-xl p-4 flex flex-col gap-3">
-                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Add images</p>
-                
-                {/* Manual upload */}
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex items-center gap-3 px-4 py-3 border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors text-left"
-                >
-                  <div className="w-8 h-8 bg-stone-100 rounded-lg flex items-center justify-center shrink-0">
-                    <svg className="w-4 h-4 text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <p className="text-[13px] font-medium text-stone-800">Upload manually</p>
-                    <p className="text-[11px] text-stone-400">Your own photos · Free</p>
-                  </div>
-                </button>
-
-                {/* DALL-E */}
-                <button
-                  onClick={() => generateImages()}
-                  disabled={generatingImages}
-                  className="w-full flex items-center gap-3 px-4 py-3 border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <div className="w-8 h-8 bg-stone-900 rounded-lg flex items-center justify-center shrink-0">
-                    <span className="text-white text-[12px]">✦</span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-[13px] font-medium text-stone-800">
-                      {generatingImages ? 'Generating...' : 'Generate with DALL-E'}
-                    </p>
-                    <p className="text-[11px] text-stone-400">Story-specific AI images · ~$0.18</p>
-                  </div>
-                  {generatingImages && (
-                    <svg className="w-3.5 h-3.5 animate-spin text-stone-400" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
-                      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-                    </svg>
-                  )}
-                </button>
-
-              </div>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex items-center gap-3 px-4 py-3 bg-white border border-stone-100 rounded-xl hover:bg-stone-50 transition-colors text-left"
+              >
+                <div className="w-8 h-8 bg-stone-100 rounded-lg flex items-center justify-center shrink-0">
+                  <svg className="w-4 h-4 text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-[13px] font-medium text-stone-800">Upload images</p>
+                  <p className="text-[11px] text-stone-400">Add your own photos to slides</p>
+                </div>
+              </button>
             )}
           </div>
 
@@ -990,29 +790,12 @@ export default function CarouselPage() {
                   </div>
                 </div>
 
-                {/* Add image to this slide */}
-                <button
-                  onClick={() => generateImageForSlide(selectedSlide!)}
-                  disabled={sel.image === 'loading'}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[12px] bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors disabled:opacity-50"
-                >
-                  {sel.image === 'loading' ? (
-                    <>
-                      <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
-                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-                      </svg>
-                      Generating...
-                    </>
-                  ) : (
-                    <><span className="text-[10px]">✦</span> {sel.image ? 'Regenerate image' : 'Generate image'} (~$0.02)</>
-                  )}
-                </button>
+                {/* Upload image for this slide */}
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full px-3 py-2 text-[12px] border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors text-stone-600"
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[12px] bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors"
                 >
-                  {sel.image && sel.image !== 'loading' ? 'Replace with own photo' : '+ Upload photo instead'}
+                  {sel.image ? 'Replace image' : '+ Upload image'}
                 </button>
 
                 {/* Nav between slides */}
