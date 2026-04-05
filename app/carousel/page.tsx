@@ -81,7 +81,7 @@ export default function CarouselPage() {
   const [selectedSlide, setSelectedSlide] = useState<number | null>(null)
   const [generatingImages, setGeneratingImages] = useState(false)
   const [imageStyle, setImageStyle] = useState('vintage cinematic')
-  const [imageSource, setImageSource] = useState<'dalle' | 'pexels'>('dalle')
+  const [imageSource, setImageSource] = useState<'dalle'>('dalle')
   const [generatingVideo, setGeneratingVideo] = useState(false)
   const [slideDuration, setSlideDuration] = useState(3)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
@@ -204,7 +204,7 @@ export default function CarouselPage() {
           return
         }
 
-        // Slides 2-5: search Pexels via /api/generate-images using imageQuery
+        // Slides 2-5: generate via DALL-E using imageQuery
         const query = extSlide.imageQuery || extSlide.headline
         if (!query) {
           setSlides(prev => {
@@ -216,18 +216,17 @@ export default function CarouselPage() {
         }
 
         try {
-          const imgRes = await fetch('/api/generate-images', {
+          const imgRes = await fetch('/api/generate-images-dalle', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              slide: { ...slide, headline: query, tag: query, body: slide.body },
-              slideIndex: i,
+              slides: [{ ...slide, headline: query, tag: query, body: slide.body }],
               style: imageStyle,
             }),
           })
           const imgData = await imgRes.json()
-          if (imgData.url) {
-            const base64 = await fetchImageAsBase64(imgData.url)
+          if (imgData.images?.[0]?.url) {
+            const base64 = await fetchImageAsBase64(imgData.images[0].url)
             setSlides(prev => {
               const u = [...prev]
               if (u[i]) u[i] = { ...u[i], image: base64 || undefined }
@@ -282,13 +281,12 @@ export default function CarouselPage() {
     }
   }
 
-  const generateImages = async (source: 'dalle' | 'pexels' = 'dalle') => {
+  const generateImages = async () => {
     if (!slides.length) { showToast('Generate slides first', 'error'); return }
     setGeneratingImages(true)
-    showToast(source === 'dalle' ? 'Generating AI images (~30s)...' : 'Searching Pexels...')
+    showToast('Generating AI images (~30s)...')
     try {
-      const endpoint = source === 'dalle' ? '/api/generate-images-dalle' : '/api/generate-images'
-      const res = await fetch(endpoint, {
+      const res = await fetch('/api/generate-images-dalle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slides, style: imageStyle, channel }),
@@ -333,16 +331,16 @@ export default function CarouselPage() {
       return u
     })
     try {
-      const res = await fetch('/api/generate-images', {
+      const res = await fetch('/api/generate-images-dalle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slide: slides[slideIndex], slideIndex, style: imageStyle }),
+        body: JSON.stringify({ slides: [slides[slideIndex]], style: imageStyle }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      if (data.url) {
+      if (data.images?.[0]?.url) {
         try {
-          const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(data.url)}`
+          const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(data.images[0].url)}`
           const response = await fetch(proxyUrl)
           if (!response.ok) throw new Error('Proxy failed')
           const blob = await response.blob()
@@ -360,7 +358,7 @@ export default function CarouselPage() {
             const u = [...prev]; u[slideIndex] = { ...u[slideIndex], image: undefined }; return u
           })
         }
-        showToast(data.cached ? 'Loaded from cache — free!' : 'Image generated!')
+        showToast('Image generated!')
       }
     } catch (e: unknown) {
       setSlides(prev => {
@@ -859,7 +857,7 @@ export default function CarouselPage() {
 
                 {/* DALL-E */}
                 <button
-                  onClick={() => generateImages('dalle')}
+                  onClick={() => generateImages()}
                   disabled={generatingImages}
                   className="w-full flex items-center gap-3 px-4 py-3 border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -880,20 +878,6 @@ export default function CarouselPage() {
                   )}
                 </button>
 
-                {/* Pexels */}
-                <button
-                  disabled={generatingImages}
-                  className="w-full flex items-center gap-3 px-4 py-3 border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={() => generateImages('pexels')}
-                >
-                  <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center shrink-0">
-                    <span className="text-white text-[11px] font-medium">P</span>
-                  </div>
-                  <div>
-                    <p className="text-[13px] font-medium text-stone-800">Search Pexels</p>
-                    <p className="text-[11px] text-stone-400">Stock photography · Free</p>
-                  </div>
-                </button>
               </div>
             )}
           </div>
