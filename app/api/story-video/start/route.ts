@@ -145,7 +145,7 @@ async function assembleInBackground(
             // Image: Ken Burns slow zoom for 5 seconds
             await runFfmpeg([
               '-loop', '1', '-framerate', '1', '-i', m.path,
-              '-vf', `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=black,zoompan=z='min(zoom+0.001,1.1)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=25:s=${W}x${H}:fps=24`,
+              '-vf', `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=black,zoompan=z='if(eq(on,1),1.0,min(zoom+0.0015,1.3))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=120:s=${W}x${H}:fps=24`,
               '-t', String(IMAGE_DUR),
               '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'veryfast', '-crf', '23',
               '-y', clipPath,
