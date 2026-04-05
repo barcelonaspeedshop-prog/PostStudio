@@ -47,8 +47,7 @@ async function fetchArticleImage(url: string): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { channel, timestamp: _bust } = await req.json()
-    void _bust // cache-bust param — presence forces a fresh request
+    const { channel } = await req.json()
 
     if (!channel || !VALID_CHANNELS.includes(channel)) {
       return NextResponse.json(
