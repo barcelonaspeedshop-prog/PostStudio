@@ -69,13 +69,13 @@ export async function POST(req: NextRequest) {
         role: 'user',
         content: `Search the web for the most trending or breaking news story TODAY (${today}) in ${topicKeywords}. Look for recent race results, transfers, car launches, controversies, or major breaking news.
 
-After searching, respond with ONLY a JSON object (no markdown, no backticks) containing:
+Respond with ONLY a JSON object. No explanatory text before or after. No markdown. Just the raw JSON.
+
+The JSON object must contain:
 - "topic": a concise but descriptive topic string (15-25 words) that captures the story
 - "headline": a short 5-8 word headline summary
 - "articleUrl": the URL of the best source article you found
-- "searchTerms": an array of 5 short image search terms related to different aspects of this story (e.g. specific people, cars, teams, venues mentioned)
-
-Return only the JSON object.`,
+- "searchTerms": an array of 5 short image search terms related to different aspects of this story (e.g. specific people, cars, teams, venues mentioned)`,
       }],
     })
 
@@ -87,7 +87,10 @@ Return only the JSON object.`,
 
     let trend: { topic: string; headline: string; articleUrl?: string; searchTerms?: string[] }
     try {
-      trend = JSON.parse(searchText.replace(/```json|```/g, '').trim())
+      const cleaned = searchText.replace(/```json|```/g, '').trim()
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/)?.[0]
+      if (!jsonMatch) throw new Error('No JSON object found in response')
+      trend = JSON.parse(jsonMatch)
     } catch {
       console.error('[news-brief] Failed to parse search response:', searchText.substring(0, 500))
       return NextResponse.json(
@@ -138,7 +141,10 @@ Return only the JSON array, nothing else.`
 
     let slides: Array<Record<string, unknown>>
     try {
-      slides = JSON.parse(text.replace(/```json|```/g, '').trim())
+      const cleanedSlides = text.replace(/```json|```/g, '').trim()
+      const slidesMatch = cleanedSlides.match(/\[[\s\S]*\]/)?.[0]
+      if (!slidesMatch) throw new Error('No JSON array found in response')
+      slides = JSON.parse(slidesMatch)
     } catch {
       console.error('[news-brief] Failed to parse slides response:', text.substring(0, 500))
       return NextResponse.json(
