@@ -148,10 +148,11 @@ export default function CarouselPage() {
   const loadTodaysNews = async () => {
     setLoadingNews(true)
     try {
-      const res = await fetch('/api/news-brief?t=' + Date.now(), {
+      const res = await fetch(`/api/news-brief?t=${Date.now()}`, {
         method: 'POST',
+        cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel: newsChannel }),
+        body: JSON.stringify({ channel: newsChannel, timestamp: Date.now() }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
