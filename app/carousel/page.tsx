@@ -154,7 +154,7 @@ export default function CarouselPage() {
       const res = await fetch('/api/news-brief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel: newsChannel }),
+        body: JSON.stringify({ channel: newsChannel, timestamp: Date.now() }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -342,11 +342,14 @@ export default function CarouselPage() {
       if (!res.ok) throw new Error(data.error)
       if (data.url) {
         try {
-          const response = await fetch(data.url)
+          const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(data.url)}`
+          const response = await fetch(proxyUrl)
+          if (!response.ok) throw new Error('Proxy failed')
           const blob = await response.blob()
-          const base64 = await new Promise<string>((resolve) => {
+          const base64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader()
             reader.onload = () => resolve(reader.result as string)
+            reader.onerror = reject
             reader.readAsDataURL(blob)
           })
           setSlides(prev => {
@@ -354,7 +357,7 @@ export default function CarouselPage() {
           })
         } catch {
           setSlides(prev => {
-            const u = [...prev]; u[slideIndex] = { ...u[slideIndex], image: data.url }; return u
+            const u = [...prev]; u[slideIndex] = { ...u[slideIndex], image: undefined }; return u
           })
         }
         showToast(data.cached ? 'Loaded from cache — free!' : 'Image generated!')
