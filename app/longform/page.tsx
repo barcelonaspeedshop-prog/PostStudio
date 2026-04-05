@@ -24,6 +24,9 @@ export default function LongFormPage() {
   const [assemblyProgress, setAssemblyProgress] = useState('')
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; type?: 'error' | 'success' } | null>(null)
+  const [chapterAudio, setChapterAudio] = useState<Record<number, string>>({}) // chapterId -> base64 data URL
+  const [voiceoverStatus, setVoiceoverStatus] = useState<Record<number, 'generating' | 'ready'>>({})
+  const [generatingAllVoiceovers, setGeneratingAllVoiceovers] = useState(false)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -44,6 +47,8 @@ export default function LongFormPage() {
       if (!res.ok) throw new Error(data.error)
       setScript(data.script)
       setChapterMedia({})
+      setChapterAudio({})
+      setVoiceoverStatus({})
       setVideoUrl(null)
       showToast('Script generated!')
     } catch (e: unknown) {
@@ -126,6 +131,67 @@ export default function LongFormPage() {
     a.click()
   }
 
+  // ─── Voiceover generation ───
+  const generateVoiceover = async (chapterId: number, text: string) => {
+    setVoiceoverStatus(prev => ({ ...prev, [chapterId]: 'generating' }))
+    try {
+      const res = await fetch('/api/story-voiceover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setChapterAudio(prev => ({ ...prev, [chapterId]: data.audio }))
+      setVoiceoverStatus(prev => ({ ...prev, [chapterId]: 'ready' }))
+      return true
+    } catch (e: unknown) {
+      setVoiceoverStatus(prev => { const n = { ...prev }; delete n[chapterId]; return n })
+      showToast(e instanceof Error ? e.message : 'Voiceover failed', 'error')
+      return false
+    }
+  }
+
+  const generateAllVoiceovers = async () => {
+    if (!script) return
+    setGeneratingAllVoiceovers(true)
+    let success = 0
+    for (const chapter of script.chapters) {
+      if (chapterAudio[chapter.id]) { success++; continue }
+      const ok = await generateVoiceover(chapter.id, chapter.narration)
+      if (ok) success++
+    }
+    setGeneratingAllVoiceovers(false)
+    showToast(`${success}/${script.chapters.length} voiceovers generated`)
+  }
+
+  const downloadCombinedAudio = async () => {
+    if (!script) return
+    // Collect audio blobs in chapter order
+    const chunks: ArrayBuffer[] = []
+    for (const chapter of script.chapters) {
+      const dataUrl = chapterAudio[chapter.id]
+      if (!dataUrl) continue
+      const base64 = dataUrl.split(',')[1]
+      const binary = atob(base64)
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+      chunks.push(bytes.buffer)
+    }
+    if (chunks.length === 0) { showToast('No voiceovers to download', 'error'); return }
+    const blob = new Blob(chunks, { type: 'audio/mpeg' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${channel.replace(/\s+/g, '_')}_voiceover.mp3`
+    a.click()
+    URL.revokeObjectURL(url)
+    showToast('Audio downloaded!')
+  }
+
+  const voiceoverCount = Object.keys(chapterAudio).length
+  const allVoiceoversReady = script ? voiceoverCount === script.chapters.length : false
+
   // ─── Computed ───
   const hasAnyMedia = Object.values(chapterMedia).some(f => f.length > 0)
   const totalMedia = Object.values(chapterMedia).reduce((s, f) => s + f.length, 0)
@@ -165,6 +231,29 @@ export default function LongFormPage() {
               {generating ? <><Spinner /> Writing script...</> : <><span className="text-[11px]">&#x270E;</span> Generate story</>}
             </button>
 
+            {/* Voiceover */}
+            {script && (
+              <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 flex flex-col gap-3">
+                <p className="text-[10px] font-medium text-violet-700 uppercase tracking-widest">Voiceover</p>
+                <button
+                  onClick={generateAllVoiceovers}
+                  disabled={generatingAllVoiceovers || allVoiceoversReady}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-violet-600 text-white text-[13px] font-medium rounded-xl hover:bg-violet-700 transition-colors disabled:opacity-50"
+                >
+                  {generatingAllVoiceovers ? <><Spinner /> Generating...</> : allVoiceoversReady ? 'All voiceovers ready' : <><span className="text-[11px]">&#9835;</span> Generate all voiceovers</>}
+                </button>
+                <p className="text-[10px] text-violet-500">{voiceoverCount}/{script.chapters.length} chapters voiced</p>
+                {allVoiceoversReady && (
+                  <button
+                    onClick={downloadCombinedAudio}
+                    className="w-full px-3 py-2 text-[12px] font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
+                  >
+                    &#8595; Download combined audio
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Assembly */}
             {script && (
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex flex-col gap-3">
@@ -188,6 +277,7 @@ export default function LongFormPage() {
                 <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-1">Info</p>
                 <p>{script.chapters.length} chapters</p>
                 <p>{totalMedia} media files uploaded</p>
+                <p>{voiceoverCount} voiceovers generated</p>
               </div>
             )}
           </div>
@@ -217,6 +307,33 @@ export default function LongFormPage() {
                     </div>
 
                     <p className="text-[13px] text-stone-700 leading-relaxed">{chapter.narration}</p>
+
+                    {/* Voiceover */}
+                    <div className="flex items-center gap-2">
+                      {voiceoverStatus[chapter.id] === 'generating' ? (
+                        <div className="flex items-center gap-2 text-[12px] text-violet-600">
+                          <Spinner className="w-3 h-3" />
+                          <span>Generating voiceover...</span>
+                        </div>
+                      ) : chapterAudio[chapter.id] ? (
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <audio src={chapterAudio[chapter.id]} controls className="h-8 flex-1 min-w-0" />
+                          <button
+                            onClick={() => generateVoiceover(chapter.id, chapter.narration)}
+                            className="shrink-0 px-2 py-1 text-[10px] border border-stone-200 rounded-md hover:bg-stone-50 text-stone-500 transition-colors"
+                          >
+                            Redo
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => generateVoiceover(chapter.id, chapter.narration)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-violet-100 text-violet-700 rounded-lg hover:bg-violet-200 transition-colors"
+                        >
+                          <span className="text-[10px]">&#9835;</span> Generate voiceover
+                        </button>
+                      )}
+                    </div>
 
                     <div className="bg-stone-50 rounded-lg px-3 py-2">
                       <p className="text-[10px] font-medium text-stone-400 uppercase tracking-widest mb-0.5">Visual</p>
