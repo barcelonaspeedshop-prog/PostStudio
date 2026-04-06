@@ -269,9 +269,19 @@ async function assembleInBackground(
       updateJob(jobId, { progress: 'Mixing background music...' })
       const masterWithMusic = path.join(tmpDir, 'master_with_music.mp4')
       const vol = Math.max(0, Math.min(1, musicVolume))
-      // Check if the video has an audio stream to mix with
-      const hasAudio = Object.keys(audioByChapter).length > 0
-      if (hasAudio) {
+      // Probe the video file for audio streams
+      const hasAudioStream = await new Promise<boolean>((resolve) => {
+        const proc = spawn('ffprobe', [
+          '-v', 'error', '-select_streams', 'a', '-show_entries', 'stream=index',
+          '-of', 'csv=p=0', masterFinal,
+        ])
+        let out = ''
+        proc.stdout.on('data', (d: Buffer) => { out += d.toString() })
+        proc.on('close', () => resolve(out.trim().length > 0))
+        proc.on('error', () => resolve(false))
+      })
+      console.log(`[story-video] Video has audio stream: ${hasAudioStream}`)
+      if (hasAudioStream) {
         // Mix music with existing voiceover audio
         await runFfmpeg([
           '-i', masterFinal,
@@ -283,7 +293,7 @@ async function assembleInBackground(
           '-shortest', '-movflags', '+faststart', '-y', masterWithMusic,
         ])
       } else {
-        // No voiceover — just add music as the audio track
+        // No audio in video — add music as the only audio track
         await runFfmpeg([
           '-i', masterFinal,
           '-stream_loop', '-1', '-i', musicPath,
