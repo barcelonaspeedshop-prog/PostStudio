@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { spawn } from 'child_process'
-import { writeFile, mkdir } from 'fs/promises'
+import { writeFile, mkdir, rename } from 'fs/promises'
 import { createWriteStream, existsSync, statSync } from 'fs'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
@@ -230,7 +230,23 @@ async function assembleInBackground(
         // Concat clips into chapter video (trailing newline ensures last entry is read)
         const concatList = path.join(tmpDir, `concat_ch${chId}.txt`)
         await writeFile(concatList, clips.map(f => `file '${f}'`).join('\n') + '\n')
-        await runFfmpeg(['-f', 'concat', '-safe', '0', '-i', concatList, '-c', 'copy', '-y', chapterVideoPath])
+        const chapterVideoOnly = path.join(tmpDir, `chapter_${chId}_video.mp4`)
+        await runFfmpeg(['-f', 'concat', '-safe', '0', '-i', concatList, '-c', 'copy', '-y', chapterVideoOnly])
+
+        // Mux chapter audio into the chapter video if available
+        const chapterAudioPath = audioByChapter[chId]
+        if (chapterAudioPath && existsSync(chapterAudioPath)) {
+          console.log(`[story-video] Muxing audio into chapter ${chId} video`)
+          await runFfmpeg([
+            '-i', chapterVideoOnly,
+            '-i', chapterAudioPath,
+            '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k',
+            '-shortest', '-movflags', '+faststart', '-y', chapterVideoPath,
+          ])
+        } else {
+          // No audio — just rename
+          await rename(chapterVideoOnly, chapterVideoPath)
+        }
 
         // Add 0.5s buffer to final chapter to prevent early cutoff
         if (isLastChapter) {
@@ -376,7 +392,9 @@ export async function POST(req: NextRequest) {
       const audioPath = path.join(tmpDir, `audio_ch${chId}.${ext}`)
       await streamToDisk(file, audioPath)
       audioByChapter[chId] = audioPath
+      console.log(`[story-video] Received audio for chapter ${chId}: ${file.name} (${(file.size / 1024).toFixed(1)} KB, type=${file.type})`)
     }
+    console.log(`[story-video] Audio files received for ${Object.keys(audioByChapter).length} chapters: [${Object.keys(audioByChapter).join(', ')}]`)
 
     // Stream background music to disk if provided
     let musicPath: string | null = null
