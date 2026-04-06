@@ -127,9 +127,18 @@ async function assembleInBackground(
     for (const chId of chapterIds) {
       const audioPath = audioByChapter[chId]
       if (audioPath) {
-        const dur = await probeDuration(audioPath)
-        if (dur > 0) audioDurations[chId] = dur
-        console.log(`[story-video] Chapter ${chId} audio duration: ${dur.toFixed(2)}s`)
+        try {
+          const dur = await probeDuration(audioPath)
+          // Only use audio-driven timing if we get a plausible duration (> 1s)
+          if (dur > 1) {
+            audioDurations[chId] = dur
+            console.log(`[story-video] Chapter ${chId} audio duration: ${dur.toFixed(2)}s`)
+          } else {
+            console.log(`[story-video] Chapter ${chId} audio probe returned ${dur}s, using default image timing`)
+          }
+        } catch (e) {
+          console.log(`[story-video] Chapter ${chId} audio probe failed, using default image timing`)
+        }
       }
     }
 
@@ -169,9 +178,9 @@ async function assembleInBackground(
               videoClipBudget += await probeDuration(media[j].path)
             }
           }
-          // Time remaining for images after video clips
-          const imageTimeBudget = Math.max(audioDur - videoClipBudget, imageCount * 1) // at least 1s per image
-          perImageDur = imageTimeBudget / imageCount
+          // Time remaining for images after video clips (at least 2s per image)
+          const imageTimeBudget = Math.max(audioDur - videoClipBudget, imageCount * 2)
+          perImageDur = Math.max(imageTimeBudget / imageCount, 2)
           console.log(`[story-video] Chapter ${chId}: audio=${audioDur.toFixed(2)}s, videos=${videoClipBudget.toFixed(2)}s, ${imageCount} images @ ${perImageDur.toFixed(2)}s each`)
         }
 
@@ -199,9 +208,9 @@ async function assembleInBackground(
             const clipDur = await probeDuration(clipPath)
             chapterDur += clipDur
           } else {
-            // Image duration: audio-driven or default 5s
-            const imgDur = perImageDur
-            const frames = Math.round(imgDur * 24)
+            // Image duration: audio-driven or default 5s (minimum 2s to avoid ffmpeg errors)
+            const imgDur = Math.max(perImageDur, 2)
+            const frames = Math.max(Math.round(imgDur * 24), 48)
             await runFfmpeg([
               '-loop', '1', '-framerate', '1', '-i', m.path,
               '-vf', `scale=8000:-1,zoompan=z='zoom+0.0005':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${W}x${H}:fps=24,setsar=1`,

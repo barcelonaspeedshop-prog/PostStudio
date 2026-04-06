@@ -36,7 +36,8 @@ export default function LongFormPage() {
   }
 
   const generateTestAudio = (durationSeconds: number): string => {
-    const sampleRate = 44100
+    // Use low sample rate to keep file small and avoid base64 encoding issues
+    const sampleRate = 8000
     const numSamples = sampleRate * durationSeconds
     const numChannels = 1
     const bitsPerSample = 16
@@ -45,22 +46,24 @@ export default function LongFormPage() {
     const dataSize = numSamples * blockAlign
     const buffer = new ArrayBuffer(44 + dataSize)
     const view = new DataView(buffer)
-    const writeString = (offset: number, str: string) => {
-      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i))
+    const writeStr = (off: number, str: string) => {
+      for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i))
     }
-    writeString(0, 'RIFF')
+    writeStr(0, 'RIFF')
     view.setUint32(4, 36 + dataSize, true)
-    writeString(8, 'WAVE')
-    writeString(12, 'fmt ')
-    view.setUint32(16, 16, true)
-    view.setUint16(20, 1, true)
+    writeStr(8, 'WAVE')
+    writeStr(12, 'fmt ')
+    view.setUint32(16, 16, true)       // PCM format chunk size
+    view.setUint16(20, 1, true)        // AudioFormat: PCM
     view.setUint16(22, numChannels, true)
     view.setUint32(24, sampleRate, true)
     view.setUint32(28, byteRate, true)
     view.setUint16(32, blockAlign, true)
     view.setUint16(34, bitsPerSample, true)
-    writeString(36, 'data')
+    writeStr(36, 'data')
     view.setUint32(40, dataSize, true)
+    // Data bytes are all zero = silence
+    // Convert to base64 via Blob + FileReader workaround for large buffers
     const bytes = new Uint8Array(buffer)
     let binary = ''
     for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
