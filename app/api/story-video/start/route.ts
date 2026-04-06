@@ -213,9 +213,11 @@ async function assembleInBackground(
             // Image duration: audio-driven or default 5s (minimum 2s to avoid ffmpeg errors)
             const imgDur = Math.max(perImageDur, 2)
             const frames = Math.max(Math.round(imgDur * 24), 48)
+            // Use lavfi color source + overlay instead of -loop flag (which fails on long durations)
             await runFfmpeg([
-              '-loop', '1', '-framerate', '1', '-i', m.path,
-              '-vf', `scale=8000:-1,zoompan=z='zoom+0.0005':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${W}x${H}:fps=24,setsar=1`,
+              '-f', 'lavfi', '-i', `color=black:size=${W}x${H}:rate=24`,
+              '-i', m.path,
+              '-filter_complex', `[1:v]scale=8000:-1,zoompan=z='zoom+0.0005':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${W}x${H}:fps=24,setsar=1[zoomed];[0:v][zoomed]overlay=shortest=1`,
               '-t', String(imgDur),
               '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'veryfast', '-crf', '23',
               '-y', clipPath,
