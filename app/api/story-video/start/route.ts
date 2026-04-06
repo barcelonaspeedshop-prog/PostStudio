@@ -203,7 +203,7 @@ async function assembleInBackground(
             const imgDur = perImageDur
             const frames = Math.round(imgDur * 24)
             await runFfmpeg([
-              '-loop', '1', '-framerate', '24', '-i', m.path,
+              '-loop', '1', '-framerate', '1', '-i', m.path,
               '-vf', `scale=8000:-1,zoompan=z='zoom+0.0005':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${W}x${H}:fps=24,setsar=1`,
               '-t', String(imgDur),
               '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'veryfast', '-crf', '23',
