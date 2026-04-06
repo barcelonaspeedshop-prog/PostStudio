@@ -26,6 +26,23 @@ function runFfmpeg(args: string[]): Promise<void> {
   })
 }
 
+function probeDuration(filePath: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('ffprobe', [
+      '-v', 'error', '-show_entries', 'format=duration',
+      '-of', 'default=noprint_wrappers=1:nokey=1', filePath,
+    ])
+    let out = ''
+    proc.stdout.on('data', (d: Buffer) => { out += d.toString() })
+    proc.on('close', (code) => {
+      const dur = parseFloat(out.trim())
+      if (code === 0 && !isNaN(dur)) resolve(dur)
+      else resolve(5) // fallback
+    })
+    proc.on('error', () => resolve(5))
+  })
+}
+
 // ─── Helpers ───
 
 type MediaItem = { path: string; isVideo: boolean }
@@ -105,9 +122,11 @@ async function assembleInBackground(
     updateJob(jobId, { status: 'processing', progress: 'Starting assembly...' })
 
     const chapterVideos: string[] = []
+    const chapterDurations: Record<number, number> = {}
 
     for (let ci = 0; ci < chapterIds.length; ci++) {
       const chId = chapterIds[ci]
+      const isLastChapter = ci === chapterIds.length - 1
       updateJob(jobId, { progress: `Rendering chapter ${ci + 1}/${chapterIds.length}` })
 
       const media = mediaByChapter[chId] || []
@@ -120,9 +139,11 @@ async function assembleInBackground(
           '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast', '-crf', '28',
           '-an', '-movflags', '+faststart', '-y', chapterVideoPath,
         ])
+        chapterDurations[chId] = IMAGE_DUR
       } else {
         // Build a clip per media item
         const clips: string[] = []
+        let chapterDur = 0
 
         for (let j = 0; j < media.length; j++) {
           const m = media[j]
@@ -133,14 +154,16 @@ async function assembleInBackground(
           }
 
           if (m.isVideo) {
-            // Video: scale/pad to 1920x1080, use first 5 seconds
+            // Video: scale/pad to 1920x1080, preserve full duration
             await runFfmpeg([
               '-i', m.path,
               '-vf', `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1`,
-              '-t', String(IMAGE_DUR), '-r', '24',
+              '-r', '24',
               '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast', '-crf', '28',
               '-an', '-movflags', '+faststart', '-y', clipPath,
             ])
+            const clipDur = await probeDuration(clipPath)
+            chapterDur += clipDur
           } else {
             // Image: Ken Burns smooth zoom — upscale first for sub-pixel smoothness
             const frames = IMAGE_DUR * 24
@@ -151,36 +174,38 @@ async function assembleInBackground(
               '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'veryfast', '-crf', '23',
               '-y', clipPath,
             ])
+            chapterDur += IMAGE_DUR
           }
           clips.push(clipPath)
         }
 
-        // Concat clips into chapter video
+        // Concat clips into chapter video (trailing newline ensures last entry is read)
         const concatList = path.join(tmpDir, `concat_ch${chId}.txt`)
-        await writeFile(concatList, clips.map(f => `file '${f}'`).join('\n'))
+        await writeFile(concatList, clips.map(f => `file '${f}'`).join('\n') + '\n')
         await runFfmpeg(['-f', 'concat', '-safe', '0', '-i', concatList, '-c', 'copy', '-y', chapterVideoPath])
+
+        // Add 0.5s buffer to final chapter to prevent early cutoff
+        if (isLastChapter) {
+          chapterDur += 0.5
+        }
+        chapterDurations[chId] = chapterDur
       }
 
       chapterVideos.push(chapterVideoPath)
     }
 
-    // Concat all chapters into raw video
+    // Concat all chapters into raw video (trailing newline ensures last chapter is included)
     updateJob(jobId, { progress: 'Joining chapters...' })
     const masterConcat = path.join(tmpDir, 'master_concat.txt')
-    await writeFile(masterConcat, chapterVideos.map(f => `file '${f}'`).join('\n'))
+    await writeFile(masterConcat, chapterVideos.map(f => `file '${f}'`).join('\n') + '\n')
     const masterRaw = path.join(tmpDir, 'master_raw.mp4')
     await runFfmpeg([
       '-f', 'concat', '-safe', '0', '-i', masterConcat,
       '-c', 'copy', '-movflags', '+faststart', '-y', masterRaw,
     ])
 
-    // Burn subtitles
+    // Burn subtitles (chapterDurations already computed with actual video durations above)
     updateJob(jobId, { progress: 'Burning subtitles...' })
-    const chapterDurations: Record<number, number> = {}
-    for (const ch of chapters) {
-      const media = mediaByChapter[ch.id] || []
-      chapterDurations[ch.id] = media.length > 0 ? media.length * IMAGE_DUR : IMAGE_DUR
-    }
     const assPath = path.join(tmpDir, 'subtitles.ass')
     await writeFile(assPath, buildAss(chapters, chapterDurations, W, H))
     const escapedAss = assPath.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "'\\\\\\''")
