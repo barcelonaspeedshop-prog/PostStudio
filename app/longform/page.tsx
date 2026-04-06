@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Sidebar from '@/components/Sidebar'
 
 type Chapter = { id: number; title: string; type: string; narration: string; visual: string }
@@ -29,6 +29,10 @@ export default function LongFormPage() {
   const [generatingAllVoiceovers, setGeneratingAllVoiceovers] = useState(false)
   const [testMode, setTestMode] = useState(false)
   const [testDuration, setTestDuration] = useState<10 | 30>(10)
+  const [bgMusic, setBgMusic] = useState<File | null>(null)
+  const [bgMusicName, setBgMusicName] = useState('')
+  const [musicVolume, setMusicVolume] = useState(0.15)
+  const bgMusicRef = useRef<HTMLInputElement>(null)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -147,6 +151,12 @@ export default function LongFormPage() {
         const blob = new Blob([bytes], { type: mime })
         formData.append('audio', blob, `ch${chIdStr}_voiceover.${ext}`)
         formData.append('audioChapterIds', chIdStr)
+      }
+
+      // Send background music if provided
+      if (bgMusic) {
+        formData.append('music', bgMusic, bgMusic.name)
+        formData.append('musicVolume', String(musicVolume))
       }
 
       const startRes = await fetch('/api/story-video/start', { method: 'POST', body: formData })
@@ -340,6 +350,29 @@ export default function LongFormPage() {
                   >
                     &#8595; Download combined audio
                   </button>
+                )}
+              </div>
+            )}
+
+            {/* Background music */}
+            {script && (
+              <div className="bg-stone-50 border border-stone-100 rounded-xl p-4 flex flex-col gap-3">
+                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Background music</p>
+                <input ref={bgMusicRef} type="file" accept="audio/*" className="hidden" onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) { setBgMusic(file); setBgMusicName(file.name); showToast(`Music: ${file.name}`) }
+                }} />
+                <button onClick={() => bgMusicRef.current?.click()} className="w-full px-3 py-2 text-[12px] border border-stone-200 rounded-lg hover:bg-white transition-colors text-stone-600 text-left">
+                  {bgMusic ? `\u2713 ${bgMusicName}` : '+ Add music track (optional)'}
+                </button>
+                {bgMusic && (
+                  <>
+                    <button onClick={() => { setBgMusic(null); setBgMusicName('') }} className="text-[11px] text-red-500 hover:text-red-700 text-left">Remove</button>
+                    <div>
+                      <p className="text-[11px] text-stone-400 mb-1">Volume — {Math.round(musicVolume * 100)}%</p>
+                      <input type="range" min="0" max="1" step="0.05" value={musicVolume} onChange={(e) => setMusicVolume(parseFloat(e.target.value))} className="w-full" />
+                    </div>
+                  </>
                 )}
               </div>
             )}

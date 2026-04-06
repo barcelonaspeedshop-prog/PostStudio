@@ -114,6 +114,8 @@ async function assembleInBackground(
   chapters: ChapterInfo[],
   mediaByChapter: Record<number, MediaItem[]>,
   audioByChapter: Record<number, string>,
+  musicPath: string | null,
+  musicVolume: number,
   tmpDir: string,
 ) {
   const W = 1920, H = 1080, DEFAULT_IMAGE_DUR = 5
@@ -261,11 +263,45 @@ async function assembleInBackground(
       '-c:a', 'copy', '-movflags', '+faststart', '-y', masterFinal,
     ])
 
+    // Mix background music if provided
+    let outputVideo = masterFinal
+    if (musicPath && existsSync(musicPath)) {
+      updateJob(jobId, { progress: 'Mixing background music...' })
+      const masterWithMusic = path.join(tmpDir, 'master_with_music.mp4')
+      const vol = Math.max(0, Math.min(1, musicVolume))
+      // Check if the video has an audio stream to mix with
+      const hasAudio = Object.keys(audioByChapter).length > 0
+      if (hasAudio) {
+        // Mix music with existing voiceover audio
+        await runFfmpeg([
+          '-i', masterFinal,
+          '-stream_loop', '-1', '-i', musicPath,
+          '-filter_complex', `[1:a]volume=${vol}[music];[0:a][music]amix=inputs=2:duration=first:dropout_transition=2[aout]`,
+          '-map', '0:v', '-map', '[aout]',
+          '-c:v', 'copy',
+          '-c:a', 'aac', '-b:a', '192k',
+          '-shortest', '-movflags', '+faststart', '-y', masterWithMusic,
+        ])
+      } else {
+        // No voiceover — just add music as the audio track
+        await runFfmpeg([
+          '-i', masterFinal,
+          '-stream_loop', '-1', '-i', musicPath,
+          '-filter_complex', `[1:a]volume=${vol}[aout]`,
+          '-map', '0:v', '-map', '[aout]',
+          '-c:v', 'copy',
+          '-c:a', 'aac', '-b:a', '192k',
+          '-shortest', '-movflags', '+faststart', '-y', masterWithMusic,
+        ])
+      }
+      outputVideo = masterWithMusic
+    }
+
     const totalDuration = Object.values(chapterDurations).reduce((a, b) => a + b, 0)
     updateJob(jobId, {
       status: 'complete',
       progress: 'Complete',
-      videoPath: masterFinal,
+      videoPath: outputVideo,
       duration: totalDuration,
       tmpDir,
     })
@@ -330,8 +366,22 @@ export async function POST(req: NextRequest) {
       audioByChapter[chId] = audioPath
     }
 
+    // Stream background music to disk if provided
+    let musicPath: string | null = null
+    let musicVolume = 0.15
+    const musicFile = formData.get('music') as File | null
+    const musicVolumeRaw = formData.get('musicVolume') as string | null
+    if (musicFile && musicFile.size > 0) {
+      const ext = musicFile.name.split('.').pop() || 'mp3'
+      musicPath = path.join(tmpDir, `bg_music.${ext}`)
+      await streamToDisk(musicFile, musicPath)
+    }
+    if (musicVolumeRaw) {
+      musicVolume = Math.max(0, Math.min(1, parseFloat(musicVolumeRaw) || 0.15))
+    }
+
     const job = createJob()
-    assembleInBackground(job.id, chapters, mediaByChapter, audioByChapter, tmpDir)
+    assembleInBackground(job.id, chapters, mediaByChapter, audioByChapter, musicPath, musicVolume, tmpDir)
     return NextResponse.json({ jobId: job.id })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
