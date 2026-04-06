@@ -133,6 +133,19 @@ export default function LongFormPage() {
         }
       }
 
+      // Send chapter audio files so the backend can sync image timing to voiceover duration
+      for (const [chIdStr, dataUrl] of Object.entries(chapterAudio)) {
+        const base64 = dataUrl.split(',')[1]
+        const mime = dataUrl.split(';')[0].split(':')[1] || 'audio/mpeg'
+        const binary = atob(base64)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+        const ext = mime.includes('wav') ? 'wav' : 'mp3'
+        const blob = new Blob([bytes], { type: mime })
+        formData.append('audio', blob, `ch${chIdStr}_voiceover.${ext}`)
+        formData.append('audioChapterIds', chIdStr)
+      }
+
       const startRes = await fetch('/api/story-video/start', { method: 'POST', body: formData })
       const startData = await startRes.json()
       if (!startRes.ok) throw new Error(startData.error)

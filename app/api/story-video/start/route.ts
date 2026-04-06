@@ -113,13 +113,25 @@ async function assembleInBackground(
   jobId: string,
   chapters: ChapterInfo[],
   mediaByChapter: Record<number, MediaItem[]>,
+  audioByChapter: Record<number, string>,
   tmpDir: string,
 ) {
-  const W = 1920, H = 1080, IMAGE_DUR = 5
+  const W = 1920, H = 1080, DEFAULT_IMAGE_DUR = 5
   const chapterIds = chapters.map(c => c.id)
 
   try {
     updateJob(jobId, { status: 'processing', progress: 'Starting assembly...' })
+
+    // Probe audio durations for chapters that have voiceover
+    const audioDurations: Record<number, number> = {}
+    for (const chId of chapterIds) {
+      const audioPath = audioByChapter[chId]
+      if (audioPath) {
+        const dur = await probeDuration(audioPath)
+        if (dur > 0) audioDurations[chId] = dur
+        console.log(`[story-video] Chapter ${chId} audio duration: ${dur.toFixed(2)}s`)
+      }
+    }
 
     const chapterVideos: string[] = []
     const chapterDurations: Record<number, number> = {}
@@ -133,14 +145,36 @@ async function assembleInBackground(
       const chapterVideoPath = path.join(tmpDir, `chapter_${chId}.mp4`)
 
       if (media.length === 0) {
-        // No media — 5s black frame
+        // No media — use audio duration or default 5s black frame
+        const dur = audioDurations[chId] || DEFAULT_IMAGE_DUR
         await runFfmpeg([
-          '-f', 'lavfi', '-i', `color=c=black:size=${W}x${H}:rate=24:d=${IMAGE_DUR}`,
+          '-f', 'lavfi', '-i', `color=c=black:size=${W}x${H}:rate=24:d=${dur}`,
           '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast', '-crf', '28',
           '-an', '-movflags', '+faststart', '-y', chapterVideoPath,
         ])
-        chapterDurations[chId] = IMAGE_DUR
+        chapterDurations[chId] = dur
       } else {
+        // Count images vs videos to compute per-image duration from audio
+        const imageCount = media.filter(m => !m.isVideo).length
+        const audioDur = audioDurations[chId]
+        let perImageDur = DEFAULT_IMAGE_DUR
+
+        // If audio exists, divide its duration equally across images
+        // Video clips keep their natural duration (subtracted from audio time budget)
+        if (audioDur && imageCount > 0) {
+          // First pass: probe video clip durations to subtract from audio budget
+          let videoClipBudget = 0
+          for (let j = 0; j < media.length; j++) {
+            if (media[j].isVideo) {
+              videoClipBudget += await probeDuration(media[j].path)
+            }
+          }
+          // Time remaining for images after video clips
+          const imageTimeBudget = Math.max(audioDur - videoClipBudget, imageCount * 1) // at least 1s per image
+          perImageDur = imageTimeBudget / imageCount
+          console.log(`[story-video] Chapter ${chId}: audio=${audioDur.toFixed(2)}s, videos=${videoClipBudget.toFixed(2)}s, ${imageCount} images @ ${perImageDur.toFixed(2)}s each`)
+        }
+
         // Build a clip per media item
         const clips: string[] = []
         let chapterDur = 0
@@ -165,16 +199,17 @@ async function assembleInBackground(
             const clipDur = await probeDuration(clipPath)
             chapterDur += clipDur
           } else {
-            // Image: Ken Burns smooth zoom — upscale first for sub-pixel smoothness
-            const frames = IMAGE_DUR * 24
+            // Image duration: audio-driven or default 5s
+            const imgDur = perImageDur
+            const frames = Math.round(imgDur * 24)
             await runFfmpeg([
               '-loop', '1', '-framerate', '24', '-i', m.path,
               '-vf', `scale=8000:-1,zoompan=z='zoom+0.0005':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${W}x${H}:fps=24,setsar=1`,
-              '-t', String(IMAGE_DUR),
+              '-t', String(imgDur),
               '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'veryfast', '-crf', '23',
               '-y', clipPath,
             ])
-            chapterDur += IMAGE_DUR
+            chapterDur += imgDur
           }
           clips.push(clipPath)
         }
@@ -272,8 +307,22 @@ export async function POST(req: NextRequest) {
       mediaByChapter[chId].push({ path: mediaPath, isVideo })
     }
 
+    // Stream chapter audio files to disk
+    const audioFiles = formData.getAll('audio') as File[]
+    const audioChapterIds = formData.getAll('audioChapterIds') as string[]
+    const audioByChapter: Record<number, string> = {}
+
+    for (let i = 0; i < audioFiles.length; i++) {
+      const file = audioFiles[i]
+      const chId = parseInt(audioChapterIds[i])
+      const ext = file.type.includes('wav') ? 'wav' : 'mp3'
+      const audioPath = path.join(tmpDir, `audio_ch${chId}.${ext}`)
+      await streamToDisk(file, audioPath)
+      audioByChapter[chId] = audioPath
+    }
+
     const job = createJob()
-    assembleInBackground(job.id, chapters, mediaByChapter, tmpDir)
+    assembleInBackground(job.id, chapters, mediaByChapter, audioByChapter, tmpDir)
     return NextResponse.json({ jobId: job.id })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
