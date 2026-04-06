@@ -27,10 +27,51 @@ export default function LongFormPage() {
   const [chapterAudio, setChapterAudio] = useState<Record<number, string>>({}) // chapterId -> base64 data URL
   const [voiceoverStatus, setVoiceoverStatus] = useState<Record<number, 'generating' | 'ready'>>({})
   const [generatingAllVoiceovers, setGeneratingAllVoiceovers] = useState(false)
+  const [testMode, setTestMode] = useState(false)
+  const [testDuration, setTestDuration] = useState<10 | 30>(10)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 4000)
+  }
+
+  const generateTestAudio = (durationSeconds: number): string => {
+    const sampleRate = 44100
+    const numSamples = sampleRate * durationSeconds
+    const numChannels = 1
+    const bitsPerSample = 16
+    const byteRate = sampleRate * numChannels * (bitsPerSample / 8)
+    const blockAlign = numChannels * (bitsPerSample / 8)
+    const dataSize = numSamples * blockAlign
+    const buffer = new ArrayBuffer(44 + dataSize)
+    const view = new DataView(buffer)
+    const writeString = (offset: number, str: string) => {
+      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i))
+    }
+    writeString(0, 'RIFF')
+    view.setUint32(4, 36 + dataSize, true)
+    writeString(8, 'WAVE')
+    writeString(12, 'fmt ')
+    view.setUint32(16, 16, true)
+    view.setUint16(20, 1, true)
+    view.setUint16(22, numChannels, true)
+    view.setUint32(24, sampleRate, true)
+    view.setUint32(28, byteRate, true)
+    view.setUint16(32, blockAlign, true)
+    view.setUint16(34, bitsPerSample, true)
+    writeString(36, 'data')
+    view.setUint32(40, dataSize, true)
+    const bytes = new Uint8Array(buffer)
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+    return 'data:audio/wav;base64,' + btoa(binary)
+  }
+
+  const generateTestVoiceover = (chapterId: number) => {
+    const audioDataUrl = generateTestAudio(testDuration)
+    setChapterAudio(prev => ({ ...prev, [chapterId]: audioDataUrl }))
+    setVoiceoverStatus(prev => ({ ...prev, [chapterId]: 'ready' }))
+    showToast(`Chapter ${chapterId} test audio ready (${testDuration}s)`)
   }
 
   // ─── Script generation ───
@@ -154,6 +195,13 @@ export default function LongFormPage() {
 
   const generateAllVoiceovers = async () => {
     if (!script) return
+    if (testMode) {
+      for (const chapter of script.chapters) {
+        if (!chapterAudio[chapter.id]) generateTestVoiceover(chapter.id)
+      }
+      showToast('All test audio ready!')
+      return
+    }
     setGeneratingAllVoiceovers(true)
     let success = 0
     for (const chapter of script.chapters) {
@@ -204,7 +252,33 @@ export default function LongFormPage() {
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* Topbar */}
         <div className="h-12 bg-white border-b border-stone-100 flex items-center justify-between px-5 shrink-0">
-          <span className="text-[14px] font-medium text-stone-900">Long form story</span>
+          <div className="flex items-center gap-3">
+            <span className="text-[14px] font-medium text-stone-900">Long form story</span>
+            <button
+              onClick={() => setTestMode(prev => !prev)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
+                testMode
+                  ? 'bg-amber-100 border-amber-300 text-amber-800'
+                  : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${testMode ? 'bg-amber-500' : 'bg-stone-300'}`} />
+              Test mode
+            </button>
+            {testMode && (
+              <>
+                <select
+                  value={testDuration}
+                  onChange={(e) => setTestDuration(Number(e.target.value) as 10 | 30)}
+                  className="text-[11px] border border-amber-300 rounded-lg px-2 py-1 bg-amber-50 text-amber-800 focus:outline-none"
+                >
+                  <option value={10}>10s</option>
+                  <option value={30}>30s</option>
+                </select>
+                <span className="text-[11px] text-amber-600 font-medium">Test mode — no ElevenLabs charges</span>
+              </>
+            )}
+          </div>
           {videoUrl && (
             <button onClick={downloadVideo} className="px-3 py-1.5 text-[12px] font-medium border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors">
               Download Video
@@ -238,9 +312,9 @@ export default function LongFormPage() {
                 <button
                   onClick={generateAllVoiceovers}
                   disabled={generatingAllVoiceovers || allVoiceoversReady}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-violet-600 text-white text-[13px] font-medium rounded-xl hover:bg-violet-700 transition-colors disabled:opacity-50"
+                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-white text-[13px] font-medium rounded-xl transition-colors disabled:opacity-50 ${testMode ? 'bg-amber-500 hover:bg-amber-600' : 'bg-violet-600 hover:bg-violet-700'}`}
                 >
-                  {generatingAllVoiceovers ? <><Spinner /> Generating...</> : allVoiceoversReady ? 'All voiceovers ready' : <><span className="text-[11px]">&#9835;</span> Generate all voiceovers</>}
+                  {generatingAllVoiceovers ? <><Spinner /> Generating...</> : allVoiceoversReady ? 'All voiceovers ready' : testMode ? 'Use test audio (all)' : <><span className="text-[11px]">&#9835;</span> Generate all voiceovers</>}
                 </button>
                 <p className="text-[10px] text-violet-500">{voiceoverCount}/{script.chapters.length} chapters voiced</p>
                 {allVoiceoversReady && (
@@ -327,10 +401,10 @@ export default function LongFormPage() {
                         </div>
                       ) : (
                         <button
-                          onClick={() => generateVoiceover(chapter.id, chapter.narration)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-violet-100 text-violet-700 rounded-lg hover:bg-violet-200 transition-colors"
+                          onClick={() => testMode ? generateTestVoiceover(chapter.id) : generateVoiceover(chapter.id, chapter.narration)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors ${testMode ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-violet-100 text-violet-700 hover:bg-violet-200'}`}
                         >
-                          <span className="text-[10px]">&#9835;</span> Generate voiceover
+                          <span className="text-[10px]">&#9835;</span> {testMode ? 'Use test audio' : 'Generate voiceover'}
                         </button>
                       )}
                     </div>
