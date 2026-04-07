@@ -57,7 +57,11 @@ export async function deleteTokenForChannel(channelName: string): Promise<void> 
 
 export async function getAuthenticatedClient(channelName: string) {
   const token = await getTokenForChannel(channelName)
-  if (!token) throw new Error(`No YouTube token found for channel: ${channelName}`)
+  if (!token) throw new Error(`No YouTube token found for channel: ${channelName}. Please connect it on the Accounts page.`)
+
+  if (!token.refresh_token) {
+    throw new Error(`No refresh token for "${channelName}". Please disconnect and reconnect the channel on the Accounts page.`)
+  }
 
   const oauth2 = getOAuth2Client()
   oauth2.setCredentials({
@@ -66,19 +70,32 @@ export async function getAuthenticatedClient(channelName: string) {
     expiry_date: token.expiry_date,
   })
 
-  // Refresh if expired
-  if (token.expiry_date && Date.now() >= token.expiry_date - 60000) {
-    const { credentials } = await oauth2.refreshAccessToken()
-    oauth2.setCredentials(credentials)
+  // Refresh if expired or expiring within 2 minutes
+  const isExpired = !token.expiry_date || Date.now() >= token.expiry_date - 120000
+  if (isExpired) {
+    console.log(`[youtube] Token expired for "${channelName}" (expired ${token.expiry_date ? new Date(token.expiry_date).toISOString() : 'unknown'}), refreshing...`)
+    try {
+      const { credentials } = await oauth2.refreshAccessToken()
+      oauth2.setCredentials(credentials)
 
-    // Persist refreshed tokens
-    const tokens = await loadTokens()
-    tokens[channelName] = {
-      ...token,
-      access_token: credentials.access_token || token.access_token,
-      expiry_date: credentials.expiry_date || token.expiry_date,
+      // Persist refreshed tokens
+      const tokens = await loadTokens()
+      tokens[channelName] = {
+        ...token,
+        access_token: credentials.access_token || token.access_token,
+        expiry_date: credentials.expiry_date || token.expiry_date,
+      }
+      await saveTokens(tokens)
+      console.log(`[youtube] Token refreshed for "${channelName}", new expiry: ${credentials.expiry_date ? new Date(credentials.expiry_date).toISOString() : 'unknown'}`)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[youtube] Token refresh failed for "${channelName}":`, msg)
+      // If refresh token is revoked/invalid, give a clear message
+      if (msg.includes('invalid_grant') || msg.includes('Token has been expired or revoked')) {
+        throw new Error(`YouTube access for "${channelName}" has expired. Please reconnect the channel on the Accounts page.`)
+      }
+      throw new Error(`Failed to refresh YouTube token for "${channelName}": ${msg}`)
     }
-    await saveTokens(tokens)
   }
 
   return oauth2
