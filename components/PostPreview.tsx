@@ -20,7 +20,7 @@ export default function PostPreview({
   const info = PLATFORMS.find((p) => p.id === activePrev) ?? PLATFORMS[0]
 
   return (
-    <div className="w-72 shrink-0 bg-white border-l border-stone-100 overflow-y-auto p-5 flex flex-col gap-4">
+    <div className="w-full md:w-72 shrink-0 bg-white border-t md:border-t-0 md:border-l border-stone-100 overflow-y-auto p-4 md:p-5 flex flex-col gap-4">
       <p className="text-[12px] font-medium text-stone-800">Preview</p>
 
       {/* Platform tabs */}
@@ -104,7 +104,7 @@ export default function PostPreview({
         <p className="text-[10px] text-stone-500 mb-2">Publish to</p>
         <button
           onClick={onPublishAll}
-          className="w-full bg-stone-900 text-white text-[12px] font-medium py-2 rounded-lg hover:bg-stone-800 transition-colors mb-2"
+          className="w-full bg-stone-900 text-white text-[14px] md:text-[12px] font-medium py-3 min-h-[44px] rounded-lg hover:bg-stone-800 transition-colors mb-2"
         >
           Publish to all platforms
         </button>
@@ -113,7 +113,7 @@ export default function PostPreview({
             <button
               key={p}
               onClick={() => onPublishTo(p)}
-              className="text-[10px] px-2.5 py-1 border border-stone-200 rounded-md hover:bg-stone-50 transition-colors capitalize"
+              className="text-[12px] md:text-[10px] px-3 py-2 min-h-[36px] border border-stone-200 rounded-md hover:bg-stone-50 transition-colors capitalize"
             >
               {p}
             </button>

@@ -147,27 +147,27 @@ export default function ComposerPage() {
 
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* Topbar */}
-        <div className="h-12 bg-white border-b border-stone-100 flex items-center justify-between px-5 shrink-0">
+        <div className="h-12 bg-white border-b border-stone-100 flex items-center justify-between px-5 pl-14 md:pl-5 shrink-0">
           <span className="text-[14px] font-medium text-stone-900">New post</span>
           <div className="flex gap-2">
             <button
               onClick={() => show('Draft saved')}
-              className="px-3 py-1.5 text-[12px] font-medium border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
+              className="px-3 py-2 min-h-[44px] text-[13px] font-medium border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
             >
               Save draft
             </button>
             <button
               onClick={publishAll}
-              className="px-3 py-1.5 text-[12px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors"
+              className="px-3 py-2 min-h-[44px] text-[13px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors"
             >
               Publish
             </button>
           </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
           {/* Composer scroll area */}
-          <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
+          <div className="flex-1 overflow-y-auto p-4 md:p-5 flex flex-col gap-4">
 
             {/* AI Prompt Card */}
             <div className="bg-stone-50 border border-stone-100 rounded-xl p-4">
@@ -178,7 +178,7 @@ export default function ComposerPage() {
                 onChange={(e) => setAiPrompt(e.target.value)}
                 rows={3}
                 placeholder="e.g. A product launch video for our new wireless headphones. Target: music lovers 18–35. Key message: studio-quality sound at an affordable price."
-                className="w-full text-[13px] border border-stone-200 rounded-lg p-2.5 resize-none bg-white focus:outline-none focus:border-stone-400 text-stone-900 placeholder:text-stone-400"
+                className="w-full text-[16px] md:text-[13px] border border-stone-200 rounded-lg p-3 md:p-2.5 resize-none bg-white focus:outline-none focus:border-stone-400 text-stone-900 placeholder:text-stone-400"
               />
               <div className="flex items-center gap-2 mt-2.5 flex-wrap">
                 <div className="flex gap-1.5 flex-wrap flex-1">
@@ -199,7 +199,7 @@ export default function ComposerPage() {
                 <button
                   onClick={handleGenerateAll}
                   disabled={generating}
-                  className="flex items-center gap-1.5 px-4 py-1.5 bg-stone-900 text-white text-[12px] font-medium rounded-lg hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                  className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] bg-stone-900 text-white text-[14px] md:text-[12px] font-medium rounded-lg hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                 >
                   {generating ? (
                     <>
@@ -229,7 +229,7 @@ export default function ComposerPage() {
             <div className="bg-white border border-stone-100 rounded-xl p-4">
               <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-3">Media</p>
               <label
-                className="block border border-dashed border-stone-300 rounded-lg p-5 text-center cursor-pointer hover:bg-stone-50 transition-colors"
+                className="block border-2 border-dashed border-stone-300 rounded-xl p-6 md:p-5 text-center cursor-pointer hover:bg-stone-50 transition-colors"
                 onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('bg-stone-50') }}
                 onDragLeave={(e) => e.currentTarget.classList.remove('bg-stone-50')}
                 onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files) }}
@@ -289,7 +289,7 @@ export default function ComposerPage() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Your post title..."
-                className="w-full text-[13px] border border-stone-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-stone-400 text-stone-900 placeholder:text-stone-400"
+                className="w-full text-[16px] md:text-[13px] border border-stone-200 rounded-lg px-3 py-2.5 min-h-[44px] bg-white focus:outline-none focus:border-stone-400 text-stone-900 placeholder:text-stone-400"
               />
               <AIStrip onRegen={() => handleRegenField('title')} label="Regenerate title" loading={aiStatus.includes('title')} />
             </Field>
@@ -301,7 +301,7 @@ export default function ComposerPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 rows={4}
                 placeholder="Full post description..."
-                className="w-full text-[13px] border border-stone-200 rounded-lg px-3 py-2 resize-none bg-white focus:outline-none focus:border-stone-400 text-stone-900 placeholder:text-stone-400"
+                className="w-full text-[16px] md:text-[13px] border border-stone-200 rounded-lg px-3 py-2.5 resize-none bg-white focus:outline-none focus:border-stone-400 text-stone-900 placeholder:text-stone-400"
               />
               <div className="flex items-center justify-between mt-1.5">
                 <AIStrip
@@ -321,7 +321,7 @@ export default function ComposerPage() {
                 onChange={(e) => setCaption(e.target.value)}
                 rows={3}
                 placeholder="Short punchy caption..."
-                className="w-full text-[13px] border border-stone-200 rounded-lg px-3 py-2 resize-none bg-white focus:outline-none focus:border-stone-400 text-stone-900 placeholder:text-stone-400"
+                className="w-full text-[16px] md:text-[13px] border border-stone-200 rounded-lg px-3 py-2.5 resize-none bg-white focus:outline-none focus:border-stone-400 text-stone-900 placeholder:text-stone-400"
               />
               <div className="flex items-center justify-between mt-1.5">
                 <AIStrip onRegen={() => handleRegenField('caption')} label="Regenerate" loading={aiStatus.includes('caption')} />
@@ -358,7 +358,7 @@ export default function ComposerPage() {
                 value={cta}
                 onChange={(e) => setCta(e.target.value)}
                 placeholder="e.g. Link in bio! Shop now at..."
-                className="w-full text-[13px] border border-stone-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-stone-400 text-stone-900 placeholder:text-stone-400"
+                className="w-full text-[16px] md:text-[13px] border border-stone-200 rounded-lg px-3 py-2.5 min-h-[44px] bg-white focus:outline-none focus:border-stone-400 text-stone-900 placeholder:text-stone-400"
               />
               <AIStrip onRegen={() => handleRegenField('cta')} label="Generate CTA" loading={aiStatus.includes('cta')} />
             </Field>
@@ -406,7 +406,7 @@ export default function ComposerPage() {
                   type="datetime-local"
                   value={scheduleDt}
                   onChange={(e) => setScheduleDt(e.target.value)}
-                  className="text-[13px] border border-stone-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-stone-400 text-stone-900"
+                  className="text-[16px] md:text-[13px] border border-stone-200 rounded-lg px-3 py-2.5 min-h-[44px] bg-white focus:outline-none focus:border-stone-400 text-stone-900"
                 />
               )}
               {timing === 'ai' && (

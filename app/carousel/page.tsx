@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import Sidebar from '@/components/Sidebar'
 
 type Slide = {
@@ -36,10 +36,8 @@ function SlidePreview({ slide, index }: { slide: Slide; index: number }) {
   const colors = ACCENT_COLORS[slide.accent] || ACCENT_COLORS.red
   return (
     <div
-      className="relative rounded-xl overflow-hidden flex-shrink-0"
+      className="relative rounded-xl overflow-hidden flex-shrink-0 w-[160px] h-[200px] md:w-[200px] md:h-[250px]"
       style={{
-        width: 200,
-        height: 250,
         background: slide.image ? `url(${slide.image}) center/cover` : colors.bg,
       }}
     >
@@ -90,6 +88,8 @@ export default function CarouselPage() {
   const [publishing, setPublishing] = useState(false)
   const [showPublish, setShowPublish] = useState(false)
   const [publishPlatforms, setPublishPlatforms] = useState<string[]>([])
+  const [mobilePanel, setMobilePanel] = useState<'controls' | 'slides' | 'detail'>('slides')
+  const slideStripRef = useRef<HTMLDivElement>(null)
 
   const PUBLISH_PLATFORMS = [
     { id: 'instagram', label: 'Instagram', icon: 'IG' },
@@ -431,26 +431,44 @@ export default function CarouselPage() {
 
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* Topbar */}
-        <div className="h-12 bg-white border-b border-stone-100 flex items-center justify-between px-5 shrink-0">
+        <div className="h-12 bg-white border-b border-stone-100 flex items-center justify-between px-5 pl-14 md:pl-5 shrink-0">
           <span className="text-[14px] font-medium text-stone-900">Carousel builder</span>
           <div className="flex gap-2">
             {slides.length > 0 && (
               <>
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-1.5 text-[12px] font-medium border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
+                  className="px-3 py-2 min-h-[44px] text-[13px] font-medium border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
                 >
                   Add images
                 </button>
                 <button
                   onClick={downloadSlides}
-                  className="px-3 py-1.5 text-[12px] font-medium border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
+                  className="px-3 py-2 min-h-[44px] text-[13px] font-medium border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
                 >
                   Export
                 </button>
               </>
             )}
           </div>
+        </div>
+
+        {/* Mobile tab bar */}
+        <div className="flex md:hidden border-b border-stone-100 bg-white shrink-0">
+          {(['controls', 'slides', 'detail'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setMobilePanel(tab)}
+              className={`flex-1 py-3 text-[13px] font-medium capitalize transition-colors border-b-2 -mb-px ${
+                mobilePanel === tab
+                  ? 'text-stone-900 border-stone-900'
+                  : 'text-stone-400 border-transparent'
+              } ${tab === 'detail' && selectedSlide === null ? 'opacity-40' : ''}`}
+              disabled={tab === 'detail' && selectedSlide === null}
+            >
+              {tab === 'controls' ? 'Setup' : tab === 'slides' ? `Slides${slides.length ? ` (${slides.length})` : ''}` : 'Edit'}
+            </button>
+          ))}
         </div>
 
         <input
@@ -473,9 +491,9 @@ export default function CarouselPage() {
           }}
         />
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
           {/* Left panel — controls */}
-          <div className="w-72 border-r border-stone-100 overflow-y-auto p-5 flex flex-col gap-4 shrink-0">
+          <div className={`w-full md:w-72 border-r border-stone-100 overflow-y-auto p-4 md:p-5 flex flex-col gap-4 shrink-0 ${mobilePanel === 'controls' ? 'flex' : 'hidden md:flex'}`}>
 
             {/* Load today's news */}
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col gap-2.5">
@@ -483,7 +501,7 @@ export default function CarouselPage() {
               <select
                 value={newsChannel}
                 onChange={(e) => setNewsChannel(e.target.value)}
-                className="w-full text-[13px] border border-amber-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-amber-400 text-stone-900"
+                className="w-full text-[16px] md:text-[13px] border border-amber-200 rounded-lg px-3 py-2.5 min-h-[44px] bg-white focus:outline-none focus:border-amber-400 text-stone-900"
               >
                 {NEWS_CHANNELS.map((c) => (
                   <option key={c} value={c}>{c}</option>
@@ -492,7 +510,7 @@ export default function CarouselPage() {
               <button
                 onClick={loadTodaysNews}
                 disabled={loadingNews}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-600 text-white text-[13px] font-medium rounded-xl hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] bg-amber-600 text-white text-[14px] md:text-[13px] font-medium rounded-xl hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loadingNews ? (
                   <>
@@ -516,7 +534,7 @@ export default function CarouselPage() {
                 onChange={(e) => setTopic(e.target.value)}
                 rows={3}
                 placeholder="e.g. The Ferrari vs Lamborghini rivalry story"
-                className="w-full text-[13px] border border-stone-200 rounded-lg p-2.5 resize-none bg-white focus:outline-none focus:border-stone-400 text-stone-900 placeholder:text-stone-400"
+                className="w-full text-[16px] md:text-[13px] border border-stone-200 rounded-lg p-3 md:p-2.5 resize-none bg-white focus:outline-none focus:border-stone-400 text-stone-900 placeholder:text-stone-400"
               />
             </div>
 
@@ -526,7 +544,7 @@ export default function CarouselPage() {
               <select
                 value={channel}
                 onChange={(e) => setChannel(e.target.value)}
-                className="w-full text-[13px] border border-stone-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-stone-400 text-stone-900"
+                className="w-full text-[16px] md:text-[13px] border border-stone-200 rounded-lg px-3 py-2.5 min-h-[44px] bg-white focus:outline-none focus:border-stone-400 text-stone-900"
               >
                 {CHANNELS.map((c) => (
                   <option key={c} value={c}>{c}</option>
@@ -557,7 +575,7 @@ export default function CarouselPage() {
             <button
               onClick={generateSlides}
               disabled={generating}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-stone-900 text-white text-[13px] font-medium rounded-xl hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] bg-stone-900 text-white text-[14px] md:text-[13px] font-medium rounded-xl hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {generating ? (
                 <>
@@ -591,7 +609,7 @@ export default function CarouselPage() {
 
                 <button
                   onClick={() => audioInputRef.current?.click()}
-                  className="w-full px-3 py-2 text-[12px] border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors text-stone-600 text-left"
+                  className="w-full px-3 py-3 min-h-[44px] text-[14px] md:text-[12px] border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors text-stone-600 text-left"
                 >
                   {audioFile ? `✓ ${audioFile.name}` : '+ Add music track (optional)'}
                 </button>
@@ -676,46 +694,102 @@ export default function CarouselPage() {
 
             {/* Upload images */}
             {slides.length > 0 && (
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full flex items-center gap-3 px-4 py-3 bg-white border border-stone-100 rounded-xl hover:bg-stone-50 transition-colors text-left"
-              >
-                <div className="w-8 h-8 bg-stone-100 rounded-lg flex items-center justify-center shrink-0">
-                  <svg className="w-4 h-4 text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-[13px] font-medium text-stone-800">Upload images</p>
-                  <p className="text-[11px] text-stone-400">Add your own photos to slides</p>
-                </div>
-              </button>
+              <div className="bg-white border border-stone-100 rounded-xl p-4 flex flex-col gap-3">
+                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Add images</p>
+
+                {/* Manual upload */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex items-center gap-3 px-4 py-4 min-h-[56px] border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors text-left"
+                >
+                  <div className="w-10 h-10 md:w-8 md:h-8 bg-stone-100 rounded-lg flex items-center justify-center shrink-0">
+                    <svg className="w-4 h-4 text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-medium text-stone-800">Upload manually</p>
+                    <p className="text-[11px] text-stone-400">Your own photos · Free</p>
+                  </div>
+                </button>
+
+                {/* DALL-E */}
+                <button
+                  onClick={() => generateImages('dalle')}
+                  disabled={generatingImages}
+                  className="w-full flex items-center gap-3 px-4 py-3 border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="w-8 h-8 bg-stone-900 rounded-lg flex items-center justify-center shrink-0">
+                    <span className="text-white text-[12px]">✦</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[13px] font-medium text-stone-800">
+                      {generatingImages ? 'Generating...' : 'Generate with DALL-E'}
+                    </p>
+                    <p className="text-[11px] text-stone-400">Story-specific AI images · ~$0.18</p>
+                  </div>
+                  {generatingImages && (
+                    <svg className="w-3.5 h-3.5 animate-spin text-stone-400" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                    </svg>
+                  )}
+                </button>
+
+                {/* Pexels */}
+                <button
+                  disabled={generatingImages}
+                  className="w-full flex items-center gap-3 px-4 py-3 border border-stone-200 rounded-xl hover:bg-stone-50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => generateImages('pexels')}
+                >
+                  <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center shrink-0">
+                    <span className="text-white text-[11px] font-medium">P</span>
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-medium text-stone-800">Search Pexels</p>
+                    <p className="text-[11px] text-stone-400">Stock photography · Free</p>
+                  </div>
+                </button>
+              </div>
             )}
           </div>
 
           {/* Centre — slide strip */}
-          <div className="flex-1 overflow-y-auto p-5">
+          <div className={`flex-1 overflow-y-auto p-4 md:p-5 ${mobilePanel === 'slides' ? 'block' : 'hidden md:block'}`}>
             {slides.length === 0 ? (
               <div className="h-full flex items-center justify-center">
-                <div className="text-center">
+                <div className="text-center px-4">
                   <div className="w-12 h-12 bg-stone-100 rounded-xl flex items-center justify-center mx-auto mb-3">
                     <svg className="w-6 h-6 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
                     </svg>
                   </div>
-                  <p className="text-[13px] font-medium text-stone-600">No slides yet</p>
-                  <p className="text-[12px] text-stone-400 mt-1">Enter a topic and click Generate carousel</p>
+                  <p className="text-[14px] font-medium text-stone-600">No slides yet</p>
+                  <p className="text-[13px] text-stone-400 mt-1">Enter a topic and click Generate carousel</p>
+                  <button
+                    onClick={() => setMobilePanel('controls')}
+                    className="mt-4 px-5 py-3 min-h-[44px] bg-stone-900 text-white text-[14px] font-medium rounded-xl md:hidden"
+                  >
+                    Get started
+                  </button>
                 </div>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                <p className="text-[11px] text-stone-400">{slides.length} slides · click a slide to preview</p>
-                <div className="flex flex-wrap gap-3">
+                <p className="text-[12px] text-stone-400">{slides.length} slides · {typeof window !== 'undefined' && window.innerWidth < 768 ? 'swipe to browse' : 'click to preview'}</p>
+                {/* Horizontal swipeable on mobile, wrapped grid on desktop */}
+                <div
+                  ref={slideStripRef}
+                  className="flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory md:flex-wrap md:overflow-x-visible md:pb-0 md:snap-none scrollbar-hide"
+                >
                   {slides.map((slide, i) => (
                     <button
                       key={i}
-                      onClick={() => setSelectedSlide(i)}
-                      className={`transition-all ${selectedSlide === i ? 'ring-2 ring-stone-900 ring-offset-2 rounded-xl' : 'opacity-80 hover:opacity-100'}`}
+                      onClick={() => {
+                        setSelectedSlide(i)
+                        if (window.innerWidth < 768) setMobilePanel('detail')
+                      }}
+                      className={`snap-start transition-all shrink-0 md:shrink ${selectedSlide === i ? 'ring-2 ring-stone-900 ring-offset-2 rounded-xl' : 'opacity-80 hover:opacity-100'}`}
                     >
                       <SlidePreview slide={slide} index={i} />
                     </button>
@@ -727,7 +801,7 @@ export default function CarouselPage() {
 
           {/* Right — detail panel */}
           {sel && (
-            <div className="w-72 border-l border-stone-100 overflow-y-auto p-5 flex flex-col gap-3 shrink-0">
+            <div className={`w-full md:w-72 border-l-0 md:border-l border-stone-100 overflow-y-auto p-4 md:p-5 flex flex-col gap-3 shrink-0 ${mobilePanel === 'detail' ? 'flex' : 'hidden md:flex'}`}>
               <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Slide {sel.num}</p>
 
               {/* Large preview */}
@@ -765,7 +839,7 @@ export default function CarouselPage() {
                           updated[selectedSlide!] = { ...updated[selectedSlide!], [field]: e.target.value }
                           setSlides(updated)
                         }}
-                        className="w-full text-[12px] border border-stone-200 rounded-lg px-2.5 py-2 resize-none bg-white focus:outline-none focus:border-stone-400 text-stone-900"
+                        className="w-full text-[16px] md:text-[12px] border border-stone-200 rounded-lg px-3 py-2.5 resize-none bg-white focus:outline-none focus:border-stone-400 text-stone-900"
                       />
                     ) : (
                       <input
@@ -775,7 +849,7 @@ export default function CarouselPage() {
                           updated[selectedSlide!] = { ...updated[selectedSlide!], [field]: e.target.value }
                           setSlides(updated)
                         }}
-                        className="w-full text-[12px] border border-stone-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:border-stone-400 text-stone-900"
+                        className="w-full text-[16px] md:text-[12px] border border-stone-200 rounded-lg px-3 py-2.5 min-h-[44px] bg-white focus:outline-none focus:border-stone-400 text-stone-900"
                       />
                     )}
                   </div>
@@ -793,7 +867,7 @@ export default function CarouselPage() {
                           updated[selectedSlide!] = { ...updated[selectedSlide!], accent: name }
                           setSlides(updated)
                         }}
-                        className={`w-6 h-6 rounded-full border-2 transition-all ${sel.accent === name ? 'border-stone-900 scale-110' : 'border-transparent'}`}
+                        className={`w-8 h-8 md:w-6 md:h-6 rounded-full border-2 transition-all ${sel.accent === name ? 'border-stone-900 scale-110' : 'border-transparent'}`}
                         style={{ background: c.text }}
                         title={name}
                       />
@@ -801,10 +875,27 @@ export default function CarouselPage() {
                   </div>
                 </div>
 
-                {/* Upload image for this slide */}
+                {/* Add image to this slide */}
+                <button
+                  onClick={() => generateImageForSlide(selectedSlide!)}
+                  disabled={sel.image === 'loading'}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-3 min-h-[44px] text-[14px] md:text-[12px] bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors disabled:opacity-50"
+                >
+                  {sel.image === 'loading' ? (
+                    <>
+                      <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                      </svg>
+                      Generating...
+                    </>
+                  ) : (
+                    <><span className="text-[10px]">✦</span> {sel.image ? 'Regenerate image' : 'Generate image'} (~$0.02)</>
+                  )}
+                </button>
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[12px] bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors"
+                  className="w-full px-3 py-3 min-h-[44px] text-[14px] md:text-[12px] border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors text-stone-600"
                 >
                   {sel.image ? 'Replace image' : '+ Upload image'}
                 </button>
@@ -814,12 +905,12 @@ export default function CarouselPage() {
                   <button
                     onClick={() => setSelectedSlide(Math.max(0, selectedSlide! - 1))}
                     disabled={selectedSlide === 0}
-                    className="flex-1 px-3 py-1.5 text-[11px] border border-stone-200 rounded-lg hover:bg-stone-50 disabled:opacity-30"
+                    className="flex-1 px-3 py-2.5 min-h-[44px] text-[13px] md:text-[11px] border border-stone-200 rounded-lg hover:bg-stone-50 disabled:opacity-30"
                   >← Prev</button>
                   <button
                     onClick={() => setSelectedSlide(Math.min(slides.length - 1, selectedSlide! + 1))}
                     disabled={selectedSlide === slides.length - 1}
-                    className="flex-1 px-3 py-1.5 text-[11px] border border-stone-200 rounded-lg hover:bg-stone-50 disabled:opacity-30"
+                    className="flex-1 px-3 py-2.5 min-h-[44px] text-[13px] md:text-[11px] border border-stone-200 rounded-lg hover:bg-stone-50 disabled:opacity-30"
                   >Next →</button>
                 </div>
               </div>

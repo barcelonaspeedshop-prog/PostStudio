@@ -277,12 +277,12 @@ export default function LongFormPage() {
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* Topbar */}
-        <div className="h-12 bg-white border-b border-stone-100 flex items-center justify-between px-5 shrink-0">
+        <div className="h-12 bg-white border-b border-stone-100 flex items-center justify-between px-5 pl-14 md:pl-5 shrink-0">
           <div className="flex items-center gap-3">
             <span className="text-[14px] font-medium text-stone-900">Long form story</span>
             <button
               onClick={() => setTestMode(prev => !prev)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
+              className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
                 testMode
                   ? 'bg-amber-100 border-amber-300 text-amber-800'
                   : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'
@@ -296,33 +296,33 @@ export default function LongFormPage() {
                 <select
                   value={testDuration}
                   onChange={(e) => setTestDuration(Number(e.target.value) as 10 | 30)}
-                  className="text-[11px] border border-amber-300 rounded-lg px-2 py-1 bg-amber-50 text-amber-800 focus:outline-none"
+                  className="hidden md:block text-[11px] border border-amber-300 rounded-lg px-2 py-1 bg-amber-50 text-amber-800 focus:outline-none"
                 >
                   <option value={10}>10s</option>
                   <option value={30}>30s</option>
                 </select>
-                <span className="text-[11px] text-amber-600 font-medium">Test mode — no ElevenLabs charges</span>
+                <span className="hidden md:inline text-[11px] text-amber-600 font-medium">Test mode — no ElevenLabs charges</span>
               </>
             )}
           </div>
           {videoUrl && (
-            <button onClick={downloadVideo} className="px-3 py-1.5 text-[12px] font-medium border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors">
+            <button onClick={downloadVideo} className="px-3 py-2 min-h-[44px] text-[13px] font-medium border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors">
               Download Video
             </button>
           )}
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
           {/* Left panel */}
-          <div className="w-72 border-r border-stone-100 overflow-y-auto p-5 flex flex-col gap-4 shrink-0">
+          <div className="w-full md:w-72 border-r border-stone-100 overflow-y-auto p-4 md:p-5 flex flex-col gap-4 shrink-0">
             <div>
               <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-2">Story topic</p>
-              <textarea value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. The untold story of the 1966 Le Mans rivalry" className="w-full border border-stone-200 rounded-lg px-3 py-2.5 text-[13px] resize-none focus:outline-none focus:ring-1 focus:ring-stone-400" rows={3} />
+              <textarea value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. The untold story of the 1966 Le Mans rivalry" className="w-full border border-stone-200 rounded-lg px-3 py-2.5 text-[16px] md:text-[13px] resize-none focus:outline-none focus:ring-1 focus:ring-stone-400" rows={3} />
             </div>
 
             <div>
               <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-2">Channel</p>
-              <select value={channel} onChange={(e) => setChannel(e.target.value)} className="w-full border border-stone-200 rounded-lg px-3 py-2.5 text-[13px] bg-white focus:outline-none focus:ring-1 focus:ring-stone-400">
+              <select value={channel} onChange={(e) => setChannel(e.target.value)} className="w-full text-[16px] md:text-[13px] border border-stone-200 rounded-lg px-3 py-2.5 min-h-[44px] bg-white focus:outline-none focus:ring-1 focus:ring-stone-400">
                 {CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
