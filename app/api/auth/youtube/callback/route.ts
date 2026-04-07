@@ -6,10 +6,10 @@ export const dynamic = 'force-dynamic'
 
 // Map PostStudio channel names to their YouTube handles
 const CHANNEL_HANDLES: Record<string, string> = {
-  'Gentlemen of Fuel': '@Gentlemenoffuel',
-  'Omnira F1': '@OmniraF1',
-  'Road & Trax': '@RoadandTrax',
-  'Omnira Football': '@OmniraFC',
+  'Gentlemen of Fuel': '@gentlemenoffuel',
+  'Omnira F1': '@omniraf1',
+  'Road & Trax': '@roadandtrax',
+  'Omnira Football': '@omnirafc',
 }
 
 export async function GET(req: NextRequest) {
