@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
-import { getAuthenticatedClient } from '@/lib/youtube'
+import { getAuthenticatedClient, getTokenForChannel } from '@/lib/youtube'
 import { Readable } from 'stream'
 
 export const dynamic = 'force-dynamic'
@@ -17,8 +17,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'channelName is required' }, { status: 400 })
     }
 
-    // Get authenticated OAuth client for this channel
+    // Get authenticated OAuth client and channel ID for this channel
     const oauth2 = await getAuthenticatedClient(channelName)
+    const token = await getTokenForChannel(channelName)
+    const channelId = token?.youtube_channel_id
+    if (!channelId) {
+      return NextResponse.json({ error: `No YouTube channel ID stored for "${channelName}". Reconnect on the Accounts page.` }, { status: 400 })
+    }
+
     const youtube = google.youtube({ version: 'v3', auth: oauth2 })
 
     // Convert base64 data URL to Buffer
@@ -30,13 +36,14 @@ export async function POST(req: NextRequest) {
     stream.push(buffer)
     stream.push(null)
 
-    console.log(`[youtube-publish] Uploading ${(buffer.length / 1024 / 1024).toFixed(1)}MB to YouTube for "${channelName}"`)
+    console.log(`[youtube-publish] Uploading ${(buffer.length / 1024 / 1024).toFixed(1)}MB to YouTube channel ${channelId} for "${channelName}"`)
 
-    // Upload to YouTube
+    // Upload to YouTube — channelId ensures it goes to the correct channel
     const res = await youtube.videos.insert({
       part: ['snippet', 'status'],
       requestBody: {
         snippet: {
+          channelId,
           title: (title || 'Carousel Video').slice(0, 100),
           description: (description || '').slice(0, 5000),
           tags: tags || [],

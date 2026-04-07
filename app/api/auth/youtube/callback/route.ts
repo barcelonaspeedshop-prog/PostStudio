@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
           youtube_handle: matched.snippet?.customUrl || '',
         }
         connected.push(psChannel)
-        console.log(`[youtube-callback] Matched "${psChannel}" → "${matched.snippet?.title}" (${matched.snippet?.customUrl})`)
+        console.log(`[youtube-callback] Matched "${psChannel}" → "${matched.snippet?.title}" (${matched.snippet?.customUrl}, ID: ${matched.id})`)
       }
     }
 
