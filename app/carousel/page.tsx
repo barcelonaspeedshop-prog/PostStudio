@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 
 type Slide = {
@@ -97,6 +97,17 @@ export default function CarouselPage() {
   const [ytTitle, setYtTitle] = useState('')
   const [ytDescription, setYtDescription] = useState('')
   const [ytTags, setYtTags] = useState('')
+
+  // Reset YouTube fields when channel changes
+  useEffect(() => {
+    if (slides.length > 0) {
+      setYtTitle(slides[0]?.headline || '')
+      setYtDescription(slides.map(s => `${s.headline} — ${s.body}`).join('\n\n'))
+      const keywords = [channel, topic.split(' ').slice(0, 3).join(' ')].filter(Boolean)
+      const hashTags = slides.flatMap(s => (s.body + ' ' + s.headline).match(/#[\w]+/g) || []).map(t => t.replace('#', ''))
+      setYtTags([...new Set([...keywords, ...hashTags])].join(', '))
+    }
+  }, [channel])
 
   const PUBLISH_PLATFORMS = [
     { id: 'instagram', label: 'Instagram', icon: 'IG' },
