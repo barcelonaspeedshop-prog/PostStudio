@@ -90,6 +90,8 @@ export default function CarouselPage() {
   const [publishPlatforms, setPublishPlatforms] = useState<string[]>([])
   const [mobilePanel, setMobilePanel] = useState<'controls' | 'slides' | 'detail'>('slides')
   const slideStripRef = useRef<HTMLDivElement>(null)
+  const [musicVolume, setMusicVolume] = useState(20)
+  const musicInputRef = useRef<HTMLInputElement>(null)
 
   const PUBLISH_PLATFORMS = [
     { id: 'instagram', label: 'Instagram', icon: 'IG' },
@@ -371,7 +373,7 @@ export default function CarouselPage() {
       const res = await fetch('/api/video-export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slides: compositedSlides, slideDuration, audioUrl: audioDataUrl }),
+        body: JSON.stringify({ slides: compositedSlides, slideDuration, audioUrl: audioDataUrl, musicVolume }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -420,6 +422,32 @@ export default function CarouselPage() {
     a.click()
     URL.revokeObjectURL(url)
     showToast('Slides exported!')
+  }
+
+  const moveImageToSlide = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return
+    if (!slides[fromIndex]?.image) { showToast('No image to move', 'error'); return }
+    setSlides(prev => {
+      const updated = [...prev]
+      const img = updated[fromIndex].image
+      updated[fromIndex] = { ...updated[fromIndex], image: undefined }
+      updated[toIndex] = { ...updated[toIndex], image: img }
+      return updated
+    })
+    showToast(`Image moved to slide ${toIndex + 1}`)
+  }
+
+  const swapImages = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return
+    setSlides(prev => {
+      const updated = [...prev]
+      const imgA = updated[fromIndex].image
+      const imgB = updated[toIndex].image
+      updated[fromIndex] = { ...updated[fromIndex], image: imgB }
+      updated[toIndex] = { ...updated[toIndex], image: imgA }
+      return updated
+    })
+    showToast(`Swapped images between slides ${fromIndex + 1} and ${toIndex + 1}`)
   }
 
   const sel = selectedSlide !== null ? slides[selectedSlide] : null
@@ -488,6 +516,18 @@ export default function CarouselPage() {
           onChange={(e) => {
             const file = e.target.files?.[0]
             if (file) { setAudioFile(file); showToast(`Audio: ${file.name}`) }
+          }}
+        />
+
+        <input
+          ref={musicInputRef}
+          type="file"
+          accept="audio/mpeg,.mp3,audio/wav,.wav,audio/aac,.aac,audio/x-m4a,.m4a"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) { setAudioFile(file); showToast(`Music added: ${file.name}`) }
+            if (e.target) e.target.value = ''
           }}
         />
 
@@ -608,13 +648,6 @@ export default function CarouselPage() {
                 </div>
 
                 <button
-                  onClick={() => audioInputRef.current?.click()}
-                  className="w-full px-3 py-3 min-h-[44px] text-[14px] md:text-[12px] border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors text-stone-600 text-left"
-                >
-                  {audioFile ? `✓ ${audioFile.name}` : '+ Add music track (optional)'}
-                </button>
-
-                <button
                   onClick={generateVideo}
                   disabled={generatingVideo}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-stone-900 text-white text-[13px] font-medium rounded-xl hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -708,6 +741,61 @@ export default function CarouselPage() {
                   <p className="text-[11px] text-stone-400">Add your own photos to slides</p>
                 </div>
               </button>
+            )}
+
+            {/* Background music */}
+            {slides.length > 0 && (
+              <div className="bg-white border border-stone-100 rounded-xl p-4 flex flex-col gap-3">
+                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Background music</p>
+                {audioFile ? (
+                  <>
+                    <div className="flex items-center gap-2 px-3 py-2 bg-stone-50 rounded-lg">
+                      <svg className="w-4 h-4 text-stone-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                      </svg>
+                      <span className="text-[12px] text-stone-700 truncate flex-1">{audioFile.name}</span>
+                      <button
+                        onClick={() => { setAudioFile(null); showToast('Music removed') }}
+                        className="w-6 h-6 flex items-center justify-center rounded hover:bg-stone-200 text-stone-400 hover:text-stone-600 shrink-0"
+                        title="Remove music"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div>
+                      <div className="flex justify-between mb-1">
+                        <span className="text-[11px] text-stone-400">Volume</span>
+                        <span className="text-[11px] text-stone-500 font-medium">{musicVolume}%</span>
+                      </div>
+                      <input
+                        type="range" min={0} max={100} step={5} value={musicVolume}
+                        onChange={(e) => setMusicVolume(Number(e.target.value))}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-[10px] text-stone-400 mt-0.5">
+                        <span>0%</span><span>100%</span>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => musicInputRef.current?.click()}
+                    className="w-full flex items-center gap-3 px-4 py-3 min-h-[48px] border border-dashed border-stone-300 rounded-xl hover:bg-stone-50 transition-colors text-left"
+                  >
+                    <div className="w-8 h-8 bg-stone-100 rounded-lg flex items-center justify-center shrink-0">
+                      <svg className="w-4 h-4 text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-medium text-stone-800">+ Add music</p>
+                      <p className="text-[11px] text-stone-400">MP3, WAV, M4A</p>
+                    </div>
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -839,6 +927,47 @@ export default function CarouselPage() {
                 >
                   {sel.image ? 'Replace image' : '+ Upload image'}
                 </button>
+
+                {/* Move image to another slide */}
+                {sel.image && sel.image !== 'loading' && slides.length > 1 && (
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-[10px] text-stone-400">Move image to</p>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => swapImages(selectedSlide!, Math.max(0, selectedSlide! - 1))}
+                        disabled={selectedSlide === 0}
+                        className="flex-1 px-2 py-2 min-h-[40px] text-[12px] border border-stone-200 rounded-lg hover:bg-stone-50 disabled:opacity-30 transition-colors"
+                        title="Swap image with previous slide"
+                      >
+                        ← Swap
+                      </button>
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const target = Number(e.target.value)
+                          if (!isNaN(target)) {
+                            moveImageToSlide(selectedSlide!, target)
+                            e.target.value = ''
+                          }
+                        }}
+                        className="flex-1 px-2 py-2 min-h-[40px] text-[16px] md:text-[12px] border border-stone-200 rounded-lg bg-white focus:outline-none focus:border-stone-400 text-stone-600"
+                      >
+                        <option value="" disabled>Slide...</option>
+                        {slides.map((_, i) => i !== selectedSlide && (
+                          <option key={i} value={i}>Slide {i + 1}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => swapImages(selectedSlide!, Math.min(slides.length - 1, selectedSlide! + 1))}
+                        disabled={selectedSlide === slides.length - 1}
+                        className="flex-1 px-2 py-2 min-h-[40px] text-[12px] border border-stone-200 rounded-lg hover:bg-stone-50 disabled:opacity-30 transition-colors"
+                        title="Swap image with next slide"
+                      >
+                        Swap →
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Nav between slides */}
                 <div className="flex gap-2 mt-1">
