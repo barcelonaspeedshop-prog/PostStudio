@@ -140,14 +140,14 @@ export default function CarouselPage() {
     return unique.slice(0, 15).join(', ')
   }
 
-  // Reset YouTube fields when channel changes
+  // Reset YouTube fields when slides or channel change
   useEffect(() => {
     if (slides.length > 0) {
       setYtTitle(slides[0]?.headline || '')
-      setYtDescription(slides.map(s => `${s.headline} — ${s.body}`).join('\n\n'))
+      setYtDescription(slides.map(s => s.headline + '\n' + s.body).join('\n\n'))
       setYtTags(generateYtTags())
     }
-  }, [channel])
+  }, [slides, channel])
 
   const PUBLISH_PLATFORMS = [
     { id: 'instagram', label: 'Instagram', icon: 'IG' },
