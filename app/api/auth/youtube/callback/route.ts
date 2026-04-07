@@ -42,22 +42,41 @@ export async function GET(req: NextRequest) {
 
     const youtube = google.youtube({ version: 'v3', auth: oauth2 })
 
-    // Fetch all channels on this Google account
+    // Fetch channels: mine=true returns the primary channel
     const channelRes = await youtube.channels.list({
       part: ['snippet'],
       mine: true,
       maxResults: 50,
     })
 
-    const ytChannels = channelRes.data.items || []
+    const ytChannels = [...(channelRes.data.items || [])]
 
-    // Log what we found
-    const debugChannels = ytChannels.map(ch => ({
-      id: ch.id,
-      title: ch.snippet?.title,
-      customUrl: ch.snippet?.customUrl,
-    }))
-    console.log(`[youtube-callback] Found ${ytChannels.length} channel(s):`, JSON.stringify(debugChannels, null, 2))
+    // Log each channel with full detail
+    for (const ch of ytChannels) {
+      console.log(`[youtube-callback] Channel: id=${ch.id}, title="${ch.snippet?.title}", customUrl="${ch.snippet?.customUrl}"`)
+    }
+
+    // Also try fetching known channel IDs directly (Brand Accounts may not appear in mine=true)
+    const knownIds = Object.values(CHANNEL_IDS)
+    const missingIds = knownIds.filter(id => !ytChannels.some(ch => ch.id === id))
+    if (missingIds.length > 0) {
+      try {
+        const byIdRes = await youtube.channels.list({
+          part: ['snippet'],
+          id: missingIds,
+          maxResults: 50,
+        })
+        const extra = byIdRes.data.items || []
+        for (const ch of extra) {
+          console.log(`[youtube-callback] Found by ID lookup: id=${ch.id}, title="${ch.snippet?.title}", customUrl="${ch.snippet?.customUrl}"`)
+          ytChannels.push(ch)
+        }
+      } catch (e) {
+        console.warn(`[youtube-callback] Channel ID lookup failed:`, e instanceof Error ? e.message : e)
+      }
+    }
+
+    console.log(`[youtube-callback] Total channels available: ${ytChannels.length}`)
 
     if (ytChannels.length === 0) {
       return NextResponse.redirect(
