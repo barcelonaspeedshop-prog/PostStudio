@@ -47,7 +47,17 @@ export async function GET(req: NextRequest) {
     const channels = channelRes.data.items || []
     const expectedHandle = CHANNEL_HANDLES[state]
 
-    // Find the matching YouTube channel by handle
+    // DEBUG: Log all channels found on this account
+    const debugChannels = channels.map(ch => ({
+      id: ch.id,
+      title: ch.snippet?.title,
+      customUrl: ch.snippet?.customUrl,
+      description: (ch.snippet?.description || '').slice(0, 80),
+    }))
+    console.log(`[youtube-callback] Looking for "${state}" (expected handle: ${expectedHandle})`)
+    console.log(`[youtube-callback] Found ${channels.length} channel(s):`, JSON.stringify(debugChannels, null, 2))
+
+    // Find the matching YouTube channel by handle (case-insensitive)
     let matched = channels.find(ch => {
       const handle = ch.snippet?.customUrl || ''
       return handle.toLowerCase() === expectedHandle?.toLowerCase()
@@ -57,7 +67,6 @@ export async function GET(req: NextRequest) {
     if (!matched && expectedHandle) {
       matched = channels.find(ch => {
         const title = ch.snippet?.title || ''
-        // Match loosely — e.g. "Gentlemen of Fuel" in title
         return title.toLowerCase().includes(state.toLowerCase()) ||
                state.toLowerCase().includes(title.toLowerCase())
       })
@@ -93,8 +102,11 @@ export async function GET(req: NextRequest) {
 
     console.log(`[youtube-callback] Connected "${state}" → "${ytChannelName}" (${ytHandle}, ${ytChannelId})`)
 
+    // DEBUG: Include channel list in redirect so it's visible in the UI
+    const debugParam = encodeURIComponent(JSON.stringify(debugChannels))
+
     return NextResponse.redirect(
-      `${appUrl}/accounts?connected=${encodeURIComponent(state)}`
+      `${appUrl}/accounts?connected=${encodeURIComponent(state)}&matched_handle=${encodeURIComponent(ytHandle)}&matched_name=${encodeURIComponent(ytChannelName)}&debug_channels=${debugParam}`
     )
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'

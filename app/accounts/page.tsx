@@ -49,12 +49,25 @@ function AccountsContent() {
     }
   }
 
+  const [debugInfo, setDebugInfo] = useState<string | null>(null)
+
   useEffect(() => {
     fetchStatuses()
     const connected = searchParams.get('connected')
     const error = searchParams.get('error')
+    const debugChannels = searchParams.get('debug_channels')
+    const matchedHandle = searchParams.get('matched_handle')
+    const matchedName = searchParams.get('matched_name')
     if (connected) showToast(`Connected: ${connected}`)
     if (error) showToast(`Error: ${error}`)
+    if (debugChannels) {
+      try {
+        const parsed = JSON.parse(debugChannels)
+        setDebugInfo(`Matched: ${matchedName} (${matchedHandle})\n\nAll channels found:\n${JSON.stringify(parsed, null, 2)}`)
+      } catch {
+        setDebugInfo(debugChannels)
+      }
+    }
   }, [searchParams])
 
   const disconnect = async (channelName: string) => {
@@ -173,6 +186,16 @@ function AccountsContent() {
                 </div>
               </div>
             </div>
+
+            {/* Debug info — temporary */}
+            {debugInfo && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <p className="text-[10px] font-medium text-amber-700 uppercase tracking-widest mb-2">Debug — YouTube channels found</p>
+                <pre className="text-[11px] text-stone-700 whitespace-pre-wrap break-all font-mono bg-white rounded-lg p-3 border border-amber-100 overflow-x-auto">
+                  {debugInfo}
+                </pre>
+              </div>
+            )}
           </div>
         </div>
       </div>
