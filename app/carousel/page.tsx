@@ -486,11 +486,21 @@ export default function CarouselPage() {
                   Add images
                 </button>
                 <button
-                  onClick={downloadSlides}
-                  className="px-3 py-2 min-h-[44px] text-[13px] font-medium border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
+                  onClick={generateVideo}
+                  disabled={generatingVideo}
+                  className="px-3 py-2 min-h-[44px] text-[13px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors disabled:opacity-50"
                 >
-                  Export
+                  {generatingVideo ? 'Exporting...' : 'Export MP4'}
                 </button>
+                {videoUrl && (
+                  <a
+                    href={videoUrl}
+                    download={`${channel.replace(/\s+/g, '_')}_carousel.mp4`}
+                    className="px-3 py-2 min-h-[44px] text-[13px] font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center"
+                  >
+                    ↓ MP4
+                  </a>
+                )}
               </>
             )}
           </div>
