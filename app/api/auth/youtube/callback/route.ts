@@ -13,6 +13,7 @@ const CHANNEL_HANDLES: Record<string, string> = {
 }
 
 export async function GET(req: NextRequest) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
   const { searchParams } = new URL(req.url)
   const code = searchParams.get('code')
   const state = searchParams.get('state') // PostStudio channel name
@@ -20,11 +21,11 @@ export async function GET(req: NextRequest) {
 
   if (error) {
     console.error('[youtube-callback] OAuth error:', error)
-    return NextResponse.redirect(new URL('/accounts?error=' + encodeURIComponent(error), req.url))
+    return NextResponse.redirect(`${appUrl}/accounts?error=${encodeURIComponent(error)}`)
   }
 
   if (!code || !state) {
-    return NextResponse.redirect(new URL('/accounts?error=missing_code', req.url))
+    return NextResponse.redirect(`${appUrl}/accounts?error=missing_code`)
   }
 
   try {
@@ -70,7 +71,7 @@ export async function GET(req: NextRequest) {
 
     if (!matched) {
       return NextResponse.redirect(
-        new URL(`/accounts?error=${encodeURIComponent('No YouTube channels found on this account')}`, req.url)
+        `${appUrl}/accounts?error=${encodeURIComponent('No YouTube channels found on this account')}`
       )
     }
 
@@ -93,7 +94,7 @@ export async function GET(req: NextRequest) {
     console.log(`[youtube-callback] Connected "${state}" → "${ytChannelName}" (${ytHandle}, ${ytChannelId})`)
 
     return NextResponse.redirect(
-      new URL(`/accounts?connected=${encodeURIComponent(state)}`, req.url)
+      `${appUrl}/accounts?connected=${encodeURIComponent(state)}`
     )
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
