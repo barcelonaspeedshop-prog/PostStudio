@@ -14,6 +14,7 @@ type ChannelStatus = {
   connected: boolean
   youtube_channel_name?: string
   youtube_channel_id?: string
+  youtube_handle?: string
 }
 
 export default function AccountsPage() {
@@ -123,7 +124,7 @@ function AccountsContent() {
                             <p className="text-[13px] font-medium text-stone-900">{name}</p>
                             {isConnected ? (
                               <p className="text-[11px] text-green-600 truncate">
-                                Connected — {status.youtube_channel_name}
+                                Connected — {status.youtube_channel_name}{status.youtube_handle ? ` (${status.youtube_handle})` : ''}
                               </p>
                             ) : (
                               <p className="text-[11px] text-stone-400">Not connected</p>

@@ -4,10 +4,18 @@ import { getOAuth2Client, loadTokens, saveTokens } from '@/lib/youtube'
 
 export const dynamic = 'force-dynamic'
 
+// Map PostStudio channel names to their YouTube handles
+const CHANNEL_HANDLES: Record<string, string> = {
+  'Gentlemen of Fuel': '@Gentlemenoffuel',
+  'Omnira F1': '@OmniraF1',
+  'Road & Trax': '@RoadandTrax',
+  'Omnira Football': '@OmniraFC',
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const code = searchParams.get('code')
-  const state = searchParams.get('state') // channel name
+  const state = searchParams.get('state') // PostStudio channel name
   const error = searchParams.get('error')
 
   if (error) {
@@ -26,18 +34,51 @@ export async function GET(req: NextRequest) {
     const { tokens } = await oauth2.getToken(code)
     oauth2.setCredentials(tokens)
 
-    // Fetch YouTube channel info
     const youtube = google.youtube({ version: 'v3', auth: oauth2 })
+
+    // Fetch all channels the authenticated user manages
     const channelRes = await youtube.channels.list({
       part: ['snippet'],
       mine: true,
+      maxResults: 50,
     })
 
-    const channelInfo = channelRes.data.items?.[0]
-    const ytChannelName = channelInfo?.snippet?.title || state
-    const ytChannelId = channelInfo?.id || ''
+    const channels = channelRes.data.items || []
+    const expectedHandle = CHANNEL_HANDLES[state]
 
-    // Store tokens keyed by app channel name
+    // Find the matching YouTube channel by handle
+    let matched = channels.find(ch => {
+      const handle = ch.snippet?.customUrl || ''
+      return handle.toLowerCase() === expectedHandle?.toLowerCase()
+    })
+
+    // Fallback: if no handle match, try matching by channel title
+    if (!matched && expectedHandle) {
+      matched = channels.find(ch => {
+        const title = ch.snippet?.title || ''
+        // Match loosely — e.g. "Gentlemen of Fuel" in title
+        return title.toLowerCase().includes(state.toLowerCase()) ||
+               state.toLowerCase().includes(title.toLowerCase())
+      })
+    }
+
+    // If still no match, use the first channel and warn
+    if (!matched && channels.length > 0) {
+      matched = channels[0]
+      console.warn(`[youtube-callback] No handle match for "${state}" (expected ${expectedHandle}). Using first channel: "${matched?.snippet?.title}"`)
+    }
+
+    if (!matched) {
+      return NextResponse.redirect(
+        new URL(`/accounts?error=${encodeURIComponent('No YouTube channels found on this account')}`, req.url)
+      )
+    }
+
+    const ytChannelName = matched.snippet?.title || state
+    const ytChannelId = matched.id || ''
+    const ytHandle = matched.snippet?.customUrl || ''
+
+    // Store tokens keyed by PostStudio channel name
     const allTokens = await loadTokens()
     allTokens[state] = {
       access_token: tokens.access_token || '',
@@ -45,10 +86,11 @@ export async function GET(req: NextRequest) {
       expiry_date: tokens.expiry_date || 0,
       youtube_channel_name: ytChannelName,
       youtube_channel_id: ytChannelId,
+      youtube_handle: ytHandle,
     }
     await saveTokens(allTokens)
 
-    console.log(`[youtube-callback] Connected "${state}" → YouTube channel "${ytChannelName}" (${ytChannelId})`)
+    console.log(`[youtube-callback] Connected "${state}" → "${ytChannelName}" (${ytHandle}, ${ytChannelId})`)
 
     return NextResponse.redirect(
       new URL(`/accounts?connected=${encodeURIComponent(state)}`, req.url)

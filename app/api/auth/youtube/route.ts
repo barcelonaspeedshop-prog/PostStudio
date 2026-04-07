@@ -10,12 +10,13 @@ export async function GET(req: NextRequest) {
   // Return connected status for all channels
   if (action === 'status') {
     const tokens = await loadTokens()
-    const status: Record<string, { connected: boolean; youtube_channel_name?: string; youtube_channel_id?: string }> = {}
+    const status: Record<string, { connected: boolean; youtube_channel_name?: string; youtube_channel_id?: string; youtube_handle?: string }> = {}
     for (const [channel, token] of Object.entries(tokens)) {
       status[channel] = {
         connected: true,
         youtube_channel_name: token.youtube_channel_name,
         youtube_channel_id: token.youtube_channel_id,
+        youtube_handle: token.youtube_handle,
       }
     }
     return NextResponse.json(status)

@@ -11,6 +11,7 @@ export type YouTubeToken = {
   expiry_date: number
   youtube_channel_name: string
   youtube_channel_id: string
+  youtube_handle?: string
 }
 
 export type TokenStore = Record<string, YouTubeToken>
