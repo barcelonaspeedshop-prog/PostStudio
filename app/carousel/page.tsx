@@ -424,6 +424,21 @@ export default function CarouselPage() {
     showToast('Slides exported!')
   }
 
+  const reorderSlide = (fromIndex: number, direction: 'up' | 'down') => {
+    const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1
+    if (toIndex < 0 || toIndex >= slides.length) return
+    setSlides(prev => {
+      const updated = [...prev]
+      const temp = updated[fromIndex]
+      updated[fromIndex] = updated[toIndex]
+      updated[toIndex] = temp
+      return updated
+    })
+    // Follow the moved slide's selection
+    if (selectedSlide === fromIndex) setSelectedSlide(toIndex)
+    else if (selectedSlide === toIndex) setSelectedSlide(fromIndex)
+  }
+
   const moveImageToSlide = (fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex) return
     if (!slides[fromIndex]?.image) { showToast('No image to move', 'error'); return }
@@ -828,16 +843,43 @@ export default function CarouselPage() {
                   className="flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory md:flex-wrap md:overflow-x-visible md:pb-0 md:snap-none scrollbar-hide"
                 >
                   {slides.map((slide, i) => (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        setSelectedSlide(i)
-                        if (window.innerWidth < 768) setMobilePanel('detail')
-                      }}
-                      className={`snap-start transition-all shrink-0 md:shrink ${selectedSlide === i ? 'ring-2 ring-stone-900 ring-offset-2 rounded-xl' : 'opacity-80 hover:opacity-100'}`}
-                    >
-                      <SlidePreview slide={slide} index={i} />
-                    </button>
+                    <div key={i} className="snap-start shrink-0 md:shrink flex flex-col items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setSelectedSlide(i)
+                          if (window.innerWidth < 768) setMobilePanel('detail')
+                        }}
+                        className={`transition-all ${selectedSlide === i ? 'ring-2 ring-stone-900 ring-offset-2 rounded-xl' : 'opacity-80 hover:opacity-100'}`}
+                      >
+                        <SlidePreview slide={slide} index={i} />
+                      </button>
+                      {/* Reorder buttons */}
+                      {slides.length > 1 && (
+                        <div className="flex gap-1 items-center">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); reorderSlide(i, 'up') }}
+                            disabled={i === 0}
+                            className="w-7 h-7 flex items-center justify-center rounded-md border border-stone-200 bg-white hover:bg-stone-50 disabled:opacity-20 transition-colors text-stone-500"
+                            title="Move left"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                          </button>
+                          <span className="text-[10px] text-stone-400 min-w-[20px] text-center">{i + 1}</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); reorderSlide(i, 'down') }}
+                            disabled={i === slides.length - 1}
+                            className="w-7 h-7 flex items-center justify-center rounded-md border border-stone-200 bg-white hover:bg-stone-50 disabled:opacity-20 transition-colors text-stone-500"
+                            title="Move right"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
