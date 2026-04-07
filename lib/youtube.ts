@@ -3,7 +3,9 @@ import { readFile, writeFile, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
 
-const TOKENS_PATH = path.join(process.cwd(), 'data', 'youtube-tokens.json')
+// Use /data for Docker (mounted volume), fall back to ./data for local dev
+const TOKENS_DIR = process.env.TOKEN_STORAGE_PATH || '/data'
+const TOKENS_PATH = path.join(TOKENS_DIR, 'youtube-tokens.json')
 
 export type YouTubeToken = {
   access_token: string
