@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
     stream.push(null)
 
     console.log(`[youtube-publish] Uploading ${(buffer.length / 1024 / 1024).toFixed(1)}MB to YouTube channel ${channelId} for "${channelName}"`)
+    console.log(`[youtube-publish] Title: "${title}", Tags: [${(tags || []).join(', ')}], Description length: ${(description || '').length}`)
 
     // Upload to YouTube — channelId ensures it goes to the correct channel
     const res = await youtube.videos.insert({

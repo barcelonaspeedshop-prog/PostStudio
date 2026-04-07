@@ -447,19 +447,21 @@ export default function CarouselPage() {
     showToast('Uploading to YouTube...')
     try {
       const caption = slides.map((s) => `${s.headline} — ${s.body}`).join('\n\n')
-      const tags = ytTags
+      const tagsArray = ytTags
         ? ytTags.split(',').map(t => t.trim()).filter(Boolean)
         : caption.match(/#[\w]+/g)?.map(t => t.replace('#', '')) || []
+      const payload = {
+        videoBase64: videoUrl,
+        title: ytTitle || slides[0]?.headline || 'Carousel Video',
+        description: ytDescription || caption,
+        tags: tagsArray,
+        channelName: channel,
+      }
+      console.log('[youtube-publish-client] Sending:', { title: payload.title, description: payload.description.slice(0, 100) + '...', tags: payload.tags, channelName: payload.channelName, videoSize: payload.videoBase64.length })
       const res = await fetch('/api/publish/youtube', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          videoBase64: videoUrl,
-          title: ytTitle || slides[0]?.headline || 'Carousel Video',
-          description: ytDescription || caption,
-          tags,
-          channelName: channel,
-        }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
