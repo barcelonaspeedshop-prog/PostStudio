@@ -98,14 +98,54 @@ export default function CarouselPage() {
   const [ytDescription, setYtDescription] = useState('')
   const [ytTags, setYtTags] = useState('')
 
+  const generateYtTags = () => {
+    const tags: string[] = []
+    // Channel name and its keywords
+    tags.push(channel)
+    const channelWords: Record<string, string[]> = {
+      'Gentlemen of Fuel': ['Motorsport', 'Cars', 'Racing', 'Automotive'],
+      'Omnira F1': ['Formula 1', 'F1', 'Grand Prix', 'Racing', 'Motorsport'],
+      'Road & Trax': ['Cars', 'Automotive', 'Driving', 'Road Cars'],
+      'Omnira Football': ['Football', 'Soccer', 'Premier League'],
+      'Omnira NFL': ['NFL', 'American Football', 'Gridiron'],
+      'Omnira Golf': ['Golf', 'PGA', 'Golf Tour'],
+      'Omnira Cricket': ['Cricket', 'Test Cricket', 'T20'],
+      'Omnira Food': ['Food', 'Cooking', 'Recipe', 'Foodie'],
+      'Omnira Travel': ['Travel', 'Adventure', 'Destination'],
+    }
+    tags.push(...(channelWords[channel] || []))
+    // Topic keywords (skip short/common words)
+    const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'is', 'was', 'are', 'vs', 'with', 'how', 'why', 'what'])
+    if (topic) {
+      const topicWords = topic.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()))
+      tags.push(...topicWords.slice(0, 4))
+    }
+    // Key nouns from slide headlines
+    for (const s of slides) {
+      const words = s.headline.split(/\s+/).filter(w => w.length > 3 && !stopWords.has(w.toLowerCase()) && /^[A-Z]/.test(w))
+      tags.push(...words)
+    }
+    // Hashtags from all slide content
+    const allText = slides.map(s => `${s.headline} ${s.body} ${s.tag} ${s.badge}`).join(' ')
+    const hashTags = (allText.match(/#[\w]+/g) || []).map(t => t.replace('#', ''))
+    tags.push(...hashTags)
+    // Dedupe (case-insensitive), limit to 15
+    const seen = new Set<string>()
+    const unique = tags.filter(t => {
+      const key = t.toLowerCase().trim()
+      if (!key || seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    return unique.slice(0, 15).join(', ')
+  }
+
   // Reset YouTube fields when channel changes
   useEffect(() => {
     if (slides.length > 0) {
       setYtTitle(slides[0]?.headline || '')
       setYtDescription(slides.map(s => `${s.headline} — ${s.body}`).join('\n\n'))
-      const keywords = [channel, topic.split(' ').slice(0, 3).join(' ')].filter(Boolean)
-      const hashTags = slides.flatMap(s => (s.body + ' ' + s.headline).match(/#[\w]+/g) || []).map(t => t.replace('#', ''))
-      setYtTags([...new Set([...keywords, ...hashTags])].join(', '))
+      setYtTags(generateYtTags())
     }
   }, [channel])
 
@@ -802,11 +842,7 @@ export default function CarouselPage() {
                         setShowYouTube(!showYouTube)
                         if (!ytTitle) setYtTitle(slides[0]?.headline || '')
                         if (!ytDescription) setYtDescription(slides.map(s => `${s.headline} — ${s.body}`).join('\n\n'))
-                        if (!ytTags) {
-                          const keywords = [channel, topic.split(' ').slice(0, 3).join(' ')].filter(Boolean)
-                          const hashTags = slides.flatMap(s => (s.body + ' ' + s.headline).match(/#[\w]+/g) || []).map(t => t.replace('#', ''))
-                          setYtTags([...new Set([...keywords, ...hashTags])].join(', '))
-                        }
+                        if (!ytTags) setYtTags(generateYtTags())
                       }}
                       className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 text-white text-[13px] font-medium rounded-xl hover:bg-red-700 transition-colors"
                     >
