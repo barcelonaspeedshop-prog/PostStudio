@@ -117,8 +117,8 @@ export async function POST(req: NextRequest) {
           break
         case 'youtube':
           formData.append('platforms[youtube][title]', videoTitle.slice(0, 100))
-          formData.append('platforms[youtube][description]', (content || '').slice(0, 5000))
           formData.append('platforms[youtube][privacy_status]', 'public')
+          formData.append('platforms[youtube][made_for_kids]', 'false')
           break
         case 'tiktok':
           formData.append('platforms[tiktok][title]', videoTitle.slice(0, 100))
