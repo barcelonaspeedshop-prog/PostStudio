@@ -96,6 +96,7 @@ export default function CarouselPage() {
   const [ytPublishing, setYtPublishing] = useState(false)
   const [ytTitle, setYtTitle] = useState('')
   const [ytDescription, setYtDescription] = useState('')
+  const [ytTags, setYtTags] = useState('')
 
   const PUBLISH_PLATFORMS = [
     { id: 'instagram', label: 'Instagram', icon: 'IG' },
@@ -435,7 +436,9 @@ export default function CarouselPage() {
     showToast('Uploading to YouTube...')
     try {
       const caption = slides.map((s) => `${s.headline} — ${s.body}`).join('\n\n')
-      const tags = caption.match(/#[\w]+/g)?.map(t => t.replace('#', '')) || []
+      const tags = ytTags
+        ? ytTags.split(',').map(t => t.trim()).filter(Boolean)
+        : caption.match(/#[\w]+/g)?.map(t => t.replace('#', '')) || []
       const res = await fetch('/api/publish/youtube', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -786,6 +789,11 @@ export default function CarouselPage() {
                         setShowYouTube(!showYouTube)
                         if (!ytTitle) setYtTitle(slides[0]?.headline || '')
                         if (!ytDescription) setYtDescription(slides.map(s => `${s.headline} — ${s.body}`).join('\n\n'))
+                        if (!ytTags) {
+                          const keywords = [channel, topic.split(' ').slice(0, 3).join(' ')].filter(Boolean)
+                          const hashTags = slides.flatMap(s => (s.body + ' ' + s.headline).match(/#[\w]+/g) || []).map(t => t.replace('#', ''))
+                          setYtTags([...new Set([...keywords, ...hashTags])].join(', '))
+                        }
                       }}
                       className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 text-white text-[13px] font-medium rounded-xl hover:bg-red-700 transition-colors"
                     >
@@ -815,6 +823,15 @@ export default function CarouselPage() {
                             rows={3}
                             className="w-full text-[16px] md:text-[12px] border border-red-200 rounded-lg px-2.5 py-2 resize-none bg-white focus:outline-none focus:border-red-400 text-stone-900"
                             placeholder="Video description"
+                          />
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-stone-400 mb-1">Tags</p>
+                          <input
+                            value={ytTags}
+                            onChange={(e) => setYtTags(e.target.value)}
+                            className="w-full text-[16px] md:text-[12px] border border-red-200 rounded-lg px-2.5 py-2 min-h-[44px] bg-white focus:outline-none focus:border-red-400 text-stone-900"
+                            placeholder="tag1, tag2, tag3"
                           />
                         </div>
                         <p className="text-[10px] text-stone-400">Channel: {channel}</p>

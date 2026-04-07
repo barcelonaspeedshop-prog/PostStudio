@@ -6,6 +6,18 @@ import { Readable } from 'stream'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
+const CATEGORY_IDS: Record<string, string> = {
+  'Gentlemen of Fuel': '2',  // Autos & Vehicles
+  'Omnira F1': '2',          // Autos & Vehicles
+  'Road & Trax': '2',       // Autos & Vehicles
+  'Omnira Football': '17',   // Sports
+  'Omnira NFL': '17',        // Sports
+  'Omnira Golf': '17',       // Sports
+  'Omnira Cricket': '17',    // Sports
+  'Omnira Food': '26',       // Howto & Style
+  'Omnira Travel': '19',     // Travel & Events
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { videoBase64, title, description, tags, channelName } = await req.json()
@@ -47,7 +59,7 @@ export async function POST(req: NextRequest) {
           title: (title || 'Carousel Video').slice(0, 100),
           description: (description || '').slice(0, 5000),
           tags: tags || [],
-          categoryId: '22', // People & Blogs
+          categoryId: CATEGORY_IDS[channelName] || '22',
         },
         status: {
           privacyStatus: 'public',
