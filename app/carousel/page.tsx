@@ -682,25 +682,13 @@ export default function CarouselPage() {
 
                 {videoUrl && (
                   <>
-                    <button
-                      onClick={() => {
-                        // Convert data URL to Blob for reliable .mp4 download
-                        const byteString = atob(videoUrl.split(',')[1])
-                        const ab = new ArrayBuffer(byteString.length)
-                        const ia = new Uint8Array(ab)
-                        for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i)
-                        const blob = new Blob([ab], { type: 'video/mp4' })
-                        const url = URL.createObjectURL(blob)
-                        const a = document.createElement('a')
-                        a.href = url
-                        a.download = 'carousel.mp4'
-                        a.click()
-                        URL.revokeObjectURL(url)
-                      }}
+                    <a
+                      href={videoUrl}
+                      download={`${channel.replace(/\s+/g, '_')}_carousel.mp4`}
                       className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white text-[13px] font-medium rounded-xl hover:bg-green-700 transition-colors"
                     >
                       ↓ Download MP4
-                    </button>
+                    </a>
 
                     {/* Publish button */}
                     <button
