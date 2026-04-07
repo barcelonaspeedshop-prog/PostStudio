@@ -12,6 +12,11 @@ const CHANNEL_HANDLES: Record<string, string> = {
   'Omnira Football': '@omnirafc',
 }
 
+// Hardcoded fallback channel IDs for when handle matching fails
+const CHANNEL_IDS: Record<string, string> = {
+  'Gentlemen of Fuel': 'UCRul9-FAiGqwz7yKa7WRCwQ',
+}
+
 export async function GET(req: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
   const { searchParams } = new URL(req.url)
@@ -65,10 +70,18 @@ export async function GET(req: NextRequest) {
     const connected: string[] = []
 
     for (const [psChannel, handle] of Object.entries(CHANNEL_HANDLES)) {
-      // Find YouTube channel matching this handle
-      const matched = ytChannels.find(ch =>
+      // Try matching by handle first
+      let matched = ytChannels.find(ch =>
         (ch.snippet?.customUrl || '').toLowerCase() === handle.toLowerCase()
       )
+
+      // Fallback: match by hardcoded channel ID
+      if (!matched && CHANNEL_IDS[psChannel]) {
+        matched = ytChannels.find(ch => ch.id === CHANNEL_IDS[psChannel])
+        if (matched) {
+          console.log(`[youtube-callback] Handle miss for "${psChannel}", matched by channel ID ${CHANNEL_IDS[psChannel]}`)
+        }
+      }
 
       if (matched) {
         allTokens[psChannel] = {
