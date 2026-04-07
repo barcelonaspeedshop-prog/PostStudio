@@ -48,21 +48,34 @@ export default function Sidebar() {
         />
       )}
 
-      {/* Sidebar */}
-      <aside className={`
-        w-52 bg-white border-r border-stone-100 flex flex-col py-5 shrink-0 h-screen sticky top-0
-        fixed z-50 transition-transform duration-200 ease-out
-        md:relative md:translate-x-0
-        ${open ? 'translate-x-0' : '-translate-x-full'}
-      `}>
+      {/* Sidebar — hidden on mobile (fixed overlay when open), in-flow on desktop */}
+      <aside
+        className="sidebar-aside w-52 bg-white border-r border-stone-100 flex-col py-5 shrink-0 h-screen hidden md:flex md:sticky md:top-0"
+      >
+        <div className="px-5 pb-6">
+          <span className="text-[15px] font-medium tracking-tight text-stone-900">
+            post<span className="text-stone-400 font-normal">studio</span>
+          </span>
+        </div>
+        <SidebarNav pathname={pathname} />
+        <div className="mt-auto px-5 pt-4 border-t border-stone-100">
+          <p className="text-[10px] text-stone-400">3 accounts connected</p>
+        </div>
+      </aside>
+
+      {/* Mobile drawer — completely separate from desktop sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-52 bg-white border-r border-stone-100 flex flex-col py-5 transition-transform duration-200 ease-out md:hidden ${
+          open ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
         <div className="px-5 pb-6 flex items-center justify-between">
           <span className="text-[15px] font-medium tracking-tight text-stone-900">
             post<span className="text-stone-400 font-normal">studio</span>
           </span>
-          {/* Close button — mobile only */}
           <button
             onClick={() => setOpen(false)}
-            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-stone-100 md:hidden"
+            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-stone-100"
             aria-label="Close menu"
           >
             <svg className="w-4 h-4 text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -70,37 +83,43 @@ export default function Sidebar() {
             </svg>
           </button>
         </div>
-        <nav className="flex flex-col gap-0.5 px-2">
-          {links.map(({ href, label, icon }) => {
-            const active = pathname === href
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] transition-colors min-h-[44px] ${
-                  active
-                    ? 'bg-stone-100 text-stone-900 font-medium'
-                    : 'text-stone-500 hover:bg-stone-50 hover:text-stone-800'
-                }`}
-              >
-                <svg
-                  className="w-[15px] h-[15px] shrink-0"
-                  style={{ opacity: active ? 1 : 0.55 }}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={icon} />
-                </svg>
-                {label}
-              </Link>
-            )
-          })}
-        </nav>
+        <SidebarNav pathname={pathname} />
         <div className="mt-auto px-5 pt-4 border-t border-stone-100">
           <p className="text-[10px] text-stone-400">3 accounts connected</p>
         </div>
       </aside>
     </>
+  )
+}
+
+function SidebarNav({ pathname }: { pathname: string }) {
+  return (
+    <nav className="flex flex-col gap-0.5 px-2">
+      {links.map(({ href, label, icon }) => {
+        const active = pathname === href
+        return (
+          <Link
+            key={href}
+            href={href}
+            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] transition-colors min-h-[44px] ${
+              active
+                ? 'bg-stone-100 text-stone-900 font-medium'
+                : 'text-stone-500 hover:bg-stone-50 hover:text-stone-800'
+            }`}
+          >
+            <svg
+              className="w-[15px] h-[15px] shrink-0"
+              style={{ opacity: active ? 1 : 0.55 }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={icon} />
+            </svg>
+            {label}
+          </Link>
+        )
+      })}
+    </nav>
   )
 }
