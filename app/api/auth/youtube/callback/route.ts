@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
   const { searchParams } = new URL(req.url)
   const code = searchParams.get('code')
-  const state = searchParams.get('state') // PostStudio channel name
+  const state = searchParams.get('state') // PostStudio channel name that initiated the flow
   const error = searchParams.get('error')
 
   if (error) {
@@ -37,82 +37,65 @@ export async function GET(req: NextRequest) {
 
     const youtube = google.youtube({ version: 'v3', auth: oauth2 })
 
-    // Fetch all channels the authenticated user manages
+    // Fetch all channels on this Google account
     const channelRes = await youtube.channels.list({
       part: ['snippet'],
       mine: true,
       maxResults: 50,
     })
 
-    const channels = channelRes.data.items || []
-    const expectedHandle = CHANNEL_HANDLES[state]
+    const ytChannels = channelRes.data.items || []
 
-    // DEBUG: Log all channels found on this account
-    const debugChannels = channels.map(ch => ({
+    // Log what we found
+    const debugChannels = ytChannels.map(ch => ({
       id: ch.id,
       title: ch.snippet?.title,
       customUrl: ch.snippet?.customUrl,
-      description: (ch.snippet?.description || '').slice(0, 80),
     }))
-    console.log(`[youtube-callback] Looking for "${state}" (expected handle: ${expectedHandle})`)
-    console.log(`[youtube-callback] Found ${channels.length} channel(s):`, JSON.stringify(debugChannels, null, 2))
+    console.log(`[youtube-callback] Found ${ytChannels.length} channel(s):`, JSON.stringify(debugChannels, null, 2))
 
-    // Find the matching YouTube channel by handle (case-insensitive)
-    let matched = channels.find(ch => {
-      const handle = ch.snippet?.customUrl || ''
-      return handle.toLowerCase() === expectedHandle?.toLowerCase()
-    })
-
-    // Fallback: if no handle match, try matching by channel title
-    if (!matched && expectedHandle) {
-      matched = channels.find(ch => {
-        const title = ch.snippet?.title || ''
-        return title.toLowerCase().includes(state.toLowerCase()) ||
-               state.toLowerCase().includes(title.toLowerCase())
-      })
-    }
-
-    // If still no match, use the first channel and warn
-    if (!matched && channels.length > 0) {
-      matched = channels[0]
-      console.warn(`[youtube-callback] No handle match for "${state}" (expected ${expectedHandle}). Using first channel: "${matched?.snippet?.title}"`)
-    }
-
-    if (!matched) {
+    if (ytChannels.length === 0) {
       return NextResponse.redirect(
         `${appUrl}/accounts?error=${encodeURIComponent('No YouTube channels found on this account')}`
       )
     }
 
-    const ytChannelName = matched.snippet?.title || state
-    const ytChannelId = matched.id || ''
-    const ytHandle = matched.snippet?.customUrl || ''
-
-    // Store tokens keyed by PostStudio channel name
+    // Match ALL PostStudio channels to YouTube channels and store tokens for each
     const allTokens = await loadTokens()
-    allTokens[state] = {
-      access_token: tokens.access_token || '',
-      refresh_token: tokens.refresh_token || '',
-      expiry_date: tokens.expiry_date || 0,
-      youtube_channel_name: ytChannelName,
-      youtube_channel_id: ytChannelId,
-      youtube_handle: ytHandle,
+    const connected: string[] = []
+
+    for (const [psChannel, handle] of Object.entries(CHANNEL_HANDLES)) {
+      // Find YouTube channel matching this handle
+      const matched = ytChannels.find(ch =>
+        (ch.snippet?.customUrl || '').toLowerCase() === handle.toLowerCase()
+      )
+
+      if (matched) {
+        allTokens[psChannel] = {
+          access_token: tokens.access_token || '',
+          refresh_token: tokens.refresh_token || '',
+          expiry_date: tokens.expiry_date || 0,
+          youtube_channel_name: matched.snippet?.title || psChannel,
+          youtube_channel_id: matched.id || '',
+          youtube_handle: matched.snippet?.customUrl || '',
+        }
+        connected.push(psChannel)
+        console.log(`[youtube-callback] Matched "${psChannel}" → "${matched.snippet?.title}" (${matched.snippet?.customUrl})`)
+      }
     }
+
     await saveTokens(allTokens)
 
-    console.log(`[youtube-callback] Connected "${state}" → "${ytChannelName}" (${ytHandle}, ${ytChannelId})`)
-
-    // DEBUG: Include channel list in redirect so it's visible in the UI
-    const debugParam = encodeURIComponent(JSON.stringify(debugChannels))
+    console.log(`[youtube-callback] Connected ${connected.length} channel(s): ${connected.join(', ')}`)
 
     return NextResponse.redirect(
-      `${appUrl}/accounts?connected=${encodeURIComponent(state)}&matched_handle=${encodeURIComponent(ytHandle)}&matched_name=${encodeURIComponent(ytChannelName)}&debug_channels=${debugParam}`
+      `${appUrl}/accounts?connected=${encodeURIComponent(connected.join(', '))}`
     )
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[youtube-callback] Error:', message)
     return NextResponse.redirect(
-      new URL(`/accounts?error=${encodeURIComponent(message)}`, req.url)
+      `${appUrl}/accounts?error=${encodeURIComponent(message)}`
     )
   }
 }
