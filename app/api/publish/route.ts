@@ -5,13 +5,28 @@ const POSTPROXY_BASE = 'https://api.postproxy.dev'
 const VALID_PLATFORMS = ['instagram', 'tiktok', 'twitter', 'facebook', 'youtube'] as const
 type Platform = (typeof VALID_PLATFORMS)[number]
 
+const PROFILE_GROUPS: Record<string, string> = {
+  'Gentlemen of Fuel': 'z4MFLl',
+  'Omnira F1': 'qGZFm7',
+  'Omnira Golf': 'zBmFDV',
+  'Omnira Football': 'qlmF06',
+  'Omnira NFL': 'qQLFZj',
+  'Omnira Food': 'zgYFNP',
+  'Omnira Travel': 'z8NFp1',
+  'Road & Trax': 'z4MFLl', // temporary - uses GoF until Road & Trax profile is created
+}
+
 function truncateForTwitter(text: string, max = 280): string {
   if (text.length <= max) return text
   const ellipsis = '...'
   const trimmed = text.slice(0, max - ellipsis.length)
-  // Cut back to the last full word
   const lastSpace = trimmed.lastIndexOf(' ')
   return (lastSpace > 0 ? trimmed.slice(0, lastSpace) : trimmed) + ellipsis
+}
+
+function extractHashtags(text: string): string[] {
+  const matches = text.match(/#[\w]+/g)
+  return matches ? matches.map(t => t.replace(/^#/, '')) : []
 }
 
 export async function POST(req: NextRequest) {
@@ -24,7 +39,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { content, mediaUrl, platforms, scheduleAt, firstSlideHeadline } = await req.json()
+    const { content, mediaUrl, platforms, scheduleAt, firstSlideHeadline, channel } = await req.json()
 
     if (!platforms || !Array.isArray(platforms) || platforms.length === 0) {
       return NextResponse.json(
@@ -49,6 +64,22 @@ export async function POST(req: NextRequest) {
     // Post body text
     formData.append('post[body]', content || '')
 
+    // Profile group — map channel name to Postproxy profile group ID
+    const profileGroupId = channel ? PROFILE_GROUPS[channel] : undefined
+    if (profileGroupId) {
+      formData.append('post[profile_group]', profileGroupId)
+    }
+
+    // Title
+    const videoTitle = firstSlideHeadline || 'Carousel Video'
+    formData.append('post[title]', videoTitle.slice(0, 100))
+
+    // Hashtags — extract from content
+    const hashtags = extractHashtags(content || '')
+    for (const tag of hashtags) {
+      formData.append('post[hashtags][]', tag)
+    }
+
     // Schedule if provided
     if (scheduleAt) {
       formData.append('post[scheduled_at]', scheduleAt)
@@ -69,19 +100,16 @@ export async function POST(req: NextRequest) {
         const mimeType = mimeMatch ? mimeMatch[1] : 'video/mp4'
         const ext = mimeType === 'video/mp4' ? 'mp4' : 'webm'
 
-        // Use Node.js Buffer for server-side base64 decoding
         const buffer = Buffer.from(b64, 'base64')
         const blob = new Blob([buffer], { type: mimeType })
 
         formData.append('media[]', blob, `carousel.${ext}`)
       } else {
-        // External URL — still use media[] field
         formData.append('media[]', mediaUrl)
       }
     }
 
     // Platform-specific parameters
-    const videoTitle = firstSlideHeadline || 'Carousel Video'
     for (const p of platforms as string[]) {
       switch (p) {
         case 'instagram':
@@ -89,9 +117,11 @@ export async function POST(req: NextRequest) {
           break
         case 'youtube':
           formData.append('platforms[youtube][title]', videoTitle.slice(0, 100))
+          formData.append('platforms[youtube][description]', (content || '').slice(0, 5000))
           formData.append('platforms[youtube][privacy_status]', 'public')
           break
         case 'tiktok':
+          formData.append('platforms[tiktok][title]', videoTitle.slice(0, 100))
           formData.append('platforms[tiktok][privacy_status]', 'PUBLIC_TO_EVERYONE')
           break
         case 'twitter':
@@ -117,12 +147,11 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
-        // Content-Type is set automatically by fetch for FormData with boundary
       },
       body: formData,
     })
 
-    // Parse response — handle non-JSON responses gracefully
+    // Parse response
     let data: Record<string, unknown>
     const responseText = await res.text()
     try {
