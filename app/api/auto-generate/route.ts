@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readdir, readFile } from 'fs/promises'
+import { readdir, readFile, stat } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
 
@@ -10,8 +10,13 @@ async function pickRandomMusic(): Promise<string | null> {
   const musicFolder = process.env.MUSIC_FOLDER
   if (!musicFolder || !existsSync(musicFolder)) return null
   try {
-    const files = await readdir(musicFolder)
-    const mp3s = files.filter(f => f.toLowerCase().endsWith('.mp3'))
+    const entries = await readdir(musicFolder)
+    const mp3s: string[] = []
+    for (const f of entries) {
+      if (!f.toLowerCase().endsWith('.mp3')) continue
+      const fileStat = await stat(path.join(musicFolder, f))
+      if (fileStat.isFile()) mp3s.push(f)
+    }
     if (mp3s.length === 0) return null
     const pick = mp3s[Math.floor(Math.random() * mp3s.length)]
     const buffer = await readFile(path.join(musicFolder, pick))
