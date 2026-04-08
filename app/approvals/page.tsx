@@ -25,8 +25,10 @@ export default function ApprovalsPage() {
   const [acting, setActing] = useState<string | null>(null)
   const [actingLabel, setActingLabel] = useState('')
   const [generatingVideo, setGeneratingVideo] = useState<string | null>(null)
+  const [genStep, setGenStep] = useState('')
   const [toast, setToast] = useState<{ msg: string; type?: 'error' | 'success' } | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [previewId, setPreviewId] = useState<string | null>(null)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -49,30 +51,49 @@ export default function ApprovalsPage() {
 
   const generateVideoForItem = async (item: ApprovalItem) => {
     setGeneratingVideo(item.id)
-    showToast('Generating video from slides...')
     try {
-      const res = await fetch('/api/video-export', {
+      // Step 1: Composite slides server-side with Sharp
+      setGenStep('Compositing slides...')
+      const compRes = await fetch('/api/composite-slides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slides: item.slides, slideDuration: 3 }),
+        body: JSON.stringify({ slides: item.slides }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      const compData = await compRes.json()
+      if (!compRes.ok) throw new Error(compData.error || 'Compositing failed')
 
-      // Save video to the approval item
+      // Build slides with composited frames
+      const compositedSlides = item.slides.map((s, i) => ({
+        ...s,
+        image: compData.frames[i] || s.image,
+      }))
+
+      // Step 2: Generate video from composited frames
+      setGenStep('Encoding video...')
+      const vidRes = await fetch('/api/video-export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slides: compositedSlides, slideDuration: 3 }),
+      })
+      const vidData = await vidRes.json()
+      if (!vidRes.ok) throw new Error(vidData.error || 'Video export failed')
+
+      // Step 3: Save video to the approval item
+      setGenStep('Saving...')
       const updateRes = await fetch('/api/approvals', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: item.id, videoBase64: data.video }),
+        body: JSON.stringify({ id: item.id, videoBase64: vidData.video }),
       })
       if (!updateRes.ok) throw new Error('Failed to save video')
 
-      setItems(prev => prev.map(i => i.id === item.id ? { ...i, videoBase64: data.video } : i))
-      showToast('Video ready!')
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, videoBase64: vidData.video } : i))
+      showToast('Video ready — tap Preview to watch')
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Video generation failed', 'error')
     } finally {
       setGeneratingVideo(null)
+      setGenStep('')
     }
   }
 
@@ -89,6 +110,7 @@ export default function ApprovalsPage() {
       if (!res.ok) throw new Error(data.error)
 
       setItems(prev => prev.map(i => i.id === id ? { ...i, status: action === 'approve' ? 'approved' : 'rejected', reviewedAt: new Date().toISOString() } : i))
+      setPreviewId(null)
 
       if (action === 'reject') {
         showToast('Rejected')
@@ -108,6 +130,7 @@ export default function ApprovalsPage() {
 
   const pending = items.filter(i => i.status === 'pending')
   const reviewed = items.filter(i => i.status !== 'pending')
+  const previewItem = previewId ? items.find(i => i.id === previewId) : null
 
   const formatDate = (iso: string) => {
     const d = new Date(iso)
@@ -129,7 +152,6 @@ export default function ApprovalsPage() {
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
           <div className="max-w-2xl mx-auto flex flex-col gap-6">
 
-            {/* Pending */}
             {loading ? (
               <p className="text-[13px] text-stone-400 text-center py-12">Loading...</p>
             ) : pending.length === 0 ? (
@@ -152,7 +174,6 @@ export default function ApprovalsPage() {
                   return (
                     <div key={item.id} className="bg-white border border-stone-100 rounded-xl overflow-hidden">
                       <div className="p-4 flex gap-3">
-                        {/* Thumbnail */}
                         {item.slides[0]?.image && (
                           <div
                             className="w-16 h-20 rounded-lg bg-stone-100 shrink-0 bg-cover bg-center"
@@ -178,7 +199,7 @@ export default function ApprovalsPage() {
                         </div>
                       </div>
 
-                      {/* Expandable slide preview */}
+                      {/* Slide preview toggle */}
                       <button
                         onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
                         className="w-full px-4 py-1.5 text-[11px] text-stone-400 hover:text-stone-600 border-t border-stone-50 transition-colors"
@@ -214,23 +235,27 @@ export default function ApprovalsPage() {
                                   <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
                                   <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
                                 </svg>
-                                Generating video...
+                                {genStep || 'Generating...'}
                               </>
                             ) : (
-                              <>
-                                <span className="text-[11px]">▶</span> Generate video first
-                              </>
+                              <><span className="text-[11px]">▶</span> Generate video first</>
                             )}
                           </button>
                         )}
                         <div className="flex gap-2">
+                          {hasVideo && (
+                            <button
+                              onClick={() => setPreviewId(item.id)}
+                              className="px-4 py-2.5 min-h-[44px] border border-stone-200 text-stone-700 text-[13px] font-medium rounded-lg hover:bg-stone-50 transition-colors flex items-center gap-1.5"
+                            >
+                              <span className="text-[11px]">▶</span> Preview
+                            </button>
+                          )}
                           <button
                             onClick={() => handleAction(item.id, 'approve')}
                             disabled={isActing || !hasVideo}
                             className={`flex-1 px-4 py-2.5 min-h-[44px] text-[13px] font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${
-                              hasVideo
-                                ? 'bg-green-600 text-white hover:bg-green-700'
-                                : 'bg-stone-200 text-stone-400 cursor-not-allowed'
+                              hasVideo ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-stone-200 text-stone-400 cursor-not-allowed'
                             }`}
                           >
                             {isActing ? (
@@ -241,11 +266,7 @@ export default function ApprovalsPage() {
                                 </svg>
                                 {actingLabel}
                               </>
-                            ) : hasVideo ? (
-                              'Approve & Post'
-                            ) : (
-                              'Generate video to approve'
-                            )}
+                            ) : hasVideo ? 'Approve & Post' : 'Need video'}
                           </button>
                           <button
                             onClick={() => handleAction(item.id, 'reject')}
@@ -290,6 +311,68 @@ export default function ApprovalsPage() {
           </div>
         </div>
       </div>
+
+      {/* Video preview modal */}
+      {previewItem?.videoBase64 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setPreviewId(null)}>
+          <div className="bg-white rounded-2xl overflow-hidden max-w-lg w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+            {/* Video player */}
+            <div className="bg-black">
+              <video
+                src={previewItem.videoBase64}
+                controls
+                autoPlay
+                playsInline
+                className="w-full max-h-[60vh] object-contain"
+              />
+            </div>
+
+            {/* Info + actions */}
+            <div className="p-4 flex flex-col gap-3">
+              <div>
+                <p className="text-[14px] font-medium text-stone-900">{previewItem.headline}</p>
+                <p className="text-[12px] text-stone-500 mt-0.5">{previewItem.channel} · {previewItem.slides.length} slides</p>
+                <div className="flex gap-1 mt-1.5 flex-wrap">
+                  {previewItem.platforms.map(p => (
+                    <span key={p} className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded capitalize">{p}</span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleAction(previewItem.id, 'approve')}
+                  disabled={acting === previewItem.id}
+                  className="flex-1 px-4 py-2.5 min-h-[44px] bg-green-600 text-white text-[13px] font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {acting === previewItem.id ? (
+                    <>
+                      <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                      </svg>
+                      Publishing...
+                    </>
+                  ) : 'Approve & Post'}
+                </button>
+                <button
+                  onClick={() => handleAction(previewItem.id, 'reject')}
+                  disabled={acting === previewItem.id}
+                  className="px-4 py-2.5 min-h-[44px] border border-red-200 text-red-600 text-[13px] font-medium rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                >
+                  Reject
+                </button>
+                <button
+                  onClick={() => setPreviewId(null)}
+                  className="px-4 py-2.5 min-h-[44px] border border-stone-200 text-stone-500 text-[13px] font-medium rounded-lg hover:bg-stone-50 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div className={`fixed bottom-5 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-lg text-[12px] font-medium shadow-sm z-50 ${
