@@ -139,7 +139,47 @@ export default function ApprovalsPage() {
       const newTopic: string = newsData.topic || newsData.story || ''
       const newHeadline = newSlides[0]?.headline || newTopic
 
-      // Step 2: Composite slides
+      // Step 2: Fetch images for each slide
+      setRegenStep('Fetching images...')
+      await Promise.all(newSlides.map(async (slide) => {
+        try {
+          const searchQuery = `${slide.headline} ${item.channel}`
+          const imgRes = await fetch('/api/search-images', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: searchQuery, count: 5 }),
+          })
+          if (!imgRes.ok) return
+          const imgData = await imgRes.json()
+          const imageUrls: string[] = (imgData.images || []).map((img: { url: string }) => img.url)
+          if (imageUrls.length === 0) return
+
+          slide.imageOptions = imageUrls
+
+          // Try each URL until one downloads successfully
+          for (const url of imageUrls) {
+            try {
+              const proxyRes = await fetch('/api/fetch-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url }),
+              })
+              if (!proxyRes.ok) continue
+              const proxyData = await proxyRes.json()
+              if (proxyData.base64) {
+                slide.image = proxyData.base64
+                break
+              }
+            } catch {
+              continue
+            }
+          }
+        } catch {
+          // Image search failed for this slide — will use solid colour
+        }
+      }))
+
+      // Step 3: Composite slides
       setRegenStep('Compositing slides...')
       const compRes = await fetch('/api/composite-slides', {
         method: 'POST',
@@ -211,23 +251,57 @@ export default function ApprovalsPage() {
     const item = items.find(i => i.id === itemId)
     if (!item) return
     const slide = item.slides[slideIndex]
-    if (!slide?.imageOptions || slide.imageOptions.length < 2) {
-      showToast('No alternative images available', 'error')
-      return
-    }
-
-    // Find the current image's index in imageOptions (by matching the URL)
-    // If we can't find it (current image is base64), start from index 1
-    const currentUrl = slide.image?.startsWith('data:') ? null : slide.image
-    let currentIdx = currentUrl ? slide.imageOptions.indexOf(currentUrl) : 0
-    if (currentIdx < 0) currentIdx = 0
-    const nextIdx = (currentIdx + 1) % slide.imageOptions.length
-    const nextUrl = slide.imageOptions[nextIdx]
 
     const key = `${itemId}-${slideIndex}`
     setSwappingImage(key)
 
     try {
+      let imageOptions = slide.imageOptions || []
+      let nextIdx = 0
+
+      if (imageOptions.length >= 2) {
+        // Cycle through existing options
+        // Track which index we're on via a simple counter stored in the slide
+        const currentUrl = slide.image?.startsWith('data:') ? null : slide.image
+        let currentIdx = currentUrl ? imageOptions.indexOf(currentUrl) : 0
+        if (currentIdx < 0) currentIdx = 0
+        nextIdx = currentIdx + 1
+
+        // If we've exhausted all options, fetch fresh ones
+        if (nextIdx >= imageOptions.length) {
+          const freshRes = await fetch('/api/search-images', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: `${slide.headline} ${item.channel} photo`, count: 5 }),
+          })
+          if (freshRes.ok) {
+            const freshData = await freshRes.json()
+            const freshUrls: string[] = (freshData.images || [])
+              .map((img: { url: string }) => img.url)
+              .filter((url: string) => !imageOptions.includes(url))
+            if (freshUrls.length > 0) {
+              imageOptions = [...imageOptions, ...freshUrls]
+            }
+          }
+          // If still no new options, wrap around
+          nextIdx = nextIdx < imageOptions.length ? nextIdx : 0
+        }
+      } else {
+        // No existing options — fetch fresh from search
+        const searchRes = await fetch('/api/search-images', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: `${slide.headline} ${item.channel}`, count: 5 }),
+        })
+        if (!searchRes.ok) throw new Error('Image search failed')
+        const searchData = await searchRes.json()
+        imageOptions = (searchData.images || []).map((img: { url: string }) => img.url)
+        if (imageOptions.length === 0) throw new Error('No images found')
+        nextIdx = 0
+      }
+
+      const nextUrl = imageOptions[nextIdx]
+
       // Download the new image via proxy
       const proxyRes = await fetch('/api/fetch-image', {
         method: 'POST',
@@ -238,9 +312,9 @@ export default function ApprovalsPage() {
       const proxyData = await proxyRes.json()
       if (!proxyData.base64) throw new Error('No image data returned')
 
-      // Update the slide image locally
+      // Update the slide image and expanded imageOptions locally
       const updatedSlides = item.slides.map((s, i) =>
-        i === slideIndex ? { ...s, image: proxyData.base64 } : s
+        i === slideIndex ? { ...s, image: proxyData.base64, imageOptions } : s
       )
 
       // Save to server
@@ -395,7 +469,6 @@ export default function ApprovalsPage() {
                           {item.slides.map((s, i) => {
                             const swapKey = `${item.id}-${i}`
                             const isSwapping = swappingImage === swapKey
-                            const hasAlts = s.imageOptions && s.imageOptions.length >= 2
                             return (
                               <div key={i} className="shrink-0 flex flex-col items-center gap-1">
                                 <div className="w-[100px] h-[125px] rounded-lg bg-stone-800 relative overflow-hidden" style={{ background: s.image ? `url(${s.image}) center/cover` : '#1a1a1a' }}>
@@ -413,15 +486,13 @@ export default function ApprovalsPage() {
                                     </div>
                                   )}
                                 </div>
-                                {hasAlts && (
-                                  <button
-                                    onClick={() => cycleSlideImage(item.id, i)}
-                                    disabled={isSwapping}
-                                    className="text-[9px] text-amber-600 hover:text-amber-700 font-medium disabled:opacity-50"
-                                  >
-                                    ↺ New image
-                                  </button>
-                                )}
+                                <button
+                                  onClick={() => cycleSlideImage(item.id, i)}
+                                  disabled={isSwapping}
+                                  className="text-[9px] text-amber-600 hover:text-amber-700 font-medium disabled:opacity-50"
+                                >
+                                  ↺ New image
+                                </button>
                               </div>
                             )
                           })}

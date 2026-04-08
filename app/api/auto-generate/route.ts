@@ -1,7 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { readdir, readFile } from 'fs/promises'
+import { existsSync } from 'fs'
+import path from 'path'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
+
+async function pickRandomMusic(): Promise<string | null> {
+  const musicFolder = process.env.MUSIC_FOLDER
+  if (!musicFolder || !existsSync(musicFolder)) return null
+  try {
+    const files = await readdir(musicFolder)
+    const mp3s = files.filter(f => f.toLowerCase().endsWith('.mp3'))
+    if (mp3s.length === 0) return null
+    const pick = mp3s[Math.floor(Math.random() * mp3s.length)]
+    const buffer = await readFile(path.join(musicFolder, pick))
+    console.log(`[auto-generate] Using music: ${pick}`)
+    return `data:audio/mpeg;base64,${buffer.toString('base64')}`
+  } catch (e) {
+    console.warn('[auto-generate] Failed to read music folder:', e instanceof Error ? e.message : e)
+    return null
+  }
+}
 
 const DEFAULT_CHANNELS = [
   'Gentlemen of Fuel',
@@ -134,10 +154,15 @@ export async function POST(req: NextRequest) {
       }))
 
       console.log(`[auto-generate] [${channel}] Generating video...`)
+      const musicBase64 = await pickRandomMusic()
       const vidRes = await fetch(`${baseUrl}/api/video-export`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slides: compositedSlides, slideDuration: 3 }),
+        body: JSON.stringify({
+          slides: compositedSlides,
+          slideDuration: 5,
+          ...(musicBase64 ? { audioUrl: musicBase64, musicVolume: 15 } : {}),
+        }),
       })
       const vidData = await vidRes.json()
       if (!vidRes.ok) throw new Error(vidData.error || 'Video export failed')

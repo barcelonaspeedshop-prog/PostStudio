@@ -30,7 +30,9 @@ export async function POST(req: NextRequest) {
   const tmpDir = `/tmp/carousel_${Date.now()}`
   
   try {
-    const { slides, slideDuration = 3, audioUrl, musicVolume = 20 } = await req.json()
+    const { slides, slideDuration: rawDuration = 5, audioUrl, musicVolume = 20 } = await req.json()
+    // Enforce minimum 5 seconds per slide
+    const slideDuration = Math.max(5, Number(rawDuration) || 5)
 
     if (!slides || !Array.isArray(slides) || slides.length === 0) {
       return NextResponse.json({ error: 'slides array is required' }, { status: 400 })
