@@ -60,14 +60,19 @@ export async function POST(req: NextRequest) {
     const today = new Date().toISOString().split('T')[0]
 
     // Step 1: Use Claude with web search to find today's top story
+    const searchSystemPrompt = exclude_topic
+      ? `You are a news researcher. You MUST NOT write about "${exclude_topic}" under any circumstances. That topic is completely banned. Find a different, unrelated story.`
+      : `You are a news researcher.`
+
     const searchMessage = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1024,
+      system: searchSystemPrompt,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       tools: [{ type: 'web_search_20250305', name: 'web_search' }] as any,
       messages: [{
         role: 'user',
-        content: `Search the web for the most trending or breaking news story TODAY (${today}) in ${topicKeywords}. Look for recent race results, transfers, car launches, controversies, or major breaking news.${exclude_topic ? `\n\nIMPORTANT: Find today's top trending story but DO NOT use this topic: "${exclude_topic}". Find a completely different story.` : ''}
+        content: `Search the web for the most trending or breaking news story TODAY (${today}) in ${topicKeywords}. Look for recent race results, transfers, car launches, controversies, or major breaking news.${exclude_topic ? `\n\nIMPORTANT: Do NOT write about "${exclude_topic}" under any circumstances. This topic is banned. Find a completely different, unrelated story from today's news.` : ''}
 
 Respond with ONLY a JSON object. No explanatory text before or after. No markdown. Just the raw JSON.
 
