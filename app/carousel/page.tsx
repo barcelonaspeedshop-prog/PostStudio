@@ -94,6 +94,7 @@ export default function CarouselPage() {
   const musicInputRef = useRef<HTMLInputElement>(null)
   const [showYouTube, setShowYouTube] = useState(false)
   const [ytPublishing, setYtPublishing] = useState(false)
+  const [sendingApproval, setSendingApproval] = useState(false)
   const [ytTitle, setYtTitle] = useState('')
   const [ytDescription, setYtDescription] = useState('')
   const [ytTags, setYtTags] = useState('')
@@ -514,6 +515,32 @@ export default function CarouselPage() {
     }
   }
 
+  const sendForApproval = async () => {
+    if (!slides.length) { showToast('Generate slides first', 'error'); return }
+    setSendingApproval(true)
+    try {
+      const res = await fetch('/api/approvals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel,
+          headline: slides[0]?.headline || topic || 'Untitled',
+          topic,
+          slides,
+          videoBase64: videoUrl || undefined,
+          platforms: publishPlatforms.length > 0 ? publishPlatforms : ['instagram', 'tiktok', 'youtube'],
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      showToast('Sent for approval!')
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Failed to send for approval', 'error')
+    } finally {
+      setSendingApproval(false)
+    }
+  }
+
   const reorderSlide = (fromIndex: number, direction: 'up' | 'down') => {
     const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1
     if (toIndex < 0 || toIndex >= slides.length) return
@@ -744,6 +771,32 @@ export default function CarouselPage() {
                 <><span className="text-[11px]">✦</span> Generate carousel</>
               )}
             </button>
+
+            {/* Send for approval */}
+            {slides.length > 0 && (
+              <button
+                onClick={sendForApproval}
+                disabled={sendingApproval}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] bg-amber-600 text-white text-[14px] md:text-[13px] font-medium rounded-xl hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {sendingApproval ? (
+                  <>
+                    <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                    </svg>
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Send for approval
+                  </>
+                )}
+              </button>
+            )}
 
             {/* Video export */}
             {slides.length > 0 && (
