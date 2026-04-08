@@ -9,6 +9,33 @@ type ImageResult = {
   thumbnail?: string
 }
 
+const BLOCKED_DOMAINS = [
+  'instagram.com',
+  'lookaside.instagram.com',
+  'fbcdn.net',
+  'facebook.com',
+]
+
+const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif']
+
+function isAllowedImageUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    // Block known domains that reject server-side fetches
+    if (BLOCKED_DOMAINS.some(d => parsed.hostname === d || parsed.hostname.endsWith('.' + d))) {
+      return false
+    }
+    // Require a common image extension in the pathname
+    const pathname = parsed.pathname.toLowerCase()
+    if (!ALLOWED_EXTENSIONS.some(ext => pathname.endsWith(ext))) {
+      return false
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { query, count = 5 } = await req.json()
@@ -46,17 +73,19 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const images: ImageResult[] = (data.images || []).map((item: {
-      imageUrl: string
-      title: string
-      source: string
-      thumbnailUrl?: string
-    }) => ({
-      url: item.imageUrl,
-      title: item.title,
-      source: item.source,
-      thumbnail: item.thumbnailUrl,
-    }))
+    const images: ImageResult[] = (data.images || [])
+      .map((item: {
+        imageUrl: string
+        title: string
+        source: string
+        thumbnailUrl?: string
+      }) => ({
+        url: item.imageUrl,
+        title: item.title,
+        source: item.source,
+        thumbnail: item.thumbnailUrl,
+      }))
+      .filter((img: ImageResult) => isAllowedImageUrl(img.url))
 
     return NextResponse.json({ query, images })
   } catch (err: unknown) {
