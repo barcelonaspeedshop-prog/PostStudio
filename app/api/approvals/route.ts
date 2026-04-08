@@ -15,7 +15,7 @@ export type ApprovalItem = {
   channel: string
   headline: string
   topic: string
-  slides: Array<{ num: string; tag: string; headline: string; body: string; badge: string; accent: string; image?: string }>
+  slides: Array<{ num: string; tag: string; headline: string; body: string; badge: string; accent: string; image?: string; imageOptions?: string[] }>
   videoBase64?: string
   platforms: string[]
   ytTitle?: string

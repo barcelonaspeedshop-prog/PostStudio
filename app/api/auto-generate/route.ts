@@ -20,7 +20,7 @@ const CHANNEL_TAGS: Record<string, string[]> = {
 const DEFAULT_PLATFORMS = ['instagram', 'tiktok', 'youtube']
 
 type Slide = {
-  num: string; tag: string; headline: string; body: string; badge: string; accent: string; image?: string
+  num: string; tag: string; headline: string; body: string; badge: string; accent: string; image?: string; imageOptions?: string[]
 }
 
 function generateTags(channel: string, topic: string, slides: Slide[]): string[] {
@@ -74,7 +74,41 @@ export async function POST(req: NextRequest) {
       const topic: string = newsData.topic || newsData.story || ''
       const headline = slides[0]?.headline || topic
 
-      // Step 2: Composite slides server-side
+      // Step 2: Fetch images for each slide via Google Custom Search
+      console.log(`[auto-generate] [${channel}] Fetching images for ${slides.length} slides...`)
+      await Promise.all(slides.map(async (slide) => {
+        try {
+          const searchQuery = `${slide.headline} ${channel}`
+          const imgRes = await fetch(`${baseUrl}/api/search-images`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: searchQuery, count: 5 }),
+          })
+          if (!imgRes.ok) return
+          const imgData = await imgRes.json()
+          const imageUrls: string[] = (imgData.images || []).map((img: { url: string }) => img.url)
+          if (imageUrls.length === 0) return
+
+          // Store all URLs as options for cycling later
+          slide.imageOptions = imageUrls
+
+          // Download the first image as base64 for compositing
+          const proxyRes = await fetch(`${baseUrl}/api/fetch-image`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: imageUrls[0] }),
+          })
+          if (proxyRes.ok) {
+            const proxyData = await proxyRes.json()
+            if (proxyData.base64) {
+              slide.image = proxyData.base64
+            }
+          }
+        } catch (e) {
+          console.warn(`[auto-generate] [${channel}] Image fetch failed for "${slide.headline}":`, e instanceof Error ? e.message : e)
+        }
+      }))
+
       console.log(`[auto-generate] [${channel}] Compositing ${slides.length} slides...`)
       const compRes = await fetch(`${baseUrl}/api/composite-slides`, {
         method: 'POST',
@@ -89,7 +123,6 @@ export async function POST(req: NextRequest) {
         image: compData.frames[i] || s.image,
       }))
 
-      // Step 3: Generate video
       console.log(`[auto-generate] [${channel}] Generating video...`)
       const vidRes = await fetch(`${baseUrl}/api/video-export`, {
         method: 'POST',
@@ -99,12 +132,11 @@ export async function POST(req: NextRequest) {
       const vidData = await vidRes.json()
       if (!vidRes.ok) throw new Error(vidData.error || 'Video export failed')
 
-      // Step 4: Generate tags
+      // Generate tags
       const ytTags = generateTags(channel, topic, slides)
       const ytTitle = headline
       const ytDescription = slides.map(s => s.headline + '\n' + s.body).join('\n\n')
 
-      // Step 5: Add to approval queue
       console.log(`[auto-generate] [${channel}] Adding to approval queue...`)
       const approvalRes = await fetch(`${baseUrl}/api/approvals`, {
         method: 'POST',

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 
 type Slide = {
-  num: string; tag: string; headline: string; body: string; badge: string; accent: string; image?: string
+  num: string; tag: string; headline: string; body: string; badge: string; accent: string; image?: string; imageOptions?: string[]
 }
 
 type ApprovalItem = {
@@ -32,6 +32,7 @@ export default function ApprovalsPage() {
   const [autoGenerating, setAutoGenerating] = useState(false)
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
   const [regenStep, setRegenStep] = useState('')
+  const [swappingImage, setSwappingImage] = useState<string | null>(null) // "itemId-slideIndex"
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -206,6 +207,59 @@ export default function ApprovalsPage() {
     }
   }
 
+  const cycleSlideImage = async (itemId: string, slideIndex: number) => {
+    const item = items.find(i => i.id === itemId)
+    if (!item) return
+    const slide = item.slides[slideIndex]
+    if (!slide?.imageOptions || slide.imageOptions.length < 2) {
+      showToast('No alternative images available', 'error')
+      return
+    }
+
+    // Find the current image's index in imageOptions (by matching the URL)
+    // If we can't find it (current image is base64), start from index 1
+    const currentUrl = slide.image?.startsWith('data:') ? null : slide.image
+    let currentIdx = currentUrl ? slide.imageOptions.indexOf(currentUrl) : 0
+    if (currentIdx < 0) currentIdx = 0
+    const nextIdx = (currentIdx + 1) % slide.imageOptions.length
+    const nextUrl = slide.imageOptions[nextIdx]
+
+    const key = `${itemId}-${slideIndex}`
+    setSwappingImage(key)
+
+    try {
+      // Download the new image via proxy
+      const proxyRes = await fetch('/api/fetch-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: nextUrl }),
+      })
+      if (!proxyRes.ok) throw new Error('Failed to download image')
+      const proxyData = await proxyRes.json()
+      if (!proxyData.base64) throw new Error('No image data returned')
+
+      // Update the slide image locally
+      const updatedSlides = item.slides.map((s, i) =>
+        i === slideIndex ? { ...s, image: proxyData.base64 } : s
+      )
+
+      // Save to server
+      await fetch('/api/approvals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: itemId, slides: updatedSlides }),
+      })
+
+      // Clear video since the image changed — it needs re-generation
+      setItems(prev => prev.map(i => i.id === itemId ? { ...i, slides: updatedSlides, videoBase64: undefined } : i))
+      showToast(`Slide ${slideIndex + 1} image updated — regenerate video when ready`)
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Image swap failed', 'error')
+    } finally {
+      setSwappingImage(null)
+    }
+  }
+
   const handleAction = async (id: string, action: 'approve' | 'reject') => {
     setActing(id)
     setActingLabel(action === 'approve' ? 'Publishing...' : 'Rejecting...')
@@ -338,15 +392,39 @@ export default function ApprovalsPage() {
 
                       {expandedId === item.id && (
                         <div className="px-4 pb-3 flex gap-2 overflow-x-auto scrollbar-hide">
-                          {item.slides.map((s, i) => (
-                            <div key={i} className="w-[100px] h-[125px] rounded-lg bg-stone-800 shrink-0 relative overflow-hidden" style={{ background: s.image ? `url(${s.image}) center/cover` : '#1a1a1a' }}>
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-                              <div className="absolute bottom-0 left-0 right-0 p-2">
-                                <p className="text-white text-[8px] font-medium leading-tight line-clamp-2">{s.headline}</p>
+                          {item.slides.map((s, i) => {
+                            const swapKey = `${item.id}-${i}`
+                            const isSwapping = swappingImage === swapKey
+                            const hasAlts = s.imageOptions && s.imageOptions.length >= 2
+                            return (
+                              <div key={i} className="shrink-0 flex flex-col items-center gap-1">
+                                <div className="w-[100px] h-[125px] rounded-lg bg-stone-800 relative overflow-hidden" style={{ background: s.image ? `url(${s.image}) center/cover` : '#1a1a1a' }}>
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                                  <div className="absolute bottom-0 left-0 right-0 p-2">
+                                    <p className="text-white text-[8px] font-medium leading-tight line-clamp-2">{s.headline}</p>
+                                  </div>
+                                  <span className="absolute top-1 right-1 text-white/50 text-[7px]">{i + 1}</span>
+                                  {isSwapping && (
+                                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                      <svg className="w-5 h-5 animate-spin text-white" viewBox="0 0 24 24" fill="none">
+                                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                                      </svg>
+                                    </div>
+                                  )}
+                                </div>
+                                {hasAlts && (
+                                  <button
+                                    onClick={() => cycleSlideImage(item.id, i)}
+                                    disabled={isSwapping}
+                                    className="text-[9px] text-amber-600 hover:text-amber-700 font-medium disabled:opacity-50"
+                                  >
+                                    ↺ New image
+                                  </button>
+                                )}
                               </div>
-                              <span className="absolute top-1 right-1 text-white/50 text-[7px]">{i + 1}</span>
-                            </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       )}
 
