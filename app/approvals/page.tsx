@@ -30,6 +30,8 @@ export default function ApprovalsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [previewId, setPreviewId] = useState<string | null>(null)
   const [autoGenerating, setAutoGenerating] = useState(false)
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
+  const [regenStep, setRegenStep] = useState('')
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -116,6 +118,91 @@ export default function ApprovalsPage() {
     } finally {
       setGeneratingVideo(null)
       setGenStep('')
+    }
+  }
+
+  const regenerateItem = async (item: ApprovalItem) => {
+    setRegeneratingId(item.id)
+    try {
+      // Step 1: Fetch fresh news for this channel
+      setRegenStep('Fetching news...')
+      const newsRes = await fetch('/api/news-brief', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: item.channel, timestamp: Date.now() }),
+      })
+      const newsData = await newsRes.json()
+      if (!newsRes.ok) throw new Error(newsData.error || 'News fetch failed')
+
+      const newSlides: Slide[] = newsData.slides
+      const newTopic: string = newsData.topic || newsData.story || ''
+      const newHeadline = newSlides[0]?.headline || newTopic
+
+      // Step 2: Composite slides
+      setRegenStep('Compositing slides...')
+      const compRes = await fetch('/api/composite-slides', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slides: newSlides }),
+      })
+      const compData = await compRes.json()
+      if (!compRes.ok) throw new Error(compData.error || 'Compositing failed')
+
+      const compositedSlides = newSlides.map((s, i) => ({
+        ...s,
+        image: compData.frames[i] || s.image,
+      }))
+
+      // Step 3: Generate video
+      setRegenStep('Encoding video...')
+      const vidRes = await fetch('/api/video-export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slides: compositedSlides, slideDuration: 3 }),
+      })
+      const vidData = await vidRes.json()
+      if (!vidRes.ok) throw new Error(vidData.error || 'Video export failed')
+
+      // Step 4: Build YouTube metadata
+      const ytTitle = newHeadline
+      const ytDescription = compositedSlides.map(s => s.headline + '\n' + s.body).join('\n\n')
+      const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'is', 'was', 'are', 'vs', 'with', 'how', 'why', 'what'])
+      const ytTags = [item.channel, ...newSlides.flatMap(s =>
+        s.headline.split(/\s+/).filter(w => w.length > 3 && !stopWords.has(w.toLowerCase()) && /^[A-Z]/.test(w))
+      )].filter((t, i, a) => a.indexOf(t) === i).slice(0, 15)
+
+      // Step 5: Update item in queue
+      setRegenStep('Saving...')
+      const updateRes = await fetch('/api/approvals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: item.id,
+          slides: compositedSlides,
+          headline: newHeadline,
+          topic: newTopic,
+          videoBase64: vidData.video,
+          ytTitle,
+          ytDescription,
+          ytTags,
+        }),
+      })
+      if (!updateRes.ok) throw new Error('Failed to save regenerated content')
+
+      // Update local state
+      setItems(prev => prev.map(i => i.id === item.id ? {
+        ...i,
+        slides: compositedSlides,
+        headline: newHeadline,
+        topic: newTopic,
+        videoBase64: vidData.video,
+      } : i))
+      showToast(`Regenerated: "${newHeadline}"`)
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Regeneration failed', 'error')
+    } finally {
+      setRegeneratingId(null)
+      setRegenStep('')
     }
   }
 
@@ -212,6 +299,7 @@ export default function ApprovalsPage() {
                   const hasVideo = !!item.videoBase64
                   const isGenerating = generatingVideo === item.id
                   const isActing = acting === item.id
+                  const isRegenerating = regeneratingId === item.id
                   return (
                     <div key={item.id} className="bg-white border border-stone-100 rounded-xl overflow-hidden">
                       <div className="p-4 flex gap-3">
@@ -292,6 +380,21 @@ export default function ApprovalsPage() {
                               <span className="text-[11px]">▶</span> Preview
                             </button>
                           )}
+                          <button
+                            onClick={() => regenerateItem(item)}
+                            disabled={isRegenerating || isActing}
+                            className="px-4 py-2.5 min-h-[44px] bg-amber-500 text-white text-[13px] font-medium rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                          >
+                            {isRegenerating ? (
+                              <>
+                                <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                                </svg>
+                                {regenStep || 'Regenerating...'}
+                              </>
+                            ) : '↺ Regenerate'}
+                          </button>
                           <button
                             onClick={() => handleAction(item.id, 'approve')}
                             disabled={isActing || !hasVideo}

@@ -85,10 +85,10 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PUT — update an item (e.g. attach video after generation)
+// PUT — update an item (e.g. attach video after generation, or regenerate with fresh content)
 export async function PUT(req: NextRequest) {
   try {
-    const { id, videoBase64 } = await req.json()
+    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags } = await req.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
     const items = await loadApprovals()
@@ -96,6 +96,12 @@ export async function PUT(req: NextRequest) {
     if (!item) return NextResponse.json({ error: 'Item not found' }, { status: 404 })
 
     if (videoBase64) item.videoBase64 = videoBase64
+    if (slides && Array.isArray(slides)) item.slides = slides
+    if (headline) item.headline = headline
+    if (topic !== undefined) item.topic = topic
+    if (ytTitle) item.ytTitle = ytTitle
+    if (ytDescription) item.ytDescription = ytDescription
+    if (ytTags && Array.isArray(ytTags)) item.ytTags = ytTags
     await saveApprovals(items)
 
     return NextResponse.json({ id: item.id, hasVideo: !!item.videoBase64 })
