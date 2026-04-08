@@ -32,7 +32,14 @@ export default function ApprovalsPage() {
   const [autoGenerating, setAutoGenerating] = useState(false)
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
   const [regenStep, setRegenStep] = useState('')
-  const [swappingImage, setSwappingImage] = useState<string | null>(null) // "itemId-slideIndex"
+  const [imagePicker, setImagePicker] = useState<{
+    itemId: string
+    slideIndex: number
+    options: string[]
+    currentIdx: number
+    saving: boolean
+  } | null>(null)
+  const [imageLoadError, setImageLoadError] = useState(false)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -247,74 +254,106 @@ export default function ApprovalsPage() {
     }
   }
 
-  const cycleSlideImage = async (itemId: string, slideIndex: number) => {
+  const openImagePicker = async (itemId: string, slideIndex: number) => {
     const item = items.find(i => i.id === itemId)
     if (!item) return
     const slide = item.slides[slideIndex]
 
-    const key = `${itemId}-${slideIndex}`
-    setSwappingImage(key)
+    let options = slide.imageOptions || []
 
-    try {
-      let imageOptions = slide.imageOptions || []
-      let nextIdx = 0
-
-      if (imageOptions.length >= 2) {
-        // Cycle through existing options
-        // Track which index we're on via a simple counter stored in the slide
-        const currentUrl = slide.image?.startsWith('data:') ? null : slide.image
-        let currentIdx = currentUrl ? imageOptions.indexOf(currentUrl) : 0
-        if (currentIdx < 0) currentIdx = 0
-        nextIdx = currentIdx + 1
-
-        // If we've exhausted all options, fetch fresh ones
-        if (nextIdx >= imageOptions.length) {
-          const freshRes = await fetch('/api/search-images', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: `${slide.headline} ${item.channel} photo`, count: 5 }),
-          })
-          if (freshRes.ok) {
-            const freshData = await freshRes.json()
-            const freshUrls: string[] = (freshData.images || [])
-              .map((img: { url: string }) => img.url)
-              .filter((url: string) => !imageOptions.includes(url))
-            if (freshUrls.length > 0) {
-              imageOptions = [...imageOptions, ...freshUrls]
-            }
-          }
-          // If still no new options, wrap around
-          nextIdx = nextIdx < imageOptions.length ? nextIdx : 0
-        }
-      } else {
-        // No existing options — fetch fresh from search
+    // If no options, fetch from search
+    if (options.length === 0) {
+      try {
         const searchRes = await fetch('/api/search-images', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: `${slide.headline} ${item.channel}`, count: 5 }),
+          body: JSON.stringify({ query: `${slide.headline} ${item.channel}`, count: 10 }),
         })
-        if (!searchRes.ok) throw new Error('Image search failed')
-        const searchData = await searchRes.json()
-        imageOptions = (searchData.images || []).map((img: { url: string }) => img.url)
-        if (imageOptions.length === 0) throw new Error('No images found')
-        nextIdx = 0
+        if (searchRes.ok) {
+          const searchData = await searchRes.json()
+          options = (searchData.images || []).map((img: { url: string }) => img.url)
+        }
+      } catch { /* ignore */ }
+    }
+
+    if (options.length === 0) {
+      showToast('No images found for this slide', 'error')
+      return
+    }
+
+    setImageLoadError(false)
+    setImagePicker({ itemId, slideIndex, options, currentIdx: 0, saving: false })
+  }
+
+  const skipImage = async () => {
+    if (!imagePicker) return
+    let nextIdx = imagePicker.currentIdx + 1
+
+    // If exhausted, fetch more
+    if (nextIdx >= imagePicker.options.length) {
+      const item = items.find(i => i.id === imagePicker.itemId)
+      const slide = item?.slides[imagePicker.slideIndex]
+      if (slide) {
+        try {
+          const searchRes = await fetch('/api/search-images', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: `${slide.headline} ${item?.channel} photo`, count: 10 }),
+          })
+          if (searchRes.ok) {
+            const searchData = await searchRes.json()
+            const freshUrls: string[] = (searchData.images || [])
+              .map((img: { url: string }) => img.url)
+              .filter((url: string) => !imagePicker.options.includes(url))
+            if (freshUrls.length > 0) {
+              setImageLoadError(false)
+              setImagePicker({
+                ...imagePicker,
+                options: [...imagePicker.options, ...freshUrls],
+                currentIdx: nextIdx,
+              })
+              return
+            }
+          }
+        } catch { /* ignore */ }
       }
+      // Wrap around if no new results
+      nextIdx = 0
+    }
 
-      const nextUrl = imageOptions[nextIdx]
+    setImageLoadError(false)
+    setImagePicker({ ...imagePicker, currentIdx: nextIdx })
+  }
 
-      // Download the new image via proxy
-      const proxyRes = await fetch('/api/fetch-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: nextUrl }),
-      })
-      if (!proxyRes.ok) throw new Error('Failed to download image')
-      const proxyData = await proxyRes.json()
-      if (!proxyData.base64) throw new Error('No image data returned')
+  const useSelectedImage = async () => {
+    if (!imagePicker) return
+    const { itemId, slideIndex, options, currentIdx } = imagePicker
+    const selectedUrl = options[currentIdx]
 
-      // Update the slide image and expanded imageOptions locally
+    setImagePicker({ ...imagePicker, saving: true })
+
+    try {
+      // Try server-side download for compositing
+      let base64: string | null = null
+      try {
+        const proxyRes = await fetch('/api/fetch-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: selectedUrl }),
+        })
+        if (proxyRes.ok) {
+          const proxyData = await proxyRes.json()
+          base64 = proxyData.base64 || null
+        }
+      } catch { /* server fetch failed */ }
+
+      // Use base64 if available, otherwise use the URL directly
+      const imageValue = base64 || selectedUrl
+      const item = items.find(i => i.id === itemId)
+      if (!item) return
+
       const updatedSlides = item.slides.map((s, i) =>
-        i === slideIndex ? { ...s, image: proxyData.base64, imageOptions } : s
+        i === slideIndex ? { ...s, image: imageValue, imageOptions: options } : s
       )
 
       // Save to server
@@ -324,13 +363,17 @@ export default function ApprovalsPage() {
         body: JSON.stringify({ id: itemId, slides: updatedSlides }),
       })
 
-      // Clear video since the image changed — it needs re-generation
+      // Update local state, clear video
       setItems(prev => prev.map(i => i.id === itemId ? { ...i, slides: updatedSlides, videoBase64: undefined } : i))
-      showToast(`Slide ${slideIndex + 1} image updated — regenerate video when ready`)
+      setImagePicker(null)
+      showToast(
+        base64
+          ? `Slide ${slideIndex + 1} image updated — regenerate video when ready`
+          : `Slide ${slideIndex + 1} image set (URL) — server download failed, will retry at compositing`
+      )
     } catch (e: unknown) {
-      showToast(e instanceof Error ? e.message : 'Image swap failed', 'error')
-    } finally {
-      setSwappingImage(null)
+      showToast(e instanceof Error ? e.message : 'Failed to save image', 'error')
+      setImagePicker(prev => prev ? { ...prev, saving: false } : null)
     }
   }
 
@@ -466,36 +509,23 @@ export default function ApprovalsPage() {
 
                       {expandedId === item.id && (
                         <div className="px-4 pb-3 flex gap-2 overflow-x-auto scrollbar-hide">
-                          {item.slides.map((s, i) => {
-                            const swapKey = `${item.id}-${i}`
-                            const isSwapping = swappingImage === swapKey
-                            return (
-                              <div key={i} className="shrink-0 flex flex-col items-center gap-1.5">
-                                <div className="w-[100px] h-[125px] rounded-lg bg-stone-800 relative overflow-hidden" style={{ background: s.image ? `url(${s.image}) center/cover` : '#1a1a1a' }}>
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-                                  <div className="absolute bottom-0 left-0 right-0 p-2">
-                                    <p className="text-white text-[8px] font-medium leading-tight line-clamp-2">{s.headline}</p>
-                                  </div>
-                                  <span className="absolute top-1 right-1 text-white/50 text-[7px]">{i + 1}</span>
-                                  {isSwapping && (
-                                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                      <svg className="w-5 h-5 animate-spin text-white" viewBox="0 0 24 24" fill="none">
-                                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
-                                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-                                      </svg>
-                                    </div>
-                                  )}
+                          {item.slides.map((s, i) => (
+                            <div key={i} className="shrink-0 flex flex-col items-center gap-1.5">
+                              <div className="w-[100px] h-[125px] rounded-lg bg-stone-800 relative overflow-hidden" style={{ background: s.image ? `url(${s.image}) center/cover` : '#1a1a1a' }}>
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                                <div className="absolute bottom-0 left-0 right-0 p-2">
+                                  <p className="text-white text-[8px] font-medium leading-tight line-clamp-2">{s.headline}</p>
                                 </div>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); cycleSlideImage(item.id, i) }}
-                                  disabled={isSwapping}
-                                  className="px-2.5 py-1 min-h-[28px] text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 font-medium disabled:opacity-50 transition-colors"
-                                >
-                                  ↺ New image
-                                </button>
+                                <span className="absolute top-1 right-1 text-white/50 text-[7px]">{i + 1}</span>
                               </div>
-                            )
-                          })}
+                              <button
+                                onClick={(e) => { e.stopPropagation(); openImagePicker(item.id, i) }}
+                                className="px-2.5 py-1 min-h-[28px] text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 font-medium transition-colors"
+                              >
+                                ↺ New image
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       )}
 
@@ -604,6 +634,75 @@ export default function ApprovalsPage() {
           </div>
         </div>
       </div>
+
+      {/* Image picker modal */}
+      {imagePicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => !imagePicker.saving && setImagePicker(null)}>
+          <div className="bg-white rounded-2xl overflow-hidden max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-stone-100">
+              <p className="text-[14px] font-medium text-stone-900">Choose image for slide {imagePicker.slideIndex + 1}</p>
+              <p className="text-[11px] text-stone-400 mt-0.5">
+                Image {imagePicker.currentIdx + 1} of {imagePicker.options.length} · Loaded in browser
+              </p>
+            </div>
+
+            {/* Browser-rendered image preview */}
+            <div className="bg-stone-100 flex items-center justify-center" style={{ minHeight: '280px', maxHeight: '400px' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imagePicker.options[imagePicker.currentIdx]}
+                alt="Image option"
+                className="max-w-full max-h-[400px] object-contain"
+                onError={() => setImageLoadError(true)}
+                onLoad={() => setImageLoadError(false)}
+              />
+              {imageLoadError && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <p className="text-[12px] text-stone-400 bg-white/80 px-3 py-1.5 rounded-lg">Image failed to load — try Skip</p>
+                </div>
+              )}
+            </div>
+
+            {/* Source URL */}
+            <div className="px-4 py-2 border-t border-stone-50">
+              <p className="text-[10px] text-stone-400 truncate">{imagePicker.options[imagePicker.currentIdx]}</p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 p-4 pt-2">
+              <button
+                onClick={useSelectedImage}
+                disabled={imagePicker.saving || imageLoadError}
+                className="flex-1 px-4 py-2.5 min-h-[44px] bg-green-600 text-white text-[13px] font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {imagePicker.saving ? (
+                  <>
+                    <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                    </svg>
+                    Saving...
+                  </>
+                ) : '✓ Use this image'}
+              </button>
+              <button
+                onClick={skipImage}
+                disabled={imagePicker.saving}
+                className="px-4 py-2.5 min-h-[44px] bg-amber-500 text-white text-[13px] font-medium rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50"
+              >
+                Skip →
+              </button>
+              <button
+                onClick={() => setImagePicker(null)}
+                disabled={imagePicker.saving}
+                className="px-4 py-2.5 min-h-[44px] border border-stone-200 text-stone-500 text-[13px] font-medium rounded-lg hover:bg-stone-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Video preview modal */}
       {previewItem?.videoBase64 && (
