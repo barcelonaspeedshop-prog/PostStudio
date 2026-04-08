@@ -17,49 +17,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'query string is required' }, { status: 400 })
     }
 
-    const apiKey = process.env.GOOGLE_SEARCH_API_KEY
-    const engineId = process.env.GOOGLE_SEARCH_ENGINE_ID
+    const apiKey = process.env.SERPER_API_KEY
 
-    if (!apiKey || !engineId) {
+    if (!apiKey) {
       return NextResponse.json(
-        { error: 'GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_ENGINE_ID env vars are required' },
+        { error: 'SERPER_API_KEY env var is required' },
         { status: 500 }
       )
     }
 
     const num = Math.min(Math.max(1, Number(count)), 10)
-    const params = new URLSearchParams({
-      key: apiKey,
-      cx: engineId,
-      q: query,
-      searchType: 'image',
-      num: String(num),
-      safe: 'active',
-      imgSize: 'large',
-      imgType: 'photo',
-    })
 
-    const res = await fetch(`https://www.googleapis.com/customsearch/v1?${params}`)
+    const res = await fetch('https://google.serper.dev/images', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ q: query, num }),
+    })
     const data = await res.json()
 
     if (!res.ok) {
-      console.error('[search-images] Google API error:', JSON.stringify(data.error || data))
+      console.error('[search-images] Serper API error:', JSON.stringify(data))
       return NextResponse.json(
-        { error: data.error?.message || 'Google Search API failed' },
+        { error: data.message || 'Serper image search failed' },
         { status: 502 }
       )
     }
 
-    const images: ImageResult[] = (data.items || []).map((item: {
-      link: string
+    const images: ImageResult[] = (data.images || []).map((item: {
+      imageUrl: string
       title: string
-      displayLink: string
-      image?: { thumbnailLink?: string }
+      source: string
+      thumbnailUrl?: string
     }) => ({
-      url: item.link,
+      url: item.imageUrl,
       title: item.title,
-      source: item.displayLink,
-      thumbnail: item.image?.thumbnailLink,
+      source: item.source,
+      thumbnail: item.thumbnailUrl,
     }))
 
     return NextResponse.json({ query, images })
