@@ -18,6 +18,9 @@ export type ApprovalItem = {
   slides: Array<{ num: string; tag: string; headline: string; body: string; badge: string; accent: string; image?: string }>
   videoBase64?: string
   platforms: string[]
+  ytTitle?: string
+  ytDescription?: string
+  ytTags?: string[]
   createdAt: string
   status: 'pending' | 'approved' | 'rejected'
   reviewedAt?: string
@@ -49,7 +52,7 @@ export async function GET() {
 // POST — add new item to queue
 export async function POST(req: NextRequest) {
   try {
-    const { channel, headline, topic, slides, videoBase64, platforms } = await req.json()
+    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags } = await req.json()
 
     if (!channel || !slides || !Array.isArray(slides)) {
       return NextResponse.json({ error: 'channel and slides are required' }, { status: 400 })
@@ -63,6 +66,9 @@ export async function POST(req: NextRequest) {
       slides,
       videoBase64,
       platforms: platforms || [],
+      ytTitle: ytTitle || '',
+      ytDescription: ytDescription || '',
+      ytTags: ytTags || [],
       createdAt: new Date().toISOString(),
       status: 'pending',
     }
@@ -163,14 +169,16 @@ export async function PATCH(req: NextRequest) {
     if (item.platforms.includes('youtube')) {
       try {
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
-        const tags = caption.match(/#[\w]+/g)?.map(t => t.replace('#', '')) || []
+        const tags = item.ytTags && item.ytTags.length > 0
+          ? item.ytTags
+          : caption.match(/#[\w]+/g)?.map(t => t.replace('#', '')) || []
         const res = await fetch(`${baseUrl}/api/publish/youtube`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             videoBase64: item.videoBase64,
-            title: item.headline,
-            description: caption,
+            title: item.ytTitle || item.headline,
+            description: item.ytDescription || caption,
             tags,
             channelName: item.channel,
           }),

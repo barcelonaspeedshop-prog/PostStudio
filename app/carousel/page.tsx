@@ -529,6 +529,9 @@ export default function CarouselPage() {
           slides,
           videoBase64: videoUrl || undefined,
           platforms: publishPlatforms.length > 0 ? publishPlatforms : ['instagram', 'tiktok', 'youtube'],
+          ytTitle: ytTitle || slides[0]?.headline || '',
+          ytDescription: ytDescription || slides.map(s => s.headline + '\n' + s.body).join('\n\n'),
+          ytTags: ytTags ? ytTags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
         }),
       })
       const data = await res.json()
