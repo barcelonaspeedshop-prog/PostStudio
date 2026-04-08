@@ -47,7 +47,7 @@ async function fetchArticleImage(url: string): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { channel } = await req.json()
+    const { channel, exclude_topic } = await req.json()
 
     if (!channel || !VALID_CHANNELS.includes(channel)) {
       return NextResponse.json(
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
       tools: [{ type: 'web_search_20250305', name: 'web_search' }] as any,
       messages: [{
         role: 'user',
-        content: `Search the web for the most trending or breaking news story TODAY (${today}) in ${topicKeywords}. Look for recent race results, transfers, car launches, controversies, or major breaking news.
+        content: `Search the web for the most trending or breaking news story TODAY (${today}) in ${topicKeywords}. Look for recent race results, transfers, car launches, controversies, or major breaking news.${exclude_topic ? `\n\nIMPORTANT: Find today's top trending story but DO NOT use this topic: "${exclude_topic}". Find a completely different story.` : ''}
 
 Respond with ONLY a JSON object. No explanatory text before or after. No markdown. Just the raw JSON.
 
