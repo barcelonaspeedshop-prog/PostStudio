@@ -2,9 +2,67 @@ import { NextRequest, NextResponse } from 'next/server'
 import { readdir, readFile, stat } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
+import Anthropic from '@anthropic-ai/sdk'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+/**
+ * Use Claude to extract specific image search queries from slide content.
+ * Returns one search query per slide, focusing on proper nouns and specific subjects.
+ */
+async function extractImageQueries(slides: Slide[], channel: string): Promise<string[]> {
+  try {
+    const slideSummaries = slides.map((s, i) =>
+      `Slide ${i + 1}: Headline: "${s.headline}" Body: "${s.body}"`
+    ).join('\n')
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 500,
+      system: 'You extract specific image search queries. Return ONLY a JSON array of strings, one per slide. No markdown, no explanation.',
+      messages: [{
+        role: 'user',
+        content: `Extract the best Google Image search query for each slide below. The channel is "${channel}".
+
+Rules:
+- Focus on SPECIFIC proper nouns: player names, team names, car models, race circuits, specific events
+- Remove generic words like "football", "soccer", "racing", "sports", "world", "news", "update", "breaking"
+- Include context that helps find the RIGHT image (e.g. "Yan Diomande Manchester United transfer" not "United Football")
+- Each query should be 3-6 words maximum
+- For people: use their full name + team/context
+- For cars: use make + model + year if mentioned
+- For events: use event name + location
+
+${slideSummaries}
+
+Return a JSON array of ${slides.length} search query strings.`,
+      }],
+    })
+
+    const text = message.content
+      .filter((b) => b.type === 'text')
+      .map((b) => (b as { type: 'text'; text: string }).text)
+      .join('')
+
+    const cleaned = text.replace(/```json|```/g, '').trim()
+    const match = cleaned.match(/\[[\s\S]*\]/)?.[0]
+    if (!match) throw new Error('No JSON array found')
+    const queries: string[] = JSON.parse(match)
+    if (queries.length !== slides.length) throw new Error('Wrong number of queries')
+    return queries
+  } catch (e) {
+    console.warn('[auto-generate] Claude image query extraction failed:', e instanceof Error ? e.message : e)
+    // Fallback: use headline words, filtering out generic terms
+    const genericWords = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'is', 'was', 'are', 'vs', 'with', 'how', 'why', 'what', 'football', 'soccer', 'racing', 'sports', 'world', 'news', 'update', 'breaking', 'latest', 'big', 'new', 'top', 'major', 'shocking'])
+    return slides.map(s => {
+      const words = s.headline.split(/\s+/).filter(w => w.length > 2 && !genericWords.has(w.toLowerCase()))
+      return words.slice(0, 4).join(' ') + ' ' + channel
+    })
+  }
+}
 
 async function pickRandomMusic(): Promise<string | null> {
   const musicFolder = process.env.MUSIC_FOLDER
@@ -99,11 +157,16 @@ export async function POST(req: NextRequest) {
       const topic: string = newsData.topic || newsData.story || ''
       const headline = slides[0]?.headline || topic
 
-      // Step 2: Fetch images for each slide via Serper image search
+      // Step 2: Extract specific image search queries using Claude
+      console.log(`[auto-generate] [${channel}] Extracting image search queries...`)
+      const imageQueries = await extractImageQueries(slides, channel)
+      console.log(`[auto-generate] [${channel}] Image queries:`, imageQueries)
+
+      // Step 3: Fetch images for each slide via Serper image search
       console.log(`[auto-generate] [${channel}] Fetching images for ${slides.length} slides...`)
-      await Promise.all(slides.map(async (slide) => {
+      await Promise.all(slides.map(async (slide, slideIdx) => {
         try {
-          const searchQuery = `${slide.headline} ${channel}`
+          const searchQuery = imageQueries[slideIdx] || `${slide.headline} ${channel}`
           const imgRes = await fetch(`${baseUrl}/api/search-images`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

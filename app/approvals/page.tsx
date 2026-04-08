@@ -470,7 +470,7 @@ export default function ApprovalsPage() {
                             const swapKey = `${item.id}-${i}`
                             const isSwapping = swappingImage === swapKey
                             return (
-                              <div key={i} className="shrink-0 flex flex-col items-center gap-1">
+                              <div key={i} className="shrink-0 flex flex-col items-center gap-1.5">
                                 <div className="w-[100px] h-[125px] rounded-lg bg-stone-800 relative overflow-hidden" style={{ background: s.image ? `url(${s.image}) center/cover` : '#1a1a1a' }}>
                                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
                                   <div className="absolute bottom-0 left-0 right-0 p-2">
@@ -487,9 +487,9 @@ export default function ApprovalsPage() {
                                   )}
                                 </div>
                                 <button
-                                  onClick={() => cycleSlideImage(item.id, i)}
+                                  onClick={(e) => { e.stopPropagation(); cycleSlideImage(item.id, i) }}
                                   disabled={isSwapping}
-                                  className="text-[9px] text-amber-600 hover:text-amber-700 font-medium disabled:opacity-50"
+                                  className="px-2.5 py-1 min-h-[28px] text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 font-medium disabled:opacity-50 transition-colors"
                                 >
                                   ↺ New image
                                 </button>
