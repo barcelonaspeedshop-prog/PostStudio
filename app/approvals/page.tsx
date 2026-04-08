@@ -23,12 +23,14 @@ export default function ApprovalsPage() {
   const [items, setItems] = useState<ApprovalItem[]>([])
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState<string | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
+  const [actingLabel, setActingLabel] = useState('')
+  const [generatingVideo, setGeneratingVideo] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ msg: string; type?: 'error' | 'success' } | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  const showToast = (msg: string) => {
-    setToast(msg)
-    setTimeout(() => setToast(null), 3000)
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 4000)
   }
 
   const fetchItems = async () => {
@@ -37,7 +39,7 @@ export default function ApprovalsPage() {
       const data = await res.json()
       setItems(data)
     } catch {
-      showToast('Failed to load approvals')
+      showToast('Failed to load approvals', 'error')
     } finally {
       setLoading(false)
     }
@@ -45,8 +47,38 @@ export default function ApprovalsPage() {
 
   useEffect(() => { fetchItems() }, [])
 
+  const generateVideoForItem = async (item: ApprovalItem) => {
+    setGeneratingVideo(item.id)
+    showToast('Generating video from slides...')
+    try {
+      const res = await fetch('/api/video-export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slides: item.slides, slideDuration: 3 }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+
+      // Save video to the approval item
+      const updateRes = await fetch('/api/approvals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, videoBase64: data.video }),
+      })
+      if (!updateRes.ok) throw new Error('Failed to save video')
+
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, videoBase64: data.video } : i))
+      showToast('Video ready!')
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Video generation failed', 'error')
+    } finally {
+      setGeneratingVideo(null)
+    }
+  }
+
   const handleAction = async (id: string, action: 'approve' | 'reject') => {
     setActing(id)
+    setActingLabel(action === 'approve' ? 'Publishing...' : 'Rejecting...')
     try {
       const res = await fetch('/api/approvals', {
         method: 'PATCH',
@@ -58,17 +90,19 @@ export default function ApprovalsPage() {
 
       setItems(prev => prev.map(i => i.id === id ? { ...i, status: action === 'approve' ? 'approved' : 'rejected', reviewedAt: new Date().toISOString() } : i))
 
-      if (data.publishError) {
-        showToast(`Approved but publish failed: ${data.publishError}`)
-      } else if (action === 'approve') {
-        showToast(`Approved & published: ${data.published ? 'sent to platforms' : 'no video to publish'}`)
-      } else {
+      if (action === 'reject') {
         showToast('Rejected')
+      } else if (data.publishError) {
+        showToast(`Approved but some platforms failed: ${data.publishError}`, 'error')
+      } else {
+        const platforms = (data.results || []).filter((r: { success: boolean }) => r.success).map((r: { platform: string }) => r.platform)
+        showToast(`Published to ${platforms.join(', ')}!`)
       }
     } catch (e: unknown) {
-      showToast(e instanceof Error ? e.message : 'Action failed')
+      showToast(e instanceof Error ? e.message : 'Action failed', 'error')
     } finally {
       setActing(null)
+      setActingLabel('')
     }
   }
 
@@ -111,69 +145,120 @@ export default function ApprovalsPage() {
             ) : (
               <div className="flex flex-col gap-3">
                 <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Pending review</p>
-                {pending.map(item => (
-                  <div key={item.id} className="bg-white border border-stone-100 rounded-xl overflow-hidden">
-                    <div className="p-4 flex gap-3">
-                      {/* Thumbnail */}
-                      {item.slides[0]?.image && (
-                        <div
-                          className="w-16 h-20 rounded-lg bg-stone-100 shrink-0 bg-cover bg-center"
-                          style={{ backgroundImage: `url(${item.slides[0].image})` }}
-                        />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-medium text-stone-900 truncate">{item.headline}</p>
-                        <p className="text-[11px] text-stone-500 mt-0.5">{item.channel}</p>
-                        <div className="flex gap-1 mt-1.5 flex-wrap">
-                          {item.platforms.map(p => (
-                            <span key={p} className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded capitalize">{p}</span>
+                {pending.map(item => {
+                  const hasVideo = !!item.videoBase64
+                  const isGenerating = generatingVideo === item.id
+                  const isActing = acting === item.id
+                  return (
+                    <div key={item.id} className="bg-white border border-stone-100 rounded-xl overflow-hidden">
+                      <div className="p-4 flex gap-3">
+                        {/* Thumbnail */}
+                        {item.slides[0]?.image && (
+                          <div
+                            className="w-16 h-20 rounded-lg bg-stone-100 shrink-0 bg-cover bg-center"
+                            style={{ backgroundImage: `url(${item.slides[0].image})` }}
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-medium text-stone-900 truncate">{item.headline}</p>
+                          <p className="text-[11px] text-stone-500 mt-0.5">{item.channel}</p>
+                          <div className="flex gap-1 mt-1.5 flex-wrap">
+                            {item.platforms.map(p => (
+                              <span key={p} className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded capitalize">{p}</span>
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <p className="text-[10px] text-stone-400">{item.slides.length} slides · {formatDate(item.createdAt)}</p>
+                            {hasVideo ? (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-600 rounded">Video ready</span>
+                            ) : (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded">No video</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Expandable slide preview */}
+                      <button
+                        onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                        className="w-full px-4 py-1.5 text-[11px] text-stone-400 hover:text-stone-600 border-t border-stone-50 transition-colors"
+                      >
+                        {expandedId === item.id ? 'Hide slides' : `Preview ${item.slides.length} slides`}
+                      </button>
+
+                      {expandedId === item.id && (
+                        <div className="px-4 pb-3 flex gap-2 overflow-x-auto scrollbar-hide">
+                          {item.slides.map((s, i) => (
+                            <div key={i} className="w-[100px] h-[125px] rounded-lg bg-stone-800 shrink-0 relative overflow-hidden" style={{ background: s.image ? `url(${s.image}) center/cover` : '#1a1a1a' }}>
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                              <div className="absolute bottom-0 left-0 right-0 p-2">
+                                <p className="text-white text-[8px] font-medium leading-tight line-clamp-2">{s.headline}</p>
+                              </div>
+                              <span className="absolute top-1 right-1 text-white/50 text-[7px]">{i + 1}</span>
+                            </div>
                           ))}
                         </div>
-                        <p className="text-[10px] text-stone-400 mt-1.5">{item.slides.length} slides · {formatDate(item.createdAt)}</p>
+                      )}
+
+                      {/* Actions */}
+                      <div className="flex flex-col gap-2 px-4 pb-4 pt-2">
+                        {!hasVideo && (
+                          <button
+                            onClick={() => generateVideoForItem(item)}
+                            disabled={isGenerating}
+                            className="w-full px-4 py-2.5 min-h-[44px] bg-stone-900 text-white text-[13px] font-medium rounded-lg hover:bg-stone-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                          >
+                            {isGenerating ? (
+                              <>
+                                <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                                </svg>
+                                Generating video...
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-[11px]">▶</span> Generate video first
+                              </>
+                            )}
+                          </button>
+                        )}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleAction(item.id, 'approve')}
+                            disabled={isActing || !hasVideo}
+                            className={`flex-1 px-4 py-2.5 min-h-[44px] text-[13px] font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${
+                              hasVideo
+                                ? 'bg-green-600 text-white hover:bg-green-700'
+                                : 'bg-stone-200 text-stone-400 cursor-not-allowed'
+                            }`}
+                          >
+                            {isActing ? (
+                              <>
+                                <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                                </svg>
+                                {actingLabel}
+                              </>
+                            ) : hasVideo ? (
+                              'Approve & Post'
+                            ) : (
+                              'Generate video to approve'
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleAction(item.id, 'reject')}
+                            disabled={isActing}
+                            className="px-4 py-2.5 min-h-[44px] border border-red-200 text-red-600 text-[13px] font-medium rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                          >
+                            Reject
+                          </button>
+                        </div>
                       </div>
                     </div>
-
-                    {/* Expandable detail */}
-                    <button
-                      onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
-                      className="w-full px-4 py-1.5 text-[11px] text-stone-400 hover:text-stone-600 border-t border-stone-50 transition-colors"
-                    >
-                      {expandedId === item.id ? 'Hide slides' : `Preview ${item.slides.length} slides`}
-                    </button>
-
-                    {expandedId === item.id && (
-                      <div className="px-4 pb-3 flex gap-2 overflow-x-auto scrollbar-hide">
-                        {item.slides.map((s, i) => (
-                          <div key={i} className="w-[100px] h-[125px] rounded-lg bg-stone-800 shrink-0 relative overflow-hidden" style={{ background: s.image ? `url(${s.image}) center/cover` : '#1a1a1a' }}>
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-                            <div className="absolute bottom-0 left-0 right-0 p-2">
-                              <p className="text-white text-[8px] font-medium leading-tight line-clamp-2">{s.headline}</p>
-                            </div>
-                            <span className="absolute top-1 right-1 text-white/50 text-[7px]">{i + 1}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Actions */}
-                    <div className="flex gap-2 px-4 pb-4 pt-2">
-                      <button
-                        onClick={() => handleAction(item.id, 'approve')}
-                        disabled={acting === item.id}
-                        className="flex-1 px-4 py-2.5 min-h-[44px] bg-green-600 text-white text-[13px] font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                      >
-                        {acting === item.id ? 'Processing...' : 'Approve & Post'}
-                      </button>
-                      <button
-                        onClick={() => handleAction(item.id, 'reject')}
-                        disabled={acting === item.id}
-                        className="flex-1 px-4 py-2.5 min-h-[44px] border border-red-200 text-red-600 text-[13px] font-medium rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
 
@@ -207,8 +292,10 @@ export default function ApprovalsPage() {
       </div>
 
       {toast && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-lg text-[12px] font-medium shadow-sm z-50 bg-stone-900 text-white">
-          {toast}
+        <div className={`fixed bottom-5 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-lg text-[12px] font-medium shadow-sm z-50 ${
+          toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-stone-900 text-white'
+        }`}>
+          {toast.msg}
         </div>
       )}
     </div>

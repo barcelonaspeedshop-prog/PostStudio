@@ -5,6 +5,7 @@ import path from 'path'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 300
 
 const DATA_DIR = process.env.TOKEN_STORAGE_PATH || '/data'
 const APPROVALS_PATH = path.join(DATA_DIR, 'approvals.json')
@@ -78,6 +79,27 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// PUT — update an item (e.g. attach video after generation)
+export async function PUT(req: NextRequest) {
+  try {
+    const { id, videoBase64 } = await req.json()
+    if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
+
+    const items = await loadApprovals()
+    const item = items.find(i => i.id === id)
+    if (!item) return NextResponse.json({ error: 'Item not found' }, { status: 404 })
+
+    if (videoBase64) item.videoBase64 = videoBase64
+    await saveApprovals(items)
+
+    return NextResponse.json({ id: item.id, hasVideo: !!item.videoBase64 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    console.error('[approvals] PUT error:', message)
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
 // PATCH — approve or reject an item
 export async function PATCH(req: NextRequest) {
   try {
@@ -93,44 +115,89 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Item not found' }, { status: 404 })
     }
 
+    if (action === 'approve' && !item.videoBase64) {
+      return NextResponse.json({ error: 'Cannot approve without a video. Generate the video first.' }, { status: 400 })
+    }
+
     item.status = action === 'approve' ? 'approved' : 'rejected'
     item.reviewedAt = new Date().toISOString()
     await saveApprovals(items)
 
-    // If approved, trigger publishing
-    if (action === 'approve' && item.platforms.length > 0 && item.videoBase64) {
+    if (action === 'reject') {
+      return NextResponse.json({ id: item.id, status: 'rejected' })
+    }
+
+    // Approved — publish to platforms
+    const results: { platform: string; success: boolean; error?: string; url?: string }[] = []
+    const caption = item.slides.map(s => `${s.headline} — ${s.body}`).join('\n\n')
+
+    // Publish to Postproxy for non-YouTube platforms
+    const postproxyPlatforms = item.platforms.filter(p => p !== 'youtube')
+    if (postproxyPlatforms.length > 0) {
       try {
-        const caption = item.slides.map(s => `${s.headline} — ${s.body}`).join('\n\n')
-        const publishRes = await fetch(new URL('/api/publish', req.url).toString(), {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
+        const res = await fetch(`${baseUrl}/api/publish`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             content: caption,
             mediaUrl: item.videoBase64,
-            platforms: item.platforms,
+            platforms: postproxyPlatforms,
             firstSlideHeadline: item.headline,
             channel: item.channel,
           }),
         })
-        const publishData = await publishRes.json()
-        if (!publishRes.ok) {
-          console.error('[approvals] Publish failed after approval:', publishData)
-          return NextResponse.json({
-            id: item.id,
-            status: item.status,
-            publishError: publishData.error || 'Publish failed',
-          })
+        const data = await res.json()
+        if (res.ok) {
+          postproxyPlatforms.forEach(p => results.push({ platform: p, success: true }))
+        } else {
+          postproxyPlatforms.forEach(p => results.push({ platform: p, success: false, error: data.error }))
         }
-        console.log(`[approvals] Approved and published: ${item.headline}`)
-        return NextResponse.json({ id: item.id, status: item.status, published: true })
-      } catch (pubErr: unknown) {
-        const msg = pubErr instanceof Error ? pubErr.message : 'Publish error'
-        console.error('[approvals] Publish error after approval:', msg)
-        return NextResponse.json({ id: item.id, status: item.status, publishError: msg })
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Publish error'
+        postproxyPlatforms.forEach(p => results.push({ platform: p, success: false, error: msg }))
       }
     }
 
-    return NextResponse.json({ id: item.id, status: item.status })
+    // Publish to YouTube directly
+    if (item.platforms.includes('youtube')) {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
+        const tags = caption.match(/#[\w]+/g)?.map(t => t.replace('#', '')) || []
+        const res = await fetch(`${baseUrl}/api/publish/youtube`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            videoBase64: item.videoBase64,
+            title: item.headline,
+            description: caption,
+            tags,
+            channelName: item.channel,
+          }),
+        })
+        const data = await res.json()
+        if (res.ok) {
+          results.push({ platform: 'youtube', success: true, url: data.url })
+        } else {
+          results.push({ platform: 'youtube', success: false, error: data.error })
+        }
+      } catch (e: unknown) {
+        results.push({ platform: 'youtube', success: false, error: e instanceof Error ? e.message : 'YouTube error' })
+      }
+    }
+
+    const allSuccess = results.every(r => r.success)
+    const failures = results.filter(r => !r.success)
+
+    console.log(`[approvals] Published "${item.headline}":`, JSON.stringify(results))
+
+    return NextResponse.json({
+      id: item.id,
+      status: item.status,
+      published: true,
+      results,
+      publishError: failures.length > 0 ? failures.map(f => `${f.platform}: ${f.error}`).join('; ') : undefined,
+    })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[approvals] PATCH error:', message)
