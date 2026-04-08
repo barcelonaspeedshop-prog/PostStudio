@@ -14,6 +14,15 @@ const BLOCKED_DOMAINS = [
   'lookaside.instagram.com',
   'fbcdn.net',
   'facebook.com',
+  'twitter.com',
+  'twimg.com',
+  'tiktok.com',
+  'tiktokcdn.com',
+  'pinterest.com',
+  'pinimg.com',
+  'reddit.com',
+  'redd.it',
+  'whatsapp.com',
 ]
 
 const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif']

@@ -9,7 +9,16 @@ const USER_AGENTS = [
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
 ]
 
-async function downloadBuffer(url: string, userAgent: string): Promise<Buffer> {
+const VALID_IMAGE_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+]
+
+const MIN_IMAGE_SIZE = 5 * 1024 // 5KB — anything smaller is likely an error page
+
+async function downloadAndValidate(url: string, userAgent: string): Promise<{ buffer: Buffer; reason?: string }> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 15000)
   try {
@@ -23,24 +32,33 @@ async function downloadBuffer(url: string, userAgent: string): Promise<Buffer> {
       },
     })
     clearTimeout(timeout)
+
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return Buffer.from(await res.arrayBuffer())
+
+    // Check Content-Type header
+    const contentType = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase()
+    if (contentType && !VALID_IMAGE_TYPES.includes(contentType)) {
+      throw new Error(`Invalid content type: ${contentType}`)
+    }
+
+    const buffer = Buffer.from(await res.arrayBuffer())
+
+    // Check buffer size
+    if (buffer.length < MIN_IMAGE_SIZE) {
+      throw new Error(`Image too small (${buffer.length} bytes) — likely an error page`)
+    }
+
+    return { buffer }
   } catch (e) {
     clearTimeout(timeout)
     throw e
   }
 }
 
-async function convertToJpeg(buffer: Buffer): Promise<Buffer> {
-  // Minimum size check — too-small buffers are likely error pages, not images
-  if (buffer.length < 200) throw new Error('Buffer too small to be a valid image')
-  return sharp(buffer).jpeg({ quality: 85 }).toBuffer()
-}
-
 /**
- * Proxy endpoint that downloads an image URL, converts it to JPEG via sharp,
- * and returns it as a base64 data URI. Tries multiple User-Agents if the first
- * attempt fails. Returns 404 if all attempts fail so callers can try the next URL.
+ * Proxy endpoint that downloads an image URL, validates it, converts to JPEG
+ * via sharp, and returns as base64 data URI. Tries multiple User-Agents.
+ * Returns 404 with a reason if all attempts fail so callers skip to the next URL.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -50,26 +68,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'url string is required' }, { status: 400 })
     }
 
+    let lastReason = ''
+
     // Try each User-Agent until one works
     for (let attempt = 0; attempt < USER_AGENTS.length; attempt++) {
       try {
-        const rawBuffer = await downloadBuffer(url, USER_AGENTS[attempt])
-        const jpegBuffer = await convertToJpeg(rawBuffer)
+        const { buffer } = await downloadAndValidate(url, USER_AGENTS[attempt])
+        const jpegBuffer = await sharp(buffer).jpeg({ quality: 85 }).toBuffer()
         const base64 = `data:image/jpeg;base64,${jpegBuffer.toString('base64')}`
         return NextResponse.json({ base64 })
       } catch (e) {
-        const msg = e instanceof Error ? e.message : 'Unknown error'
-        console.warn(`[fetch-image] Attempt ${attempt + 1} failed for ${url}: ${msg}`)
-        // Continue to next User-Agent
+        lastReason = e instanceof Error ? e.message : 'Unknown error'
+        console.warn(`[fetch-image] Attempt ${attempt + 1} failed for ${url}: ${lastReason}`)
       }
     }
 
-    // All attempts failed
-    console.error(`[fetch-image] All attempts failed for ${url}`)
-    return NextResponse.json({ error: 'All download attempts failed' }, { status: 404 })
+    // All attempts failed — return 404 with reason so caller tries next image
+    console.error(`[fetch-image] All attempts failed for ${url}: ${lastReason}`)
+    return NextResponse.json(
+      { error: 'All download attempts failed', reason: lastReason, skip: true },
+      { status: 404 }
+    )
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[fetch-image] Error:', message)
-    return NextResponse.json({ error: message }, { status: 404 })
+    return NextResponse.json(
+      { error: message, reason: message, skip: true },
+      { status: 404 }
+    )
   }
 }
