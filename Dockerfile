@@ -1,7 +1,7 @@
 FROM node:20-alpine AS base
 
 # Install ffmpeg for video export
-RUN apk add --no-cache ffmpeg
+RUN apk add --no-cache ffmpeg fontconfig ttf-dejavu
 
 # Create data directory for persistent token storage
 RUN mkdir -p /data
