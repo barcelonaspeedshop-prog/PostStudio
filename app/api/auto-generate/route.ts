@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       const topic: string = newsData.topic || newsData.story || ''
       const headline = slides[0]?.headline || topic
 
-      // Step 2: Fetch images for each slide via Google Custom Search
+      // Step 2: Fetch images for each slide via Serper image search
       console.log(`[auto-generate] [${channel}] Fetching images for ${slides.length} slides...`)
       await Promise.all(slides.map(async (slide) => {
         try {
@@ -92,20 +92,30 @@ export async function POST(req: NextRequest) {
           // Store all URLs as options for cycling later
           slide.imageOptions = imageUrls
 
-          // Download the first image as base64 for compositing
-          const proxyRes = await fetch(`${baseUrl}/api/fetch-image`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: imageUrls[0] }),
-          })
-          if (proxyRes.ok) {
-            const proxyData = await proxyRes.json()
-            if (proxyData.base64) {
-              slide.image = proxyData.base64
+          // Try each image URL until one downloads and converts successfully
+          for (const url of imageUrls) {
+            try {
+              const proxyRes = await fetch(`${baseUrl}/api/fetch-image`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url }),
+              })
+              if (!proxyRes.ok) continue
+              const proxyData = await proxyRes.json()
+              if (proxyData.base64) {
+                slide.image = proxyData.base64
+                break // success — stop trying more URLs
+              }
+            } catch {
+              // This URL failed, try the next one
+              continue
             }
           }
+          if (!slide.image) {
+            console.warn(`[auto-generate] [${channel}] All image URLs failed for "${slide.headline}" — using solid colour`)
+          }
         } catch (e) {
-          console.warn(`[auto-generate] [${channel}] Image fetch failed for "${slide.headline}":`, e instanceof Error ? e.message : e)
+          console.warn(`[auto-generate] [${channel}] Image search failed for "${slide.headline}":`, e instanceof Error ? e.message : e)
         }
       }))
 
