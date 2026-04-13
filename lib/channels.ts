@@ -37,6 +37,41 @@ export const CHANNELS: Record<string, ChannelConfig> = {
   },
 }
 
+  'Omnira Cricket': {
+    name: 'Omnira Cricket',
+    primary: '#2563eb',
+    bg: '#0a1628',
+    handle: '@omniraCricket',
+    tagline: 'Cricket · Test · T20',
+  },
+  'Omnira Golf': {
+    name: 'Omnira Golf',
+    primary: '#16a34a',
+    bg: '#0a1a0e',
+    handle: '@omniraGolf',
+    tagline: 'Golf · Tours · Majors',
+  },
+  'Omnira NFL': {
+    name: 'Omnira NFL',
+    primary: '#dc2626',
+    bg: '#1a0808',
+    handle: '@omniraNFL',
+    tagline: 'NFL · American Football · Playoffs',
+  },
+  'Omnira Food': {
+    name: 'Omnira Food',
+    primary: '#ea580c',
+    bg: '#1a0e08',
+    handle: '@omniraFood',
+    tagline: 'Food · Recipes · Culture',
+  },
+  'Omnira Travel': {
+    name: 'Omnira Travel',
+    primary: '#0891b2',
+    bg: '#08141a',
+    handle: '@omniraTravel',
+    tagline: 'Travel · Destinations · Adventure',
+  },
 export function getChannel(name: string): ChannelConfig {
   return CHANNELS[name] || CHANNELS['Gentlemen of Fuel']
 }
