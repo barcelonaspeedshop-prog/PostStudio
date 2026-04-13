@@ -1,9 +1,9 @@
 export type ChannelConfig = {
   name: string
-  primary: string   // accent / highlight colour
-  bg: string         // dark background colour
-  handle: string     // social handle
-  tagline: string    // short channel descriptor
+  primary: string
+  bg: string
+  handle: string
+  tagline: string
 }
 
 export const CHANNELS: Record<string, ChannelConfig> = {
@@ -35,43 +35,43 @@ export const CHANNELS: Record<string, ChannelConfig> = {
     handle: '@omnirafootball',
     tagline: 'Football · Transfers · Matchday',
   },
-}
-
   'Omnira Cricket': {
     name: 'Omnira Cricket',
-    primary: '#2563eb',
-    bg: '#0a1628',
-    handle: '@omniraCricket',
-    tagline: 'Cricket · Test · T20',
+    primary: '#16a34a',
+    bg: '#0a1a0e',
+    handle: '@OmniraCricket',
+    tagline: 'Cricket · Test · T20 · IPL',
   },
   'Omnira Golf': {
     name: 'Omnira Golf',
-    primary: '#16a34a',
-    bg: '#0a1a0e',
-    handle: '@omniraGolf',
-    tagline: 'Golf · Tours · Majors',
+    primary: '#15803d',
+    bg: '#081408',
+    handle: '@OmniraGolf',
+    tagline: 'Golf · PGA Tour · Majors',
   },
   'Omnira NFL': {
     name: 'Omnira NFL',
     primary: '#dc2626',
     bg: '#1a0808',
-    handle: '@omniraNFL',
+    handle: '@OmniraNFL',
     tagline: 'NFL · American Football · Playoffs',
   },
   'Omnira Food': {
     name: 'Omnira Food',
     primary: '#ea580c',
-    bg: '#1a0e08',
-    handle: '@omniraFood',
+    bg: '#1a0c08',
+    handle: '@OmniraFood',
     tagline: 'Food · Recipes · Culture',
   },
   'Omnira Travel': {
     name: 'Omnira Travel',
     primary: '#0891b2',
     bg: '#08141a',
-    handle: '@omniraTravel',
+    handle: '@OmniraTravel',
     tagline: 'Travel · Destinations · Adventure',
   },
+}
+
 export function getChannel(name: string): ChannelConfig {
   return CHANNELS[name] || CHANNELS['Gentlemen of Fuel']
 }
