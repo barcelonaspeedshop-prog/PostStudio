@@ -8,6 +8,11 @@ const CHANNEL_TOPICS: Record<string, string> = {
   'Omnira F1': 'Formula 1, F1 racing, Grand Prix',
   'Road & Trax': 'motorsport, racing, rally, endurance racing, NASCAR, IndyCar',
   'Omnira Football': 'football, soccer, Premier League, Champions League, La Liga',
+  'Omnira Cricket': 'cricket, Test cricket, T20, IPL, international cricket',
+  'Omnira Golf': 'golf, PGA Tour, Masters, Ryder Cup, LIV Golf',
+  'Omnira NFL': 'NFL, American football, Super Bowl, NFL draft, touchdowns',
+  'Omnira Food': 'food, recipes, restaurants, cuisine, cooking, chefs',
+  'Omnira Travel': 'travel, destinations, tourism, adventure, hotels, flights',
 }
 
 const VALID_CHANNELS = Object.keys(CHANNEL_TOPICS)
