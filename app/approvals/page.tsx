@@ -289,17 +289,21 @@ export default function ApprovalsPage() {
     if (!imagePicker) return
     let nextIdx = imagePicker.currentIdx + 1
 
-    // If exhausted, fetch more
+    // If exhausted, fetch more with timeout
     if (nextIdx >= imagePicker.options.length) {
       const item = items.find(i => i.id === imagePicker.itemId)
       const slide = item?.slides[imagePicker.slideIndex]
       if (slide) {
         try {
+          const controller = new AbortController()
+          const timeout = setTimeout(() => controller.abort(), 8000)
           const searchRes = await fetch('/api/search-images', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ query: `${slide.headline} ${item?.channel} photo`, count: 10 }),
+            signal: controller.signal,
           })
+          clearTimeout(timeout)
           if (searchRes.ok) {
             const searchData = await searchRes.json()
             const freshUrls: string[] = (searchData.images || [])
@@ -315,7 +319,7 @@ export default function ApprovalsPage() {
               return
             }
           }
-        } catch { /* ignore */ }
+        } catch { /* timeout or fetch failed — wrap around silently */ }
       }
       // Wrap around if no new results
       nextIdx = 0
@@ -333,19 +337,23 @@ export default function ApprovalsPage() {
     setImagePicker({ ...imagePicker, saving: true })
 
     try {
-      // Try server-side download for compositing
+      // Try server-side download for compositing (with 10s timeout)
       let base64: string | null = null
       try {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 10000)
         const proxyRes = await fetch('/api/fetch-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: selectedUrl }),
+          signal: controller.signal,
         })
+        clearTimeout(timeout)
         if (proxyRes.ok) {
           const proxyData = await proxyRes.json()
           base64 = proxyData.base64 || null
         }
-      } catch { /* server fetch failed */ }
+      } catch { /* timeout or server fetch failed — fall through to URL */ }
 
       // Use base64 if available, otherwise use the URL directly
       const imageValue = base64 || selectedUrl
@@ -373,6 +381,7 @@ export default function ApprovalsPage() {
       )
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Failed to save image', 'error')
+    } finally {
       setImagePicker(prev => prev ? { ...prev, saving: false } : null)
     }
   }
