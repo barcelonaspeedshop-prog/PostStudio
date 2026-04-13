@@ -1,11 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readdir, readFile, stat } from 'fs/promises'
+import { readdir, readFile, writeFile, stat, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
 import Anthropic from '@anthropic-ai/sdk'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
+
+const DATA_DIR = process.env.TOKEN_STORAGE_PATH || '/data'
+const USED_TOPICS_PATH = path.join(DATA_DIR, 'used-topics.json')
+
+type UsedTopics = Record<string, string[]>
+
+async function loadUsedTopics(): Promise<UsedTopics> {
+  try {
+    if (!existsSync(USED_TOPICS_PATH)) return {}
+    const raw = await readFile(USED_TOPICS_PATH, 'utf-8')
+    return JSON.parse(raw)
+  } catch {
+    return {}
+  }
+}
+
+async function saveUsedTopics(topics: UsedTopics): Promise<void> {
+  if (!existsSync(DATA_DIR)) {
+    await mkdir(DATA_DIR, { recursive: true })
+  }
+  await writeFile(USED_TOPICS_PATH, JSON.stringify(topics, null, 2))
+}
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -140,15 +162,22 @@ export async function POST(req: NextRequest) {
 
   const results: { channel: string; status: string; headline?: string; error?: string }[] = []
 
+  // Load previously used topics for deduplication
+  const usedTopics = await loadUsedTopics()
+
   for (const channel of channels) {
     console.log(`[auto-generate] Starting: ${channel}`)
     try {
-      // Step 1: Get today's news
+      // Get excluded topics for this channel
+      const channelExclusions = usedTopics[channel] || []
+      console.log(`[auto-generate] [${channel}] Excluding ${channelExclusions.length} previous topics`)
+
+      // Step 1: Get today's news (with topic exclusions)
       console.log(`[auto-generate] [${channel}] Fetching news...`)
       const newsRes = await fetch(`${baseUrl}/api/news-brief`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel, timestamp: Date.now() }),
+        body: JSON.stringify({ channel, timestamp: Date.now(), exclude_topics: channelExclusions }),
       })
       const newsData = await newsRes.json()
       if (!newsRes.ok) throw new Error(newsData.error || 'News fetch failed')
@@ -258,6 +287,17 @@ export async function POST(req: NextRequest) {
       })
       const approvalData = await approvalRes.json()
       if (!approvalRes.ok) throw new Error(approvalData.error || 'Approval queue failed')
+
+      // Track this topic to avoid repeats in future runs
+      if (topic) {
+        if (!usedTopics[channel]) usedTopics[channel] = []
+        usedTopics[channel].push(topic)
+        // Keep only the last 7 entries per channel
+        if (usedTopics[channel].length > 7) {
+          usedTopics[channel] = usedTopics[channel].slice(-7)
+        }
+        await saveUsedTopics(usedTopics)
+      }
 
       console.log(`[auto-generate] [${channel}] Done: "${headline}"`)
       results.push({ channel, status: 'success', headline })

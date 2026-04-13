@@ -137,7 +137,7 @@ export default function ApprovalsPage() {
       const newsRes = await fetch('/api/news-brief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel: item.channel, timestamp: Date.now(), exclude_topic: item.topic || item.headline }),
+        body: JSON.stringify({ channel: item.channel, timestamp: Date.now(), exclude_topics: [item.topic || item.headline].filter(Boolean) }),
       })
       const newsData = await newsRes.json()
       if (!newsRes.ok) throw new Error(newsData.error || 'News fetch failed')

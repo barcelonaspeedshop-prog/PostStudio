@@ -47,7 +47,11 @@ async function fetchArticleImage(url: string): Promise<string | null> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { channel, exclude_topic } = await req.json()
+    const { channel, exclude_topic, exclude_topics: rawExcludeTopics } = await req.json()
+    // Support both single exclude_topic (legacy) and exclude_topics array
+    const exclude_topics: string[] = Array.isArray(rawExcludeTopics)
+      ? rawExcludeTopics
+      : exclude_topic ? [exclude_topic] : []
 
     if (!channel || !VALID_CHANNELS.includes(channel)) {
       return NextResponse.json(
@@ -60,8 +64,10 @@ export async function POST(req: NextRequest) {
     const today = new Date().toISOString().split('T')[0]
 
     // Step 1: Use Claude with web search to find today's top story
-    const searchSystemPrompt = exclude_topic
-      ? `You are a news researcher. You MUST NOT write about "${exclude_topic}" under any circumstances. That topic is completely banned. Find a different, unrelated story.`
+    const hasExclusions = exclude_topics.length > 0
+    const exclusionList = exclude_topics.map((t, i) => `${i + 1}. "${t}"`).join('\n')
+    const searchSystemPrompt = hasExclusions
+      ? `You are a news researcher. You MUST NOT cover any of the following topics under any circumstances — they are all banned:\n${exclusionList}\n\nFind a completely different, unrelated story.`
       : `You are a news researcher.`
 
     const searchMessage = await client.messages.create({
@@ -72,7 +78,7 @@ export async function POST(req: NextRequest) {
       tools: [{ type: 'web_search_20250305', name: 'web_search' }] as any,
       messages: [{
         role: 'user',
-        content: `Search the web for the most trending or breaking news story TODAY (${today}) in ${topicKeywords}. Look for recent race results, transfers, car launches, controversies, or major breaking news.${exclude_topic ? `\n\nIMPORTANT: Do NOT write about "${exclude_topic}" under any circumstances. This topic is banned. Find a completely different, unrelated story from today's news.` : ''}
+        content: `Search the web for the most trending or breaking news story TODAY (${today}) in ${topicKeywords}. Look for recent race results, transfers, car launches, controversies, or major breaking news.${hasExclusions ? `\n\nIMPORTANT: You MUST NOT cover any of these topics — they are all banned:\n${exclusionList}\n\nFind a completely different, unrelated story from today's news.` : ''}
 
 Respond with ONLY a JSON object. No explanatory text before or after. No markdown. Just the raw JSON.
 
