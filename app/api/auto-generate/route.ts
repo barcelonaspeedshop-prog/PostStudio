@@ -108,6 +108,25 @@ async function pickRandomMusic(): Promise<string | null> {
   }
 }
 
+const BLOCKED_IMAGE_DOMAINS = [
+  'instagram.com', 'lookaside.instagram.com', 'lookaside.fbsbx.com',
+  'lookaside.facebook.com', 'fbcdn.net', 'facebook.com',
+  'twitter.com', 'twimg.com', 'pbs.twimg.com', 'ton.twimg.com',
+  'tiktok.com', 'tiktokcdn.com', 'pinterest.com', 'pinimg.com',
+  'reddit.com', 'redd.it', 'whatsapp.com',
+]
+
+function isBlockedImageUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase()
+    if (BLOCKED_IMAGE_DOMAINS.some(d => hostname === d || hostname.endsWith('.' + d))) return true
+    if (hostname.startsWith('scontent.') || hostname.startsWith('scontent-')) return true
+    return false
+  } catch {
+    return true
+  }
+}
+
 const DEFAULT_CHANNELS = [
   'Gentlemen of Fuel',
   'Omnira F1',
@@ -203,8 +222,13 @@ export async function POST(req: NextRequest) {
           })
           if (!imgRes.ok) return
           const imgData = await imgRes.json()
-          const imageUrls: string[] = (imgData.images || []).map((img: { url: string }) => img.url)
-          if (imageUrls.length === 0) return
+          const imageUrls: string[] = (imgData.images || [])
+            .map((img: { url: string }) => img.url)
+            .filter((url: string) => !isBlockedImageUrl(url))
+          if (imageUrls.length === 0) {
+            console.warn(`[auto-generate] [${channel}] No valid image URLs for "${slide.headline}" after filtering`)
+            return
+          }
 
           // Store all URLs as options for cycling later
           slide.imageOptions = imageUrls

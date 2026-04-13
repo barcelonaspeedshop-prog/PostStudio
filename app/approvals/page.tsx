@@ -2,6 +2,25 @@
 import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 
+const BLOCKED_IMAGE_DOMAINS = [
+  'instagram.com', 'lookaside.instagram.com', 'lookaside.fbsbx.com',
+  'lookaside.facebook.com', 'fbcdn.net', 'facebook.com',
+  'twitter.com', 'twimg.com', 'pbs.twimg.com', 'ton.twimg.com',
+  'tiktok.com', 'tiktokcdn.com', 'pinterest.com', 'pinimg.com',
+  'reddit.com', 'redd.it', 'whatsapp.com',
+]
+
+function isBlockedImageUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase()
+    if (BLOCKED_IMAGE_DOMAINS.some(d => hostname === d || hostname.endsWith('.' + d))) return true
+    if (hostname.startsWith('scontent.') || hostname.startsWith('scontent-')) return true
+    return false
+  } catch {
+    return true
+  }
+}
+
 type Slide = {
   num: string; tag: string; headline: string; body: string; badge: string; accent: string; image?: string; imageOptions?: string[]
 }
@@ -158,7 +177,9 @@ export default function ApprovalsPage() {
           })
           if (!imgRes.ok) return
           const imgData = await imgRes.json()
-          const imageUrls: string[] = (imgData.images || []).map((img: { url: string }) => img.url)
+          const imageUrls: string[] = (imgData.images || [])
+            .map((img: { url: string }) => img.url)
+            .filter((u: string) => !isBlockedImageUrl(u))
           if (imageUrls.length === 0) return
 
           slide.imageOptions = imageUrls
@@ -259,9 +280,9 @@ export default function ApprovalsPage() {
     if (!item) return
     const slide = item.slides[slideIndex]
 
-    let options = slide.imageOptions || []
+    let options = (slide.imageOptions || []).filter(u => !isBlockedImageUrl(u))
 
-    // If no options, fetch from search
+    // If no valid options, fetch from search
     if (options.length === 0) {
       try {
         const searchRes = await fetch('/api/search-images', {
@@ -271,7 +292,9 @@ export default function ApprovalsPage() {
         })
         if (searchRes.ok) {
           const searchData = await searchRes.json()
-          options = (searchData.images || []).map((img: { url: string }) => img.url)
+          options = (searchData.images || [])
+            .map((img: { url: string }) => img.url)
+            .filter((u: string) => !isBlockedImageUrl(u))
         }
       } catch { /* ignore */ }
     }
@@ -308,7 +331,7 @@ export default function ApprovalsPage() {
             const searchData = await searchRes.json()
             const freshUrls: string[] = (searchData.images || [])
               .map((img: { url: string }) => img.url)
-              .filter((url: string) => !imagePicker.options.includes(url))
+              .filter((url: string) => !isBlockedImageUrl(url) && !imagePicker.options.includes(url))
             if (freshUrls.length > 0) {
               setImageLoadError(false)
               setImagePicker({

@@ -12,10 +12,14 @@ type ImageResult = {
 const BLOCKED_DOMAINS = [
   'instagram.com',
   'lookaside.instagram.com',
+  'lookaside.fbsbx.com',
+  'lookaside.facebook.com',
   'fbcdn.net',
   'facebook.com',
   'twitter.com',
   'twimg.com',
+  'pbs.twimg.com',
+  'ton.twimg.com',
   'tiktok.com',
   'tiktokcdn.com',
   'pinterest.com',
@@ -27,15 +31,27 @@ const BLOCKED_DOMAINS = [
 
 const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif']
 
-function isAllowedImageUrl(url: string): boolean {
+function isBlockedImageUrl(url: string): boolean {
   try {
-    const parsed = new URL(url)
-    // Block known domains that reject server-side fetches
-    if (BLOCKED_DOMAINS.some(d => parsed.hostname === d || parsed.hostname.endsWith('.' + d))) {
-      return false
+    const hostname = new URL(url).hostname.toLowerCase()
+    // Exact or suffix match against blocked domains
+    if (BLOCKED_DOMAINS.some(d => hostname === d || hostname.endsWith('.' + d))) {
+      return true
     }
-    // Require a common image extension in the pathname
-    const pathname = parsed.pathname.toLowerCase()
+    // Block any hostname starting with "scontent." (Facebook/Instagram CDN)
+    if (hostname.startsWith('scontent.') || hostname.startsWith('scontent-')) {
+      return true
+    }
+    return false
+  } catch {
+    return true // invalid URLs are blocked
+  }
+}
+
+function isAllowedImageUrl(url: string): boolean {
+  if (isBlockedImageUrl(url)) return false
+  try {
+    const pathname = new URL(url).pathname.toLowerCase()
     if (!ALLOWED_EXTENSIONS.some(ext => pathname.endsWith(ext))) {
       return false
     }
