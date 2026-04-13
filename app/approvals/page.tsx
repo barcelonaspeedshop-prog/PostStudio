@@ -108,7 +108,7 @@ export default function ApprovalsPage() {
       const compRes = await fetch('/api/composite-slides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slides: item.slides }),
+        body: JSON.stringify({ slides: item.slides, channel: item.channel }),
       })
       const compData = await compRes.json()
       if (!compRes.ok) throw new Error(compData.error || 'Compositing failed')
@@ -212,7 +212,7 @@ export default function ApprovalsPage() {
       const compRes = await fetch('/api/composite-slides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slides: newSlides }),
+        body: JSON.stringify({ slides: newSlides, channel: item.channel }),
       })
       const compData = await compRes.json()
       if (!compRes.ok) throw new Error(compData.error || 'Compositing failed')

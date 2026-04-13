@@ -134,8 +134,15 @@ Return a JSON array of exactly ${slideCount} slide objects. Each object must hav
 - "badge": short badge label in CAPS (max 5 words)
 - "accent": one of these color names: "red", "amber", "blue", "green", "purple", "teal"
 - "imageQuery": a specific image search term for this slide's visual (2-5 words, e.g. a specific car model, stadium, driver name)
+- "tileType": one of "hook", "brand", "story", "cta"
 
-Make slide 1 a hook/intro, slides 2-4 tell the story, slide 5 is a CTA/verdict.
+Tile type rules:
+- Slide 1 MUST be "hook" (attention-grabbing intro over a full image)
+- Slide 2 MUST be "brand" (text-only brand slide, no image needed)
+- Slides 3 to ${slideCount - 1} MUST be "story" (narrative slides over images)
+- Slide ${slideCount} MUST be "cta" (call to action / verdict)
+
+Make slide 1 a hook/intro, slide 2 a brand context slide, slides 3-${slideCount - 1} tell the story, slide ${slideCount} is a CTA/verdict.
 Return only the JSON array, nothing else.`
 
     const message = await client.messages.create({
