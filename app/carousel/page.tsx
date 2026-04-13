@@ -73,7 +73,7 @@ function SlidePreview({ slide, index }: { slide: Slide; index: number }) {
 export default function CarouselPage() {
   const [topic, setTopic] = useState('')
   const [channel, setChannel] = useState('Gentlemen of Fuel')
-  const [slideCount, setSlideCount] = useState(10)
+  const [slideCount, setSlideCount] = useState(6)
   const [slides, setSlides] = useState<Slide[]>([])
   const [generating, setGenerating] = useState(false)
   const [selectedSlide, setSelectedSlide] = useState<number | null>(null)
@@ -758,17 +758,14 @@ export default function CarouselPage() {
               <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-2">
                 Slides — {slideCount}
               </p>
-              <input
-                type="range"
-                min={5}
-                max={15}
-                step={1}
-                value={slideCount}
-                onChange={(e) => setSlideCount(Number(e.target.value))}
-                className="w-full"
-              />
-              <div className="flex justify-between text-[10px] text-stone-400 mt-1">
-                <span>5</span><span>15</span>
+              <div className="grid grid-cols-4 gap-2 mt-1">
+                {[4, 6, 8, 10].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setSlideCount(n)}
+                    className={`py-1.5 rounded-lg text-[12px] font-medium border transition-colors ${slideCount === n ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'}`}
+                  >{n}</button>
+                ))}
               </div>
             </div>
 
