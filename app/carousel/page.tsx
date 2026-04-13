@@ -189,6 +189,22 @@ export default function CarouselPage() {
         throw new Error((data.error || `Publish failed (${res.status})`) + detail)
       }
       showToast(`Published to ${publishPlatforms.length} platform${publishPlatforms.length > 1 ? 's' : ''}!`)
+      // Auto-schedule secondary formats
+      try {
+        const now = new Date()
+        const scheduleJobs = []
+        if (publishPlatforms.includes('instagram')) scheduleJobs.push({ format: 'reel', platform: 'instagram', hours: 6 })
+        if (publishPlatforms.includes('youtube')) scheduleJobs.push({ format: 'short', platform: 'youtube', hours: 4 })
+        if (publishPlatforms.includes('tiktok')) scheduleJobs.push({ format: 'tiktok', platform: 'tiktok', hours: 2 })
+        for (const job of scheduleJobs) {
+          const scheduledTime = new Date(now.getTime() + job.hours * 60 * 60 * 1000).toISOString()
+          await fetch('/api/scheduled', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ channel, headline: slides[0]?.headline || '', format: job.format, platform: job.platform, scheduledTime, status: 'pending' })
+          })
+        }
+      } catch { /* non-critical */ }
       setShowPublish(false)
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Error publishing', 'error')
