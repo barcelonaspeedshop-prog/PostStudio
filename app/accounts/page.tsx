@@ -1,190 +1,111 @@
 'use client'
-import { useState, useEffect, Suspense } from 'react'
 import Sidebar from '@/components/Sidebar'
-import { useSearchParams } from 'next/navigation'
+import { CHANNELS } from '@/lib/channels'
 
-const CHANNELS = [
-  { name: 'Gentlemen of Fuel', short: 'GoF' },
-  { name: 'Omnira F1', short: 'F1' },
-  { name: 'Road & Trax', short: 'R&T' },
-  { name: 'Omnira Football', short: 'FB' },
+const ACCOUNT_DATA = [
+  {
+    channel: 'Gentlemen of Fuel',
+    accounts: [
+      { platform: 'YouTube', handle: '@gentlemenoffuel', status: 'connected', url: 'https://youtube.com/@gentlemenoffuel' },
+      { platform: 'Instagram', handle: '@gentlemenoffuel', status: 'connected', url: 'https://instagram.com/gentlemenoffuel' },
+      { platform: 'TikTok', handle: '@gentlemenoffuel', status: 'connected', url: 'https://tiktok.com/@gentlemenoffuel' },
+      { platform: 'Facebook', handle: 'Gentlemen of Fuel', status: 'connected', url: 'https://facebook.com/gentlemenoffuel' },
+    ]
+  },
+  {
+    channel: 'Omnira F1',
+    accounts: [
+      { platform: 'YouTube', handle: '@omniraf1', status: 'connected', url: 'https://youtube.com/@omniraf1' },
+      { platform: 'Instagram', handle: '@omniraf1', status: 'connected', url: 'https://instagram.com/omniraf1' },
+      { platform: 'TikTok', handle: '@omniraf1', status: 'pending', url: '' },
+      { platform: 'Facebook', handle: 'Omnira F1', status: 'connected', url: 'https://facebook.com' },
+    ]
+  },
+  {
+    channel: 'Road & Trax',
+    accounts: [
+      { platform: 'YouTube', handle: '@roadandtrax', status: 'connected', url: 'https://youtube.com/@roadandtrax' },
+      { platform: 'Instagram', handle: '@roadandtrax', status: 'connected', url: 'https://instagram.com/roadandtrax' },
+      { platform: 'TikTok', handle: '@roadandtrax', status: 'pending', url: '' },
+      { platform: 'Facebook', handle: 'Road & Trax', status: 'connected', url: 'https://facebook.com' },
+    ]
+  },
+  {
+    channel: 'Omnira Football',
+    accounts: [
+      { platform: 'YouTube', handle: '@omnirafc', status: 'connected', url: 'https://youtube.com/@omnirafc' },
+      { platform: 'Instagram', handle: '@omnirafootball', status: 'connected', url: 'https://instagram.com/omnirafootball' },
+      { platform: 'TikTok', handle: '@omnirafootball', status: 'pending', url: '' },
+      { platform: 'Facebook', handle: 'Omnira Football', status: 'connected', url: 'https://facebook.com' },
+    ]
+  },
 ]
 
-type ChannelStatus = {
-  connected: boolean
-  youtube_channel_name?: string
-  youtube_channel_id?: string
-  youtube_handle?: string
+const PLATFORM_TIPS: Record<string, string> = {
+  TikTok: 'Set up TikTok to reach a younger, high-engagement audience',
+  Instagram: 'Instagram Reels drive significant organic reach',
+  YouTube: 'YouTube Shorts can multiply your long-form video views',
 }
 
 export default function AccountsPage() {
   return (
-    <Suspense>
-      <AccountsContent />
-    </Suspense>
-  )
-}
-
-function AccountsContent() {
-  const searchParams = useSearchParams()
-  const [statuses, setStatuses] = useState<Record<string, ChannelStatus>>({})
-  const [loading, setLoading] = useState(true)
-  const [disconnecting, setDisconnecting] = useState<string | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
-
-  const showToast = (msg: string) => {
-    setToast(msg)
-    setTimeout(() => setToast(null), 3000)
-  }
-
-  const fetchStatuses = async () => {
-    try {
-      const res = await fetch('/api/auth/youtube?action=status')
-      const data = await res.json()
-      setStatuses(data)
-    } catch (e) {
-      console.error('Failed to fetch statuses:', e)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchStatuses()
-    const connected = searchParams.get('connected')
-    const error = searchParams.get('error')
-    if (connected) showToast(`Connected: ${connected}`)
-    if (error) showToast(`Error: ${error}`)
-  }, [searchParams])
-
-  const disconnect = async (channelName: string) => {
-    setDisconnecting(channelName)
-    try {
-      await fetch(`/api/auth/youtube?action=disconnect&channel=${encodeURIComponent(channelName)}`)
-      setStatuses(prev => {
-        const updated = { ...prev }
-        delete updated[channelName]
-        return updated
-      })
-      showToast(`Disconnected: ${channelName}`)
-    } catch {
-      showToast('Failed to disconnect')
-    } finally {
-      setDisconnecting(null)
-    }
-  }
-
-  return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen bg-stone-50">
       <Sidebar />
-
-      <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Topbar */}
-        <div className="h-12 bg-white border-b border-stone-100 flex items-center px-5 pl-14 md:pl-5 shrink-0">
-          <span className="text-[14px] font-medium text-stone-900">Accounts</span>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="max-w-xl mx-auto flex flex-col gap-6">
-            {/* YouTube section */}
-            <div>
-              <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center">
-                  <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-[14px] font-medium text-stone-900">YouTube</p>
-                  <p className="text-[12px] text-stone-400">Direct publishing via YouTube Data API</p>
-                </div>
-              </div>
-
-              {loading ? (
-                <div className="text-center py-8">
-                  <p className="text-[13px] text-stone-400">Loading accounts...</p>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {CHANNELS.map(({ name, short }) => {
-                    const status = statuses[name]
-                    const isConnected = status?.connected
-                    return (
-                      <div
-                        key={name}
-                        className="flex items-center justify-between gap-3 p-4 bg-white border border-stone-100 rounded-xl"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0 ${
-                            isConnected ? 'bg-green-100 text-green-700' : 'bg-stone-100 text-stone-400'
-                          }`}>
-                            {short}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-5xl mx-auto px-6 py-8">
+          <div className="mb-8">
+            <h1 className="text-xl font-semibold text-stone-900">Accounts</h1>
+            <p className="text-[13px] text-stone-400 mt-1">All connected social accounts across your channels</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {ACCOUNT_DATA.map((ch) => {
+              const config = CHANNELS[ch.channel]
+              const pending = ch.accounts.filter(a => a.status === 'pending')
+              const tip = pending.length > 0 ? PLATFORM_TIPS[pending[0].platform] : null
+              return (
+                <div key={ch.channel} className="bg-white border border-stone-100 rounded-xl overflow-hidden">
+                  <div className="h-1 w-full" style={{ backgroundColor: config?.primary ?? '#888' }} />
+                  <div className="p-5">
+                    <div className="mb-4">
+                      <h2 className="text-[15px] font-semibold text-stone-900">{ch.channel}</h2>
+                      <p className="text-[12px] text-stone-400 mt-0.5">{config?.tagline}</p>
+                    </div>
+                    <div className="space-y-2.5">
+                      {ch.accounts.map((acc) => (
+                        <div key={acc.platform} className="flex items-center justify-between py-2 border-b border-stone-50 last:border-0">
+                          <div className="flex items-center gap-3">
+                            <span className="text-[12px] font-medium text-stone-600 w-20">{acc.platform}</span>
+                            <span className="text-[12px] text-stone-400">{acc.handle}</span>
                           </div>
-                          <div className="min-w-0">
-                            <p className="text-[13px] font-medium text-stone-900">{name}</p>
-                            {isConnected ? (
-                              <p className="text-[11px] text-green-600 truncate">
-                                Connected — {status.youtube_channel_name}{status.youtube_handle ? ` (${status.youtube_handle})` : ''}
-                              </p>
+                          <div className="flex items-center gap-2">
+                            {acc.status === 'connected' ? (
+                              <>
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">CONNECTED</span>
+                                {acc.url && (
+                                  <a href={acc.url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-stone-400 hover:text-stone-600 transition-colors">Visit →</a>
+                                )}
+                              </>
                             ) : (
-                              <p className="text-[11px] text-stone-400">Not connected</p>
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-700">PENDING</span>
                             )}
                           </div>
                         </div>
-
-                        {isConnected ? (
-                          <button
-                            onClick={() => disconnect(name)}
-                            disabled={disconnecting === name}
-                            className="px-3 py-2 min-h-[40px] text-[12px] font-medium border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors shrink-0 disabled:opacity-50"
-                          >
-                            {disconnecting === name ? 'Removing...' : 'Disconnect'}
-                          </button>
-                        ) : (
-                          <a
-                            href={`/api/auth/youtube?channel=${encodeURIComponent(name)}`}
-                            className="px-3 py-2 min-h-[40px] text-[12px] font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shrink-0 flex items-center"
-                          >
-                            Connect
-                          </a>
-                        )}
+                      ))}
+                    </div>
+                    {tip && (
+                      <div className="mt-4 pt-3 border-t border-stone-50">
+                        <p className="text-[11px] text-stone-400">
+                          <span className="font-medium text-stone-500">Tip:</span> {tip}
+                        </p>
                       </div>
-                    )
-                  })}
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-
-            {/* Postproxy section */}
-            <div>
-              <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-8 h-8 bg-stone-800 rounded-lg flex items-center justify-center">
-                  <span className="text-white text-[11px] font-medium">PP</span>
-                </div>
-                <div>
-                  <p className="text-[14px] font-medium text-stone-900">Postproxy</p>
-                  <p className="text-[12px] text-stone-400">Multi-platform distribution (IG, TikTok, X, FB)</p>
-                </div>
-              </div>
-              <div className="p-4 bg-white border border-stone-100 rounded-xl">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500" />
-                  <p className="text-[13px] text-stone-600">Connected via API key</p>
-                </div>
-              </div>
-            </div>
-
-
+              )
+            })}
           </div>
         </div>
       </div>
-
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-lg text-[12px] font-medium shadow-sm z-50 bg-stone-900 text-white">
-          {toast}
-        </div>
-      )}
     </div>
   )
 }
