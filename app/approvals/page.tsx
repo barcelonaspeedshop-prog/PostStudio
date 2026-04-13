@@ -432,6 +432,37 @@ export default function ApprovalsPage() {
         const platforms = (data.results || []).filter((r: { success: boolean }) => r.success).map((r: { platform: string }) => r.platform)
         showToast(`Published to ${platforms.join(', ')}!`)
       }
+
+      // Schedule secondary format jobs after successful approve
+      if (action === 'approve') {
+        const item = items.find(i => i.id === id)
+        if (item) {
+          const now = Date.now()
+          const scheduleJobs: Array<{ format: string; platform: string; delayHours: number }> = []
+          if (item.platforms.includes('instagram')) scheduleJobs.push({ format: 'reel', platform: 'instagram', delayHours: 6 })
+          if (item.platforms.includes('youtube')) scheduleJobs.push({ format: 'short', platform: 'youtube', delayHours: 4 })
+          if (item.platforms.includes('tiktok')) scheduleJobs.push({ format: 'tiktok', platform: 'tiktok', delayHours: 2 })
+
+          for (const job of scheduleJobs) {
+            try {
+              await fetch('/api/scheduled', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  channel: item.channel,
+                  headline: item.headline,
+                  format: job.format,
+                  platform: job.platform,
+                  scheduledTime: new Date(now + job.delayHours * 60 * 60 * 1000).toISOString(),
+                  approvalId: item.id,
+                }),
+              })
+            } catch {
+              // Non-critical — don't fail the approval if scheduling fails
+            }
+          }
+        }
+      }
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Action failed', 'error')
     } finally {
