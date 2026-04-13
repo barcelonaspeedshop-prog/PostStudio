@@ -2,3 +2,6 @@ node_modules
 .next
 .env.local
 .vercel
+app/api/composite-slides/route.ts.bak
+app/api/video-export/route.ts.bak
+next.config.js.bak
