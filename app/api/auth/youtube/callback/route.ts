@@ -10,6 +10,11 @@ const CHANNEL_HANDLES: Record<string, string> = {
   'Omnira F1': '@omniraf1',
   'Road & Trax': '@roadandtrax',
   'Omnira Football': '@omnirafc',
+  'Omnira Cricket': '@omniracricket',
+  'Omnira Golf': '@omniragolf',
+  'Omnira NFL': '@omniranfl',
+  'Omnira Food': '@omniraFood',
+  'Omnira Travel': '@omniraTravel',
 }
 
 // Hardcoded fallback channel IDs for when handle matching fails
