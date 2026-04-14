@@ -145,16 +145,17 @@ The JSON object must contain:
     }
 
     // Step 3: Generate the carousel slides
-    const slideCount = 5
     const system = `You are a social media content expert specialising in carousel posts.
 Always respond with valid JSON only — no markdown, no backticks, no preamble.`
 
     const searchTerms: string[] = trend.searchTerms || []
 
-    const prompt = `Create a ${slideCount}-slide carousel post about: "${trend.topic}"
+    const prompt = `Create a carousel post about: "${trend.topic}"
 Channel: ${channel}
 
-Return a JSON array of exactly ${slideCount} slide objects. Each object must have:
+Generate between 6 and 10 slides. Use more slides (8-10) for complex stories with many facts and stats; use fewer (6-7) for simpler stories.
+
+Return a JSON array of slide objects. Each object must have:
 - "num": slide number as two-digit string e.g. "01"
 - "tag": short category label in CAPS (e.g. "THE ORIGIN STORY")
 - "headline": punchy headline (max 8 words)
@@ -162,25 +163,22 @@ Return a JSON array of exactly ${slideCount} slide objects. Each object must hav
 - "badge": short badge label in CAPS (max 5 words)
 - "accent": one of these color names: "red", "amber", "blue", "green", "purple", "teal"
 - "imageQuery": a specific image search term for this slide's visual (2-5 words, e.g. a specific car model, stadium, driver name)
-- "tileType": one of "hook", "brand", "story", "cta"
 
 Body length rules:
-- For "hook" and "cta" tiles: 2-3 sentences, max 40 words (short caption style)
-- For "story" tiles: 2-3 sentences, max 40 words (short caption style — the tile pattern is handled programmatically)
-- For the "brand" tile (slide 2): 5-7 sentences, 80-120 words. This must read like a full paragraph of editorial copy telling the complete background story in detail — context, history, stakes, and significance. NOT a short snippet.
+- Slide 1 (hook intro): teaser that grabs attention immediately, max 20 words
+- Slide 2 (brand context): 5-7 sentences, 80-120 words — full editorial background on this specific story. Real journalism: context, history, stakes, and significance. NOT generic channel promo.
+- All other slides: 2-3 sentences, max 40 words — specific facts and details from the story
 
-Tile type rules:
-- Slide 1 MUST be "hook" (attention-grabbing intro over a full image)
-- Slide 2 MUST be "brand" (text-only brand slide, no image needed — this is where the long-form story goes)
-- Slides 3 to ${slideCount - 1} MUST be "story"
-- Slide ${slideCount} MUST be "cta" (call to action / verdict)
+For every second middle slide (specifically slides at 1-indexed positions 4, 6, and 8 when they exist), you MAY include an optional "chartData" field if the story contains genuine, specific statistics worth visualising. Never include fabricated data. Only add this when real numbers exist. When included, use this structure:
+{ "type": "bar", "title": "Brief descriptive title", "items": [{ "label": "Team A", "value": 71, "unit": "pts" }] }
+Use "type": "comparison" for head-to-head two-item comparisons.
 
-Make slide 1 a hook/intro. Slide 2 is the brand context slide — its body MUST be 5-7 sentences (80-120 words) of editorial copy giving the full background and context of THIS SPECIFIC STORY. Do NOT use generic channel promo text. Write real journalism about this topic. Story slides with images (type "story") have a punchy headline and 2-3 sentence body. Story slides without images (type "story-text") have a larger body of 4-5 sentences with more detail and context — these are reading slides. Slide ${slideCount} is a CTA/verdict.
+Make slide 1 an attention-grabbing hook, slide 2 a deep-dive brand context slide, middle slides narrative story beats each covering a specific aspect or fact, and the last slide a verdict/CTA.
 Return only the JSON array, nothing else.`
 
     const message = await callClaudeWithRetry({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
+      max_tokens: 3500,
       system,
       messages: [{ role: 'user', content: prompt }],
     })

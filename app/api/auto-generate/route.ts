@@ -143,8 +143,29 @@ const CHANNEL_TAGS: Record<string, string[]> = {
 
 const DEFAULT_PLATFORMS = ['instagram', 'tiktok', 'youtube']
 
+type ChartData = {
+  type: string
+  title: string
+  items: { label: string; value: number | string; unit?: string }[]
+}
+
 type Slide = {
-  num: string; tag: string; headline: string; body: string; badge: string; accent: string; image?: string; imageOptions?: string[]; tileType?: string
+  num: string; tag: string; headline: string; body: string; badge: string; accent: string;
+  image?: string; imageOptions?: string[]; tileType?: string; chartData?: ChartData
+}
+
+function enforceTilePattern(slides: Slide[]): void {
+  slides.forEach((slide, i) => {
+    if (i === 0) {
+      slide.tileType = 'hook'
+    } else if (i === 1) {
+      slide.tileType = 'brand'
+    } else if (i === slides.length - 1) {
+      slide.tileType = 'cta'
+    } else {
+      slide.tileType = (i - 2) % 2 === 0 ? 'story' : 'story-text'
+    }
+  })
 }
 
 function generateTags(channel: string, topic: string, slides: Slide[]): string[] {
@@ -202,21 +223,8 @@ export async function POST(req: NextRequest) {
       if (!newsRes.ok) throw new Error(newsData.error || 'News fetch failed')
 
       const slides: Slide[] = newsData.slides
-
-      // Force the tile pattern regardless of what Claude returned:
-      // 0=hook, 1=brand, 2..N-2 alternate story/story-text, N-1=cta
-      slides.forEach((slide, i) => {
-        if (i === 0) {
-          slide.tileType = 'hook'
-        } else if (i === 1) {
-          slide.tileType = 'brand'
-        } else if (i === slides.length - 1) {
-          slide.tileType = 'cta'
-        } else {
-          // index 2 → story, index 3 → story-text, index 4 → story, etc.
-          slide.tileType = (i - 2) % 2 === 0 ? 'story' : 'story-text'
-        }
-      })
+      const topic: string = newsData.topic || newsData.story || ''
+      enforceTilePattern(slides)
       const headline = slides[0]?.headline || topic
 
       // Step 2: Extract specific image search queries using Claude
@@ -227,6 +235,11 @@ export async function POST(req: NextRequest) {
       // Step 3: Fetch images for each slide via Serper image search
       console.log(`[auto-generate] [${channel}] Fetching images for ${slides.length} slides...`)
       await Promise.all(slides.map(async (slide, slideIdx) => {
+        // Solid-bg tiles never need images
+        if (slide.tileType === 'brand' || slide.tileType === 'story-text') {
+          console.log(`[auto-generate] [${channel}] Skipping image for ${slide.tileType} tile (index ${slideIdx})`)
+          return
+        }
         try {
           const searchQuery = imageQueries[slideIdx] || `${slide.headline} ${channel}`
           const imgRes = await fetch(`${baseUrl}/api/search-images`, {
