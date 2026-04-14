@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Sidebar from '@/components/Sidebar'
 
 const BLOCKED_IMAGE_DOMAINS = [
@@ -47,6 +47,11 @@ export default function ApprovalsPage() {
   const [genStep, setGenStep] = useState('')
   const [toast, setToast] = useState<{ msg: string; type?: 'error' | 'success' } | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const stripRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  const scrollStrip = (itemId: string, dir: 'left' | 'right') => {
+    const el = stripRefs.current.get(itemId)
+    if (el) el.scrollBy({ left: dir === 'right' ? 220 : -220, behavior: 'smooth' })
+  }
   const [previewId, setPreviewId] = useState<string | null>(null)
   const [autoGenerating, setAutoGenerating] = useState(false)
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
@@ -571,24 +576,63 @@ export default function ApprovalsPage() {
                       </button>
 
                       {expandedId === item.id && (
-                        <div className="px-4 pb-3 flex gap-2 overflow-x-auto scrollbar-hide" style={{ overflowX: 'auto' }}>
-                          {item.slides.map((s, i) => (
-                            <div key={i} className="shrink-0 flex flex-col items-center gap-1.5" style={{ flexShrink: 0 }}>
-                              <div className="w-[100px] h-[125px] rounded-lg bg-stone-800 relative overflow-hidden" style={{ background: s.image ? `url(${s.image}) center/cover` : '#1a1a1a' }}>
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-                                <div className="absolute bottom-0 left-0 right-0 p-2">
-                                  <p className="text-white text-[8px] font-medium leading-tight line-clamp-2">{s.headline}</p>
+                        <div className="relative px-4 pb-3">
+                          {/* Left scroll button — only when > 4 slides */}
+                          {item.slides.length > 4 && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); scrollStrip(item.id, 'left') }}
+                              className="absolute left-0 top-[55px] z-10 w-7 h-7 flex items-center justify-center bg-white border border-stone-200 rounded-full shadow-sm text-stone-500 hover:text-stone-900 hover:border-stone-400 transition-colors"
+                              aria-label="Scroll left"
+                            >
+                              ‹
+                            </button>
+                          )}
+
+                          {/* Scrollable thumbnail strip */}
+                          <div
+                            ref={(el) => {
+                              if (el) stripRefs.current.set(item.id, el)
+                              else stripRefs.current.delete(item.id)
+                            }}
+                            className="flex gap-2 pb-2"
+                            style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}
+                          >
+                            {item.slides.map((s, i) => (
+                              <div key={i} className="flex flex-col items-center gap-1.5" style={{ flexShrink: 0, width: '110px' }}>
+                                <div
+                                  className="rounded-lg bg-stone-800 relative overflow-hidden"
+                                  style={{
+                                    width: '110px',
+                                    height: '138px',
+                                    background: s.image ? `url(${s.image}) center/cover` : '#1a1a1a',
+                                  }}
+                                >
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                                  <div className="absolute bottom-0 left-0 right-0 p-2">
+                                    <p className="text-white text-[8px] font-medium leading-tight line-clamp-2">{s.headline}</p>
+                                  </div>
+                                  <span className="absolute top-1 right-1 text-white/50 text-[7px]">{i + 1}</span>
                                 </div>
-                                <span className="absolute top-1 right-1 text-white/50 text-[7px]">{i + 1}</span>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openImagePicker(item.id, i) }}
+                                  className="px-2.5 py-1 min-h-[28px] text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 font-medium transition-colors w-full text-center"
+                                >
+                                  ↺ New image
+                                </button>
                               </div>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); openImagePicker(item.id, i) }}
-                                className="px-2.5 py-1 min-h-[28px] text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 font-medium transition-colors"
-                              >
-                                ↺ New image
-                              </button>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
+
+                          {/* Right scroll button — only when > 4 slides */}
+                          {item.slides.length > 4 && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); scrollStrip(item.id, 'right') }}
+                              className="absolute right-0 top-[55px] z-10 w-7 h-7 flex items-center justify-center bg-white border border-stone-200 rounded-full shadow-sm text-stone-500 hover:text-stone-900 hover:border-stone-400 transition-colors"
+                              aria-label="Scroll right"
+                            >
+                              ›
+                            </button>
+                          )}
                         </div>
                       )}
 
