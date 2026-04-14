@@ -63,14 +63,18 @@ function wrapText(text: string, maxCharsPerLine: number): string[] {
   return lines
 }
 
-// Trim lines to maxLines and append '...' to the last line if truncated.
-function truncateLines(lines: string[], maxLines: number): string[] {
-  if (lines.length <= maxLines) return lines
-  const result = lines.slice(0, maxLines)
-  const last = result[maxLines - 1]
-  const spaceIdx = last.lastIndexOf(' ')
-  result[maxLines - 1] = (spaceIdx > 0 ? last.slice(0, spaceIdx) : last) + '...'
-  return result
+// Reduce font size until the longest wrapped line fits within maxWidth.
+// Estimates rendered width as chars * (fontSize * 0.55). Floor: 52px.
+function dynamicFontSize(text: string, maxWidth: number, baseFontSize: number): number {
+  let fontSize = baseFontSize
+  const minSize = 52
+  while (fontSize > minSize) {
+    const lines = wrapText(text, Math.floor(maxWidth / (fontSize * 0.55)))
+    const longest = Math.max(...lines.map(l => l.length))
+    if (longest * fontSize * 0.55 <= maxWidth) break
+    fontSize -= 4
+  }
+  return Math.max(fontSize, minSize)
 }
 
 // ── Chart renderer (used by story-text) ────────────────────────────────────
@@ -132,11 +136,12 @@ function buildHookSvg(slide: SlideInput, primary: string, channelName: string): 
   const pad = 72
 
   const tagLines = wrapText(slide.tag, 38)
-  const hedLines = truncateLines(wrapText(slide.headline, 13), 2)
+  const hedFontSize = dynamicFontSize(slide.headline, 936, 88)
+  const hedLines = wrapText(slide.headline, Math.floor(936 / (hedFontSize * 0.55)))
   const bodyLines = wrapText(slide.body, 48)
 
   const bodyLineH = 44
-  const hedLineH = 96
+  const hedLineH = Math.round(hedFontSize * 1.09)
   const bodyH = bodyLines.length * bodyLineH
   const hedH = hedLines.length * hedLineH
 
@@ -179,9 +184,9 @@ function buildHookSvg(slide: SlideInput, primary: string, channelName: string): 
     svg += `<text x="${pad}" y="${tagY + i * 34}" font-family="${FONT_STACK}" font-size="24" font-weight="500" fill="rgb(${pr},${pg},${pb})" fill-opacity="1" letter-spacing="1">${escapeXml(line)}</text>`
   })
 
-  // Headline 88px weight 500
+  // Headline dynamic font size
   hedLines.forEach((line, i) => {
-    svg += `<text x="${pad}" y="${hedY + hedLineH + i * hedLineH}" font-family="${FONT_STACK}" font-size="88" font-weight="500" fill="white" fill-opacity="1">${escapeXml(line)}</text>`
+    svg += `<text x="${pad}" y="${hedY + hedLineH + i * hedLineH}" font-family="${FONT_STACK}" font-size="${hedFontSize}" font-weight="500" fill="white" fill-opacity="1">${escapeXml(line)}</text>`
   })
 
   // Divider 200px
@@ -204,11 +209,12 @@ function buildBrandSvg(slide: SlideInput, primary: string, bg: string, channelNa
   const [pr, pg, pb] = hexToRgb(primary)
   const [bgr, bgg, bgb] = hexToRgb(bg)
 
-  const hedLines = truncateLines(wrapText(slide.headline, 15), 2)
+  const hedFontSize = dynamicFontSize(slide.headline, 900, 80)
+  const hedLines = wrapText(slide.headline, Math.floor(900 / (hedFontSize * 0.55)))
   const bodyLines = wrapText(slide.body, 44).slice(0, 8)
   const tagLines = wrapText(slide.tag, 38)
 
-  const hedLineH = 88
+  const hedLineH = Math.round(hedFontSize * 1.1)
   const bodyLineH = 48
   const tagLineH = 34
   const hedH = hedLines.length * hedLineH
@@ -238,9 +244,9 @@ function buildBrandSvg(slide: SlideInput, primary: string, bg: string, channelNa
   svg += `<rect x="${W / 2 - 90}" y="${y}" width="180" height="2" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.7"/>`
   y += 40
 
-  // Headline 80px weight 500 centred
+  // Headline dynamic font size centred
   hedLines.forEach((line, i) => {
-    svg += `<text x="${W / 2}" y="${y + i * hedLineH}" font-family="${FONT_STACK}" font-size="80" font-weight="500" fill="white" fill-opacity="1" text-anchor="middle">${escapeXml(line)}</text>`
+    svg += `<text x="${W / 2}" y="${y + i * hedLineH}" font-family="${FONT_STACK}" font-size="${hedFontSize}" font-weight="500" fill="white" fill-opacity="1" text-anchor="middle">${escapeXml(line)}</text>`
   })
   y += hedH + 28
 
@@ -263,11 +269,12 @@ function buildStorySvg(slide: SlideInput, primary: string): string {
   const [pr, pg, pb] = hexToRgb(primary)
   const pad = 72
 
-  const hedLines = truncateLines(wrapText(slide.headline, 11), 3)
+  const hedFontSize = dynamicFontSize(slide.headline, 936, 96)
+  const hedLines = wrapText(slide.headline, Math.floor(936 / (hedFontSize * 0.55)))
   const bodyLines = wrapText(slide.body, 48)
 
   const bodyLineH = 44
-  const hedLineH = 104
+  const hedLineH = Math.round(hedFontSize * 1.08)
   const bodyH = bodyLines.length * bodyLineH
   const hedH = hedLines.length * hedLineH
 
@@ -301,9 +308,9 @@ function buildStorySvg(slide: SlideInput, primary: string): string {
   // Slide number top-right white 25%
   svg += `<text x="${W - pad}" y="92" font-family="${FONT_STACK}" font-size="30" fill="white" fill-opacity="0.25" text-anchor="end">${escapeXml(slide.num)}</text>`
 
-  // Headline 96px weight 500
+  // Headline dynamic font size
   hedLines.forEach((line, i) => {
-    svg += `<text x="${pad}" y="${hedY + hedLineH + i * hedLineH}" font-family="${FONT_STACK}" font-size="96" font-weight="500" fill="white" fill-opacity="1">${escapeXml(line)}</text>`
+    svg += `<text x="${pad}" y="${hedY + hedLineH + i * hedLineH}" font-family="${FONT_STACK}" font-size="${hedFontSize}" font-weight="500" fill="white" fill-opacity="1">${escapeXml(line)}</text>`
   })
 
   // Divider 160px
@@ -326,10 +333,11 @@ function buildStoryTextSvg(slide: SlideInput, primary: string, bg: string): stri
   const [bgr, bgg, bgb] = hexToRgb(bg)
   const pad = 72
 
-  const hedLines = truncateLines(wrapText(slide.headline, 17), 2)
+  const hedFontSize = dynamicFontSize(slide.headline, 900, 72)
+  const hedLines = wrapText(slide.headline, Math.floor(900 / (hedFontSize * 0.55)))
   const bodyLines = wrapText(slide.body, 46).slice(0, 5)
 
-  const hedLineH = 80
+  const hedLineH = Math.round(hedFontSize * 1.11)
   const bodyLineH = 44
 
   let svg = ''
@@ -346,9 +354,9 @@ function buildStoryTextSvg(slide: SlideInput, primary: string, bg: string): stri
   svg += `<text x="${pad}" y="${y}" font-family="${FONT_STACK}" font-size="26" font-weight="500" fill="rgb(${pr},${pg},${pb})" fill-opacity="1" letter-spacing="1">${escapeXml(slide.tag)}</text>`
   y += 64
 
-  // Headline 72px weight 500
+  // Headline dynamic font size
   hedLines.forEach((line, i) => {
-    svg += `<text x="${pad}" y="${y + i * hedLineH}" font-family="${FONT_STACK}" font-size="72" font-weight="500" fill="white" fill-opacity="1">${escapeXml(line)}</text>`
+    svg += `<text x="${pad}" y="${y + i * hedLineH}" font-family="${FONT_STACK}" font-size="${hedFontSize}" font-weight="500" fill="white" fill-opacity="1">${escapeXml(line)}</text>`
   })
   y += hedLines.length * hedLineH + 24
 
@@ -387,10 +395,11 @@ function buildCtaSvg(
   const [pr, pg, pb] = hexToRgb(primary)
   const pad = 72
 
-  const hedLines = truncateLines(wrapText(slide.headline, 13), 2)
+  const hedFontSize = dynamicFontSize(slide.headline, 936, 80)
+  const hedLines = wrapText(slide.headline, Math.floor(936 / (hedFontSize * 0.55)))
   const bodyLines = wrapText(slide.body, 48)
 
-  const hedLineH = 88
+  const hedLineH = Math.round(hedFontSize * 1.1)
   const bodyLineH = 44
   const hedH = hedLines.length * hedLineH
   const bodyH = bodyLines.length * bodyLineH
@@ -437,9 +446,9 @@ function buildCtaSvg(
   // "OUR VERDICT" label
   svg += `<text x="${pad}" y="${verdictY}" font-family="${FONT_STACK}" font-size="24" font-weight="500" fill="rgb(${pr},${pg},${pb})" fill-opacity="1" letter-spacing="3">OUR VERDICT</text>`
 
-  // Headline 80px weight 500
+  // Headline dynamic font size
   hedLines.forEach((line, i) => {
-    svg += `<text x="${pad}" y="${hedY + hedLineH + i * hedLineH}" font-family="${FONT_STACK}" font-size="80" font-weight="500" fill="white" fill-opacity="1">${escapeXml(line)}</text>`
+    svg += `<text x="${pad}" y="${hedY + hedLineH + i * hedLineH}" font-family="${FONT_STACK}" font-size="${hedFontSize}" font-weight="500" fill="white" fill-opacity="1">${escapeXml(line)}</text>`
   })
 
   // Divider 200px
