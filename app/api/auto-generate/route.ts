@@ -150,6 +150,18 @@ const CHANNEL_TAGS: Record<string, string[]> = {
 
 const DEFAULT_PLATFORMS = ['instagram', 'tiktok', 'youtube']
 
+const CHANNEL_FALLBACK_QUERIES: Record<string, string> = {
+  'Gentlemen of Fuel': 'luxury supercar racing',
+  'Omnira F1': 'Formula 1 race track',
+  'Road & Trax': 'motorsport racing circuit',
+  'Omnira Football': 'football stadium crowd soccer',
+  'Omnira Cricket': 'cricket stadium match',
+  'Omnira Golf': 'golf course green',
+  'Omnira NFL': 'american football stadium',
+  'Omnira Food': 'gourmet food restaurant',
+  'Omnira Travel': 'travel destination landscape',
+}
+
 type ChartData = {
   type: string
   title: string
@@ -419,7 +431,49 @@ export async function POST(req: NextRequest) {
               continue
             }
           }
-          if (!slide.image) {
+          if (!slide.image && slideIdx === 0) {
+            // Hook tile: try channel-level fallback query before giving up
+            const fallbackQuery = CHANNEL_FALLBACK_QUERIES[channel]
+            if (fallbackQuery) {
+              console.warn(`[auto-generate] [${channel}] Hook tile has no image — trying channel fallback query: "${fallbackQuery}"`)
+              try {
+                const fbImgRes = await fetch(`${baseUrl}/api/search-images`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ query: fallbackQuery, count: 5 }),
+                })
+                if (fbImgRes.ok) {
+                  const fbImgData = await fbImgRes.json()
+                  const fbUrls: string[] = (fbImgData.images || [])
+                    .map((img: { url: string }) => img.url)
+                    .filter((url: string) => !isBlockedImageUrl(url))
+                  for (const fbUrl of fbUrls) {
+                    try {
+                      const fbProxyRes = await fetch(`${baseUrl}/api/fetch-image`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: fbUrl }),
+                      })
+                      if (!fbProxyRes.ok) continue
+                      const fbProxyData = await fbProxyRes.json()
+                      if (fbProxyData.base64) {
+                        slide.image = fbProxyData.base64
+                        console.log(`[auto-generate] [${channel}] Hook tile fallback image resolved via "${fallbackQuery}"`)
+                        break
+                      }
+                    } catch {
+                      continue
+                    }
+                  }
+                }
+              } catch (fbErr) {
+                console.warn(`[auto-generate] [${channel}] Fallback image search failed:`, fbErr instanceof Error ? fbErr.message : fbErr)
+              }
+            }
+            if (!slide.image) {
+              console.warn(`[auto-generate] [${channel}] Hook tile still has no image after fallback — using solid colour`)
+            }
+          } else if (!slide.image) {
             console.warn(`[auto-generate] [${channel}] All image URLs failed for "${slide.headline}" — using solid colour`)
           }
         } catch (e) {
