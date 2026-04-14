@@ -7,7 +7,7 @@ const CHANNEL_TOPICS: Record<string, string> = {
   'Gentlemen of Fuel': 'classic cars, luxury cars, supercars, automotive',
   'Omnira F1': 'Formula 1, F1 racing, Grand Prix',
   'Road & Trax': 'motorsport, racing, rally, endurance racing, NASCAR, IndyCar',
-  'Omnira Football': 'football, soccer, Premier League, Champions League, La Liga',
+  'Omnira Football': 'football, soccer, Premier League, Champions League, La Liga, Bundesliga, Serie A, Ligue 1 — NOT American football, NOT NFL, NOT rugby',
   'Omnira Cricket': 'cricket, Test cricket, T20, IPL, international cricket',
   'Omnira Golf': 'golf, PGA Tour, Masters, Ryder Cup, LIV Golf',
   'Omnira NFL': 'NFL, American football, Super Bowl, NFL draft, touchdowns',
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     const hasExclusions = exclude_topics.length > 0
     const exclusionList = exclude_topics.map((t, i) => `${i + 1}. "${t}"`).join('\n')
     const searchSystemPrompt = hasExclusions
-      ? `You are a news researcher. You MUST NOT cover any of the following topics under any circumstances — they are all banned:\n${exclusionList}\n\nFind a completely different, unrelated story.`
+      ? `You are a news researcher. You MUST NOT cover any of the following topics under any circumstances — they are all banned:\n${exclusionList}\n\nFind a completely different story about different people, teams, and events. If any of the banned topics involve a specific person, team, or event, do NOT cover that person, team, or event at all even from a different angle.`
       : `You are a news researcher.`
 
     const searchMessage = await client.messages.create({
@@ -147,7 +147,7 @@ Tile type rules:
 - Slides 3 to ${slideCount - 1} MUST be "story" (narrative slides over images)
 - Slide ${slideCount} MUST be "cta" (call to action / verdict)
 
-Make slide 1 a hook/intro, slide 2 a brand context slide, slides 3-${slideCount - 1} tell the story, slide ${slideCount} is a CTA/verdict.
+Make slide 1 a hook/intro. Slide 2 is the brand context slide — its body MUST be 5-7 sentences (80-120 words) of editorial copy giving the full background and context of THIS SPECIFIC STORY. Do NOT use generic channel promo text. Write real journalism about this topic. Slides 3 to ${slideCount - 1} tell the story with specific facts and details. Slide ${slideCount} is a CTA/verdict.
 Return only the JSON array, nothing else.`
 
     const message = await client.messages.create({
