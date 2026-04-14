@@ -20,6 +20,13 @@ const CHANNEL_HANDLES: Record<string, string> = {
 // Hardcoded fallback channel IDs for when handle matching fails
 const CHANNEL_IDS: Record<string, string> = {
   'Gentlemen of Fuel': 'UCRul9-FAiGqwz7yKa7WRCwQ',
+  'Omnira F1': 'UCpJHo_MnHVZ2cCydZVAND2Q',
+  'Road & Trax': 'UCL2hKeQUBiEG36rfTs9bhbw',
+  'Omnira Football': 'UClMPeEgy_Q21K0v5GrOh4kw',
+  'Omnira Cricket': 'UCiXqVtRt-KYsRlS0LYl_iBw',
+  'Omnira Golf': 'UCyUvDlet6Py9D30aCdv46SA',
+  'Omnira NFL': 'UCR6DnL1k6Uq1lgHT27cKnHA',
+  'Omnira Food': 'UC970CeC0HKQIlLuiqbvgkkA',
 }
 
 export async function GET(req: NextRequest) {
