@@ -154,6 +154,127 @@ type Slide = {
   image?: string; imageOptions?: string[]; tileType?: string; chartData?: ChartData
 }
 
+// ── Chart extraction ───────────────────────────────────────────────────────
+// Scans a story-text slide's body for numeric patterns (points, goals, %, £)
+// and builds a chartData object when 2+ comparable values are found.
+function extractChartData(slide: { body: string; headline: string }): ChartData | undefined {
+  const text = `${slide.headline}. ${slide.body}`
+
+  type RawItem = { label: string; value: number; unit: string }
+
+  // Get the best label from text immediately before a match position
+  function labelBefore(pos: number, lookback = 55): string {
+    const before = text.slice(Math.max(0, pos - lookback), pos).trimEnd()
+    // Prefer a run of capitalised words at the tail (team/player names)
+    const cap = before.match(/\b([A-Z][a-zA-Z&'-]+(?:\s+[A-Z][a-zA-Z&'-]+)*)\s*$/)
+    if (cap && cap[1].length >= 3 && cap[1].length <= 24) return cap[1]
+    // Fall back to last 1-2 meaningful words
+    const words = before.replace(/[^a-zA-Z\s]/g, ' ').trim().split(/\s+/).filter(w => w.length >= 3)
+    const tail = words.slice(-2).join(' ')
+    return tail.length >= 3 ? tail : ''
+  }
+
+  // Deduplicate raw items by numeric value then return ≥2 unique entries
+  function dedupe(raw: RawItem[]): RawItem[] {
+    const seen = new Set<number>()
+    return raw.filter(item => {
+      if (seen.has(item.value)) return false
+      seen.add(item.value)
+      return true
+    }).slice(0, 5)
+  }
+
+  // Strategy functions — each returns (label, value, unit) triples
+  const strategies: Array<{ run: () => RawItem[]; title: (unit: string) => string }> = [
+    {
+      run: () => {
+        const items: RawItem[] = []
+        const re = /([\d,]+(?:\.\d+)?)\s*(?:points?|pts)\b/gi
+        let m: RegExpExecArray | null
+        while ((m = re.exec(text)) !== null) {
+          const v = parseFloat(m[1].replace(/,/g, ''))
+          const label = labelBefore(m.index)
+          if (!isNaN(v) && label) items.push({ label, value: v, unit: 'pts' })
+        }
+        return items
+      },
+      title: () => 'Points Standings',
+    },
+    {
+      run: () => {
+        const items: RawItem[] = []
+        const re = /([\d,]+)\s*goals?\b/gi
+        let m: RegExpExecArray | null
+        while ((m = re.exec(text)) !== null) {
+          const v = parseInt(m[1])
+          const label = labelBefore(m.index)
+          if (!isNaN(v) && label) items.push({ label, value: v, unit: 'goals' })
+        }
+        return items
+      },
+      title: () => 'Goals',
+    },
+    {
+      run: () => {
+        const items: RawItem[] = []
+        const re = /([\d,]+(?:\.\d+)?)\s*%/g
+        let m: RegExpExecArray | null
+        while ((m = re.exec(text)) !== null) {
+          const v = parseFloat(m[1])
+          const label = labelBefore(m.index)
+          if (!isNaN(v) && label) items.push({ label, value: v, unit: '%' })
+        }
+        return items
+      },
+      title: () => 'Comparison',
+    },
+    {
+      run: () => {
+        const items: RawItem[] = []
+        const re = /(£|€|\$)([\d,]+(?:\.\d+)?)\s*(M|bn|B|k)?\b/gi
+        let m: RegExpExecArray | null
+        while ((m = re.exec(text)) !== null) {
+          const v = parseFloat(m[2].replace(/,/g, ''))
+          const suffix = m[3] ? m[3].toUpperCase() : ''
+          const label = labelBefore(m.index)
+          if (!isNaN(v) && label) items.push({ label, value: v, unit: `${m[1]}${suffix}` })
+        }
+        return items
+      },
+      title: (unit) => unit.includes('£') || unit.includes('€') || unit.includes('$') ? 'Transfer Value' : 'Value',
+    },
+    {
+      run: () => {
+        const items: RawItem[] = []
+        const re = /([\d,]+)\s*(wins?|races?|laps?|assists?)\b/gi
+        let m: RegExpExecArray | null
+        while ((m = re.exec(text)) !== null) {
+          const v = parseInt(m[1])
+          const rawUnit = m[2].replace(/s$/, 's') // keep plural
+          const label = labelBefore(m.index)
+          if (!isNaN(v) && label) items.push({ label, value: v, unit: rawUnit })
+        }
+        return items
+      },
+      title: (unit) => unit.charAt(0).toUpperCase() + unit.slice(1),
+    },
+  ]
+
+  for (const { run, title } of strategies) {
+    const unique = dedupe(run())
+    if (unique.length >= 2) {
+      const unit = unique[0].unit
+      return {
+        type: 'bar',
+        title: title(unit),
+        items: unique.map(({ label, value, unit: u }) => ({ label, value, unit: u || undefined })),
+      }
+    }
+  }
+
+  return undefined
+}
+
 function enforceTilePattern(slides: Slide[]): void {
   slides.forEach((slide, i) => {
     if (i === 0) {
@@ -225,6 +346,18 @@ export async function POST(req: NextRequest) {
       const slides: Slide[] = newsData.slides
       const topic: string = newsData.topic || newsData.story || ''
       enforceTilePattern(slides)
+
+      // Auto-generate chart data for story-text tiles from body text
+      slides.forEach((slide) => {
+        if (slide.tileType === 'story-text') {
+          const chart = extractChartData(slide)
+          if (chart) {
+            slide.chartData = chart
+            console.log(`[auto-generate] [${channel}] Chart extracted for slide ${slide.num}: "${chart.title}" (${chart.items.length} items)`)
+          }
+        }
+      })
+
       const headline = slides[0]?.headline || topic
 
       // Step 2: Extract specific image search queries using Claude

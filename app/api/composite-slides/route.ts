@@ -122,7 +122,7 @@ function buildHookSvg(slide: SlideInput, primary: string, channelName: string): 
   const pad = 72
 
   const tagLines = wrapText(slide.tag, 38)
-  const hedLines = wrapText(slide.headline, 16).slice(0, 2)
+  const hedLines = wrapText(slide.headline, 13).slice(0, 2)
   const bodyLines = wrapText(slide.body, 48)
 
   const bodyLineH = 44
@@ -194,7 +194,7 @@ function buildBrandSvg(slide: SlideInput, primary: string, bg: string, channelNa
   const [pr, pg, pb] = hexToRgb(primary)
   const [bgr, bgg, bgb] = hexToRgb(bg)
 
-  const hedLines = wrapText(slide.headline, 18).slice(0, 2)
+  const hedLines = wrapText(slide.headline, 15).slice(0, 2)
   const bodyLines = wrapText(slide.body, 44).slice(0, 8)
   const tagLines = wrapText(slide.tag, 38)
 
@@ -253,7 +253,7 @@ function buildStorySvg(slide: SlideInput, primary: string): string {
   const [pr, pg, pb] = hexToRgb(primary)
   const pad = 72
 
-  const hedLines = wrapText(slide.headline, 14).slice(0, 3)
+  const hedLines = wrapText(slide.headline, 11).slice(0, 3)
   const bodyLines = wrapText(slide.body, 48)
 
   const bodyLineH = 44
@@ -316,7 +316,7 @@ function buildStoryTextSvg(slide: SlideInput, primary: string, bg: string): stri
   const [bgr, bgg, bgb] = hexToRgb(bg)
   const pad = 72
 
-  const hedLines = wrapText(slide.headline, 20).slice(0, 2)
+  const hedLines = wrapText(slide.headline, 17).slice(0, 2)
   const bodyLines = wrapText(slide.body, 46).slice(0, 5)
 
   const hedLineH = 80
@@ -377,7 +377,7 @@ function buildCtaSvg(
   const [pr, pg, pb] = hexToRgb(primary)
   const pad = 72
 
-  const hedLines = wrapText(slide.headline, 18).slice(0, 2)
+  const hedLines = wrapText(slide.headline, 13).slice(0, 2)
   const bodyLines = wrapText(slide.body, 48)
 
   const hedLineH = 88
