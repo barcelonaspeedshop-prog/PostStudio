@@ -442,11 +442,12 @@ export default function ApprovalsPage() {
       if (action === 'approve') {
         const item = items.find(i => i.id === id)
         if (item) {
-          const now = Date.now()
+          const now = new Date()
           const scheduleJobs: Array<{ format: string; platform: string; delayHours: number }> = []
-          if (item.platforms.includes('instagram')) scheduleJobs.push({ format: 'reel', platform: 'instagram', delayHours: 6 })
-          if (item.platforms.includes('youtube')) scheduleJobs.push({ format: 'short', platform: 'youtube', delayHours: 4 })
           if (item.platforms.includes('tiktok')) scheduleJobs.push({ format: 'tiktok', platform: 'tiktok', delayHours: 2 })
+          if (item.platforms.includes('youtube')) scheduleJobs.push({ format: 'short', platform: 'youtube', delayHours: 4 })
+          if (item.platforms.includes('instagram')) scheduleJobs.push({ format: 'reel', platform: 'instagram', delayHours: 6 })
+          if (item.platforms.includes('instagram')) scheduleJobs.push({ format: 'instagram_still', platform: 'instagram', delayHours: 8 })
 
           for (const job of scheduleJobs) {
             try {
@@ -458,7 +459,7 @@ export default function ApprovalsPage() {
                   headline: item.headline,
                   format: job.format,
                   platform: job.platform,
-                  scheduledTime: new Date(now + job.delayHours * 60 * 60 * 1000).toISOString(),
+                  scheduledTime: new Date(now.getTime() + job.delayHours * 60 * 60 * 1000).toISOString(),
                   approvalId: item.id,
                 }),
               })
