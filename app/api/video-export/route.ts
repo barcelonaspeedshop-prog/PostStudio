@@ -33,6 +33,16 @@ export async function POST(req: NextRequest) {
     const { slides, slideDuration: rawDuration = 5, audioUrl, musicVolume = 20 } = await req.json()
     // Enforce minimum 5 seconds per slide
     const slideDuration = Math.max(5, Number(rawDuration) || 5)
+    // Per-tile durations — text tiles need longer display time
+    const TILE_DURATIONS: Record<string, number> = {
+      'hook': slideDuration,
+      'brand': Math.max(8, slideDuration + 3),
+      'story': slideDuration,
+      'story-text': Math.max(8, slideDuration + 3),
+      'cta': slideDuration,
+    }
+    const getTileDuration = (slide: { tileType?: string }) =>
+      TILE_DURATIONS[slide.tileType || 'story'] || slideDuration
 
     if (!slides || !Array.isArray(slides) || slides.length === 0) {
       return NextResponse.json({ error: 'slides array is required' }, { status: 400 })
@@ -66,9 +76,9 @@ export async function POST(req: NextRequest) {
     // Create ffmpeg input list — last entry repeated without duration holds final frame
     const listPath = path.join(tmpDir, 'input.txt')
     const lines: string[] = []
-    for (const f of imageFiles) {
-      lines.push(`file '${f}'`)
-      lines.push(`duration ${slideDuration}`)
+    for (let i = 0; i < imageFiles.length; i++) {
+      lines.push(`file '${imageFiles[i]}'`)
+      lines.push(`duration ${getTileDuration(slides[i] || {})}`)
     }
     // Repeat last file so its duration is honoured (concat demuxer requirement)
     lines.push(`file '${imageFiles[imageFiles.length - 1]}'`)
@@ -88,7 +98,7 @@ export async function POST(req: NextRequest) {
       } else {
         await downloadImage(audioUrl, audioPath)
       }
-      const totalDuration = slides.length * slideDuration
+      const totalDuration = slides.reduce((sum: number, s: { tileType?: string }) => sum + getTileDuration(s), 0)
       // Clamp volume to 0-100 and convert to ffmpeg volume factor (0.0-1.0)
       const vol = Math.max(0, Math.min(100, Number(musicVolume) || 20)) / 100
       ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -i ${audioPath} -vf "scale=1080:1350:force_original_aspect_ratio=decrease,pad=1080:1350:(ow-iw)/2:(oh-ih)/2,setsar=1" -af "volume=${vol}" -r 30 -vsync cfr -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -t ${totalDuration} -shortest -movflags +faststart -y ${outputPath}`
