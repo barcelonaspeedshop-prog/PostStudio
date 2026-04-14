@@ -63,6 +63,16 @@ function wrapText(text: string, maxCharsPerLine: number): string[] {
   return lines
 }
 
+// Trim lines to maxLines and append '...' to the last line if truncated.
+function truncateLines(lines: string[], maxLines: number): string[] {
+  if (lines.length <= maxLines) return lines
+  const result = lines.slice(0, maxLines)
+  const last = result[maxLines - 1]
+  const spaceIdx = last.lastIndexOf(' ')
+  result[maxLines - 1] = (spaceIdx > 0 ? last.slice(0, spaceIdx) : last) + '...'
+  return result
+}
+
 // ── Chart renderer (used by story-text) ────────────────────────────────────
 function renderChart(
   chart: ChartData,
@@ -122,7 +132,7 @@ function buildHookSvg(slide: SlideInput, primary: string, channelName: string): 
   const pad = 72
 
   const tagLines = wrapText(slide.tag, 38)
-  const hedLines = wrapText(slide.headline, 13).slice(0, 2)
+  const hedLines = truncateLines(wrapText(slide.headline, 13), 2)
   const bodyLines = wrapText(slide.body, 48)
 
   const bodyLineH = 44
@@ -135,7 +145,7 @@ function buildHookSvg(slide: SlideInput, primary: string, channelName: string): 
   const bodyY = y
   y -= 32
   const dividerY = y
-  y -= hedH
+  y -= hedH + 24
   const hedY = y
   const tagY = hedY - 50
 
@@ -194,7 +204,7 @@ function buildBrandSvg(slide: SlideInput, primary: string, bg: string, channelNa
   const [pr, pg, pb] = hexToRgb(primary)
   const [bgr, bgg, bgb] = hexToRgb(bg)
 
-  const hedLines = wrapText(slide.headline, 15).slice(0, 2)
+  const hedLines = truncateLines(wrapText(slide.headline, 15), 2)
   const bodyLines = wrapText(slide.body, 44).slice(0, 8)
   const tagLines = wrapText(slide.tag, 38)
 
@@ -253,7 +263,7 @@ function buildStorySvg(slide: SlideInput, primary: string): string {
   const [pr, pg, pb] = hexToRgb(primary)
   const pad = 72
 
-  const hedLines = wrapText(slide.headline, 11).slice(0, 3)
+  const hedLines = truncateLines(wrapText(slide.headline, 11), 3)
   const bodyLines = wrapText(slide.body, 48)
 
   const bodyLineH = 44
@@ -266,7 +276,7 @@ function buildStorySvg(slide: SlideInput, primary: string): string {
   const bodyY = y
   y -= 30
   const dividerY = y
-  y -= hedH
+  y -= hedH + 24
   const hedY = y
 
   const defs = `<defs>
@@ -316,7 +326,7 @@ function buildStoryTextSvg(slide: SlideInput, primary: string, bg: string): stri
   const [bgr, bgg, bgb] = hexToRgb(bg)
   const pad = 72
 
-  const hedLines = wrapText(slide.headline, 17).slice(0, 2)
+  const hedLines = truncateLines(wrapText(slide.headline, 17), 2)
   const bodyLines = wrapText(slide.body, 46).slice(0, 5)
 
   const hedLineH = 80
@@ -377,7 +387,7 @@ function buildCtaSvg(
   const [pr, pg, pb] = hexToRgb(primary)
   const pad = 72
 
-  const hedLines = wrapText(slide.headline, 13).slice(0, 2)
+  const hedLines = truncateLines(wrapText(slide.headline, 13), 2)
   const bodyLines = wrapText(slide.body, 48)
 
   const hedLineH = 88
@@ -397,7 +407,7 @@ function buildCtaSvg(
   const bodyY = y
   y -= 32
   const dividerY = y
-  y -= hedH
+  y -= hedH + 24
   const hedY = y
   y -= 50
   const verdictY = y
