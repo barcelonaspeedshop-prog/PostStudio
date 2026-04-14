@@ -25,13 +25,22 @@ export async function POST(req: NextRequest) {
     const {
       content,
       mediaUrl,
-      imageUrls,   // optional array of public image URLs for carousels
+      imageUrls,   // optional array of explicit image URLs (public or base64)
+      slides,      // optional array of slide objects — base64 images extracted from slide.image
       platforms,
       channel,
       firstSlideHeadline,
       // scheduleAt retained in signature for forward-compatibility but not yet
       // implemented in the direct API path
     } = await req.json()
+
+    // Build the image list for carousel publishing.
+    // Priority: explicit imageUrls → slide.image fields → empty
+    const slideImages: string[] = Array.isArray(slides)
+      ? (slides as Array<{ image?: string }>)
+          .map(s => s.image)
+          .filter((img): img is string => typeof img === 'string' && img.length > 0)
+      : []
 
     if (!platforms || !Array.isArray(platforms) || platforms.length === 0) {
       return NextResponse.json(
@@ -81,13 +90,18 @@ export async function POST(req: NextRequest) {
               break
             }
 
-            // Prefer carousel (multiple public image URLs) over single video
-            const publicImages = (imageUrls as string[] | undefined)?.filter(isPublicUrl) ?? []
+            // Carousel: prefer explicit imageUrls, fall back to slide.image base64 fields.
+            // publishCarouselToInstagram handles both public URLs and base64 internally.
+            const carouselImages: string[] =
+              Array.isArray(imageUrls) && imageUrls.length >= 2
+                ? (imageUrls as string[])
+                : slideImages
 
-            if (publicImages.length >= 2) {
-              const r = await publishCarouselToInstagram(channel, publicImages, caption)
+            if (carouselImages.length >= 2) {
+              const r = await publishCarouselToInstagram(channel, carouselImages, caption)
               results.push({ platform, success: true, id: r.id })
             } else if (mediaUrl && isPublicUrl(mediaUrl)) {
+              // Single video → publish as Reel
               const r = await publishVideoToInstagram(channel, mediaUrl, caption)
               results.push({ platform, success: true, id: r.id })
             } else {
@@ -96,7 +110,7 @@ export async function POST(req: NextRequest) {
                 success: false,
                 skipped: true,
                 reason:
-                  'Instagram requires public HTTPS URLs for media. Base64 data URIs are not supported by the Meta Graph API.',
+                  'Instagram carousel requires at least 2 slide images. No valid images found in the request.',
               })
             }
           } catch (e: unknown) {

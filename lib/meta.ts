@@ -1,9 +1,11 @@
-import { readFile, writeFile, mkdir } from 'fs/promises'
+import { readFile, writeFile, unlink, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
+import { randomUUID } from 'crypto'
 
 const DATA_DIR = process.env.TOKEN_STORAGE_PATH || '/data'
 const META_TOKENS_PATH = path.join(DATA_DIR, 'meta-tokens.json')
+const TEMP_IMAGE_DIR = path.join(DATA_DIR, 'temp-images')
 const GRAPH_BASE = 'https://graph.facebook.com/v19.0'
 
 export type MetaChannelConfig = {
@@ -104,58 +106,116 @@ async function waitForContainer(
   throw new Error(`Media container ${containerId} timed out after ${maxAttempts} attempts`)
 }
 
+// ── Temp image hosting ───────────────────────────────────────────────────────
+
+/**
+ * Write a base64 data URI (or raw base64 JPEG string) to a temp file under
+ * /data/temp-images/ and return its public URL.
+ * Returns null if the input is already a public HTTPS URL (no-op).
+ */
+async function saveBase64ToTempFile(image: string): Promise<{ publicUrl: string; filePath: string } | null> {
+  // Already a public URL — nothing to do
+  if (image.startsWith('http://') || image.startsWith('https://')) return null
+
+  // Strip data URI header if present
+  const b64 = image.startsWith('data:')
+    ? image.replace(/^data:image\/\w+;base64,/, '')
+    : image
+
+  const buffer = Buffer.from(b64, 'base64')
+  const filename = `${randomUUID()}.jpg`
+  const filePath = path.join(TEMP_IMAGE_DIR, filename)
+
+  if (!existsSync(TEMP_IMAGE_DIR)) {
+    await mkdir(TEMP_IMAGE_DIR, { recursive: true })
+  }
+  await writeFile(filePath, buffer)
+
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com').replace(/\/$/, '')
+  const publicUrl = `${appUrl}/api/temp-image/${filename}`
+
+  return { publicUrl, filePath }
+}
+
+async function deleteTempFile(filePath: string): Promise<void> {
+  try { await unlink(filePath) } catch { /* already gone — ignore */ }
+}
+
 // ── Instagram carousel ───────────────────────────────────────────────────────
 
 /**
  * Publish a carousel post to Instagram.
- * imageUrls must be publicly accessible HTTPS URLs — base64 data URIs are not supported by Meta.
+ * Each entry in `images` may be:
+ *   - A public HTTPS URL  (used as-is)
+ *   - A base64 data URI   (written to a temp file and served via /api/temp-image)
+ * Temp files are deleted after publishing, whether it succeeds or fails.
  */
 export async function publishCarouselToInstagram(
   channelName: string,
-  imageUrls: string[],
+  images: string[],
   caption: string,
 ): Promise<{ id: string }> {
   const cfg = await getChannelConfig(channelName)
   if (!cfg) throw new Error(`No Meta credentials configured for channel: ${channelName}`)
-  if (imageUrls.length < 2) throw new Error('Instagram carousel requires at least 2 images')
-  if (imageUrls.length > 10) throw new Error('Instagram carousel supports a maximum of 10 images')
+  if (images.length < 2) throw new Error('Instagram carousel requires at least 2 images')
+  if (images.length > 10) throw new Error('Instagram carousel supports a maximum of 10 images')
 
   const { instagramAccountId: igId, pageAccessToken: token } = cfg
+  if (!igId) throw new Error(`Instagram Account ID not configured for channel: ${channelName}`)
 
-  // Step 1: Upload each image as a carousel item container
-  const childIds: string[] = []
-  for (const url of imageUrls) {
-    const data = await graphPost(
-      `/${igId}/media`,
-      { image_url: url, is_carousel_item: 'true' },
-      token,
-    )
-    childIds.push(data.id as string)
+  // Resolve each image to a public URL, writing temp files where needed
+  const tempFiles: string[] = []
+  const publicUrls: string[] = []
+
+  for (const image of images) {
+    const result = await saveBase64ToTempFile(image)
+    if (result) {
+      tempFiles.push(result.filePath)
+      publicUrls.push(result.publicUrl)
+    } else {
+      publicUrls.push(image) // already a public URL
+    }
   }
 
-  // Step 2: Create the carousel container
-  const carousel = await graphPost(
-    `/${igId}/media`,
-    {
-      media_type: 'CAROUSEL',
-      children: childIds.join(','),
-      caption,
-    },
-    token,
-  )
-  const carouselId = carousel.id as string
+  try {
+    // Step 1: Upload each image as a carousel item container
+    const childIds: string[] = []
+    for (const url of publicUrls) {
+      const data = await graphPost(
+        `/${igId}/media`,
+        { image_url: url, is_carousel_item: 'true' },
+        token,
+      )
+      childIds.push(data.id as string)
+    }
 
-  // Step 3: Poll until ready
-  await waitForContainer(carouselId, token)
+    // Step 2: Create the carousel container
+    const carousel = await graphPost(
+      `/${igId}/media`,
+      {
+        media_type: 'CAROUSEL',
+        children: childIds.join(','),
+        caption,
+      },
+      token,
+    )
+    const carouselId = carousel.id as string
 
-  // Step 4: Publish
-  const published = await graphPost(
-    `/${igId}/media_publish`,
-    { creation_id: carouselId },
-    token,
-  )
+    // Step 3: Poll until ready
+    await waitForContainer(carouselId, token)
 
-  return { id: published.id as string }
+    // Step 4: Publish
+    const published = await graphPost(
+      `/${igId}/media_publish`,
+      { creation_id: carouselId },
+      token,
+    )
+
+    return { id: published.id as string }
+  } finally {
+    // Clean up temp files regardless of success or failure
+    await Promise.all(tempFiles.map(deleteTempFile))
+  }
 }
 
 // ── Instagram Reel (video) ───────────────────────────────────────────────────
