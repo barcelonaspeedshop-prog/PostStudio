@@ -139,6 +139,11 @@ const DEFAULT_CHANNELS = [
   'Omnira F1',
   'Road & Trax',
   'Omnira Football',
+  'Omnira Cricket',
+  'Omnira Golf',
+  'Omnira NFL',
+  'Omnira Food',
+  'Omnira Travel',
 ]
 
 const CHANNEL_TAGS: Record<string, string[]> = {
