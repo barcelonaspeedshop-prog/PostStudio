@@ -117,8 +117,8 @@ export default function AccountsPage() {
       setConnectForm(f => f ? { ...f, error: 'Page Access Token is required' } : null)
       return
     }
-    if (!connectForm.instagramAccountId.trim()) {
-      setConnectForm(f => f ? { ...f, error: 'Instagram Account ID is required' } : null)
+    if (!connectForm.facebookPageId.trim()) {
+      setConnectForm(f => f ? { ...f, error: 'Facebook Page ID is required' } : null)
       return
     }
 
@@ -287,7 +287,23 @@ export default function AccountsPage() {
 
                 <div>
                   <label className="block text-[12px] font-medium text-stone-700 mb-1">
-                    Instagram Business Account ID <span className="text-red-500">*</span>
+                    Facebook Page ID <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={connectForm.facebookPageId}
+                    onChange={e => setConnectForm(f => f ? { ...f, facebookPageId: e.target.value } : null)}
+                    placeholder="100000000000000"
+                    className="w-full px-3 py-2 text-[12px] border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 font-mono"
+                  />
+                  <p className="text-[11px] text-stone-400 mt-1">
+                    Find via Graph API Explorer: <code className="bg-stone-100 px-1 rounded">GET /me/accounts</code> → copy the <code className="bg-stone-100 px-1 rounded">id</code> for your page.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-[12px] font-medium text-stone-700 mb-1">
+                    Instagram Business Account ID <span className="text-stone-400 font-normal">(optional — add later when Instagram is linked)</span>
                   </label>
                   <input
                     type="text"
@@ -297,21 +313,8 @@ export default function AccountsPage() {
                     className="w-full px-3 py-2 text-[12px] border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 font-mono"
                   />
                   <p className="text-[11px] text-stone-400 mt-1">
-                    Find via Graph API Explorer: <code className="bg-stone-100 px-1 rounded">GET /me/accounts</code> → pick your page → <code className="bg-stone-100 px-1 rounded">GET /&#123;page-id&#125;?fields=instagram_business_account</code>
+                    Find via: <code className="bg-stone-100 px-1 rounded">GET /&#123;page-id&#125;?fields=instagram_business_account</code>
                   </p>
-                </div>
-
-                <div>
-                  <label className="block text-[12px] font-medium text-stone-700 mb-1">
-                    Facebook Page ID <span className="text-stone-400 font-normal">(optional — for Facebook posts)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={connectForm.facebookPageId}
-                    onChange={e => setConnectForm(f => f ? { ...f, facebookPageId: e.target.value } : null)}
-                    placeholder="100000000000000"
-                    className="w-full px-3 py-2 text-[12px] border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 font-mono"
-                  />
                 </div>
 
                 {connectForm.error && (

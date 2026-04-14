@@ -17,8 +17,8 @@ export async function GET() {
 
     for (const [channel, cfg] of Object.entries(store)) {
       status[channel] = {
-        connected: Boolean(cfg.pageAccessToken && cfg.instagramAccountId),
-        instagramAccountId: cfg.instagramAccountId,
+        connected: Boolean(cfg.pageAccessToken && cfg.facebookPageId),
+        instagramAccountId: cfg.instagramAccountId || undefined,
         facebookPageId: cfg.facebookPageId,
       }
     }
@@ -42,15 +42,15 @@ export async function POST(req: NextRequest) {
     if (!pageAccessToken || typeof pageAccessToken !== 'string') {
       return NextResponse.json({ error: 'pageAccessToken is required' }, { status: 400 })
     }
-    if (!instagramAccountId || typeof instagramAccountId !== 'string') {
-      return NextResponse.json({ error: 'instagramAccountId is required' }, { status: 400 })
+    if (!facebookPageId || typeof facebookPageId !== 'string') {
+      return NextResponse.json({ error: 'facebookPageId is required' }, { status: 400 })
     }
 
     const store = await loadMetaTokens()
     store[channel] = {
       pageAccessToken,
-      instagramAccountId,
-      facebookPageId: facebookPageId || '',
+      instagramAccountId: instagramAccountId || '',
+      facebookPageId,
     }
     await saveMetaTokens(store)
 
