@@ -139,68 +139,111 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ id: item.id, status: 'rejected' })
     }
 
-    // Approved — publish to platforms
-    const results: { platform: string; success: boolean; error?: string; url?: string }[] = []
+    // Approved — publish to all platforms in parallel
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
     const caption = item.slides.map(s => `${s.headline} — ${s.body}`).join('\n\n')
 
-    // Publish to Postproxy for non-YouTube platforms
-    const postproxyPlatforms = item.platforms.filter(p => p !== 'youtube')
-    if (postproxyPlatforms.length > 0) {
-      try {
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
-        const res = await fetch(`${baseUrl}/api/publish`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content: caption,
-            mediaUrl: item.videoBase64,
-            platforms: postproxyPlatforms,
-            firstSlideHeadline: item.headline,
-            channel: item.channel,
-          }),
-        })
-        const data = await res.json()
-        if (res.ok) {
-          postproxyPlatforms.forEach(p => results.push({ platform: p, success: true }))
-        } else {
-          postproxyPlatforms.forEach(p => results.push({ platform: p, success: false, error: data.error }))
-        }
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : 'Publish error'
-        postproxyPlatforms.forEach(p => results.push({ platform: p, success: false, error: msg }))
-      }
-    }
+    type PlatformResult = { platform: string; success: boolean; error?: string; url?: string }
 
-    // Publish to YouTube directly
-    if (item.platforms.includes('youtube')) {
-      try {
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
-        const tags = item.ytTags && item.ytTags.length > 0
-          ? item.ytTags
-          : caption.match(/#[\w]+/g)?.map(t => t.replace('#', '')) || []
-        const res = await fetch(`${baseUrl}/api/publish/youtube`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            videoBase64: item.videoBase64,
-            title: item.ytTitle || item.headline,
-            description: item.ytDescription || caption,
-            tags,
-            channelName: item.channel,
-          }),
-        })
-        const data = await res.json()
-        if (res.ok) {
-          results.push({ platform: 'youtube', success: true, url: data.url })
-        } else {
-          results.push({ platform: 'youtube', success: false, error: data.error })
-        }
-      } catch (e: unknown) {
-        results.push({ platform: 'youtube', success: false, error: e instanceof Error ? e.message : 'YouTube error' })
-      }
-    }
+    const publishJobs = item.platforms.map((platform): Promise<PlatformResult> => {
+      switch (platform) {
+        case 'instagram':
+          return fetch(`${baseUrl}/api/publish`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content: caption,
+              mediaUrl: item.videoBase64,
+              platforms: ['instagram'],
+              firstSlideHeadline: item.headline,
+              channel: item.channel,
+              slides: item.slides,
+            }),
+          })
+            .then(async r => {
+              const d = await r.json()
+              const inner = (d.results as PlatformResult[] | undefined)?.find(x => x.platform === 'instagram')
+              if (inner) return inner
+              return { platform: 'instagram', success: r.ok, error: d.error }
+            })
+            .catch(e => ({ platform: 'instagram', success: false, error: e instanceof Error ? e.message : String(e) }))
 
-    const allSuccess = results.every(r => r.success)
+        case 'facebook':
+          return fetch(`${baseUrl}/api/publish`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content: caption,
+              mediaUrl: item.videoBase64,
+              platforms: ['facebook'],
+              firstSlideHeadline: item.headline,
+              channel: item.channel,
+            }),
+          })
+            .then(async r => {
+              const d = await r.json()
+              const inner = (d.results as PlatformResult[] | undefined)?.find(x => x.platform === 'facebook')
+              if (inner) return inner
+              return { platform: 'facebook', success: r.ok, error: d.error }
+            })
+            .catch(e => ({ platform: 'facebook', success: false, error: e instanceof Error ? e.message : String(e) }))
+
+        case 'tiktok':
+          return fetch(`${baseUrl}/api/publish`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content: caption,
+              mediaUrl: item.videoBase64,
+              platforms: ['tiktok'],
+              firstSlideHeadline: item.headline,
+              channel: item.channel,
+            }),
+          })
+            .then(async r => {
+              const d = await r.json()
+              const inner = (d.results as PlatformResult[] | undefined)?.find(x => x.platform === 'tiktok')
+              if (inner) return inner
+              return { platform: 'tiktok', success: r.ok, error: d.error }
+            })
+            .catch(e => ({ platform: 'tiktok', success: false, error: e instanceof Error ? e.message : String(e) }))
+
+        case 'youtube': {
+          const tags = item.ytTags && item.ytTags.length > 0
+            ? item.ytTags
+            : caption.match(/#[\w]+/g)?.map(t => t.replace('#', '')) || []
+          return fetch(`${baseUrl}/api/publish/youtube`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              videoBase64: item.videoBase64,
+              title: item.ytTitle || item.headline,
+              description: item.ytDescription || caption,
+              tags,
+              channelName: item.channel,
+            }),
+          })
+            .then(async r => {
+              const d = await r.json()
+              return r.ok
+                ? { platform: 'youtube', success: true, url: d.url }
+                : { platform: 'youtube', success: false, error: d.error }
+            })
+            .catch(e => ({ platform: 'youtube', success: false, error: e instanceof Error ? e.message : String(e) }))
+        }
+
+        default:
+          return Promise.resolve({ platform, success: false, error: `No publish handler for platform: ${platform}` })
+      }
+    })
+
+    const settled = await Promise.allSettled(publishJobs)
+    const results: PlatformResult[] = settled.map((s, i) =>
+      s.status === 'fulfilled'
+        ? s.value
+        : { platform: item.platforms[i], success: false, error: s.reason instanceof Error ? s.reason.message : String(s.reason) }
+    )
+
     const failures = results.filter(r => !r.success)
 
     console.log(`[approvals] Published "${item.headline}":`, JSON.stringify(results))
