@@ -57,7 +57,14 @@ Rules:
 - For people: use their full name + team/context
 - For cars: use make + model + year if mentioned
 - For events: use event name + location
-
+${channel === 'Omnira Football' ? `
+CHANNEL-SPECIFIC RULES FOR OMNIRA FOOTBALL:
+- Every query MUST target association football/soccer only — never use terms that could return American football, NFL, or rugby results
+- Append "soccer" to every query
+- Never use the word "football" alone — always use "soccer" instead
+- Example: "Salah Liverpool soccer goal" not "Salah Liverpool football"
+` : ''
+}
 ${slideSummaries}
 
 Return a JSON array of ${slides.length} search query strings.`,

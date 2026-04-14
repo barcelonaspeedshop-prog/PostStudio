@@ -813,16 +813,21 @@ export default function ApprovalsPage() {
 
       {/* Video preview modal */}
       {previewItem?.videoBase64 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setPreviewId(null)}>
-          <div className="bg-white rounded-2xl overflow-hidden max-w-lg w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-4" onClick={() => setPreviewId(null)}>
+          <div
+            className="bg-white rounded-2xl overflow-hidden w-full shadow-xl"
+            style={{ maxWidth: 'min(512px, 100vw)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Video player */}
-            <div className="bg-black">
+            <div className="bg-black overflow-hidden">
               <video
                 src={previewItem.videoBase64}
                 controls
                 autoPlay
                 playsInline
-                className="w-full max-h-[60vh] object-contain"
+                className="w-full max-h-[60vh]"
+                style={{ objectFit: 'contain', display: 'block' }}
               />
             </div>
 

@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
       tools: [{ type: 'web_search_20250305', name: 'web_search' }] as any,
       messages: [{
         role: 'user',
-        content: `Search for breaking news or major developments from the last 24 hours only (today is ${today}). The story MUST have been published or updated within the last 24 hours. Do not use any story older than 24 hours. Search in ${topicKeywords}. If you cannot find a qualifying story in ${topicKeywords}, pick the most recent story available even if slightly older, but always prefer today's news.${hasExclusions ? `\n\nIMPORTANT: You MUST NOT cover any of these topics — they are all banned:\n${exclusionList}\n\nFind a completely different, unrelated story from today's news.` : ''}
+        content: `Today is ${today}. Search for news published TODAY only. You must verify the publication date is ${today} before selecting a story. Reject any story published before ${today}. Search in ${topicKeywords}. If you genuinely cannot find a story published on ${today}, pick the most recent available story, but you must try ${today} first and state why no story from ${today} was found.${hasExclusions ? `\n\nIMPORTANT: You MUST NOT cover any of these topics — they are all banned:\n${exclusionList}\n\nFind a completely different, unrelated story from today's news.` : ''}
 
 Respond with ONLY a JSON object. No explanatory text before or after. No markdown. Just the raw JSON.
 
