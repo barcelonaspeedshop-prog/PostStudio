@@ -202,6 +202,12 @@ export async function POST(req: NextRequest) {
       if (!newsRes.ok) throw new Error(newsData.error || 'News fetch failed')
 
       const slides: Slide[] = newsData.slides
+      // Force alternating story/story-text pattern on middle slides
+      slides.forEach((slide, idx) => {
+        if (idx >= 2 && idx < slides.length - 1) {
+          slide.tileType = (idx % 2 === 0) ? 'story' : 'story-text'
+        }
+      })
       const topic: string = newsData.topic || newsData.story || ''
       const headline = slides[0]?.headline || topic
 
