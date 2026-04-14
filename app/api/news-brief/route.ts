@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
       tools: [{ type: 'web_search_20250305', name: 'web_search' }] as any,
       messages: [{
         role: 'user',
-        content: `Search the web for the most trending or breaking news story TODAY (${today}) in ${topicKeywords}. Look for recent race results, transfers, car launches, controversies, or major breaking news.${hasExclusions ? `\n\nIMPORTANT: You MUST NOT cover any of these topics — they are all banned:\n${exclusionList}\n\nFind a completely different, unrelated story from today's news.` : ''}
+        content: `Search for breaking news or major developments from the last 24 hours only (today is ${today}). The story MUST have been published or updated within the last 24 hours. Do not use any story older than 24 hours. Search in ${topicKeywords}. If you cannot find a qualifying story in ${topicKeywords}, pick the most recent story available even if slightly older, but always prefer today's news.${hasExclusions ? `\n\nIMPORTANT: You MUST NOT cover any of these topics — they are all banned:\n${exclusionList}\n\nFind a completely different, unrelated story from today's news.` : ''}
 
 Respond with ONLY a JSON object. No explanatory text before or after. No markdown. Just the raw JSON.
 
@@ -114,7 +114,7 @@ The JSON object must contain:
 - "topic": a concise but descriptive topic string (15-25 words) that captures the story
 - "headline": a short 5-8 word headline summary
 - "articleUrl": the URL of the best source article you found
-- "searchTerms": an array of 5 short image search terms related to different aspects of this story (e.g. specific people, cars, teams, venues mentioned)`,
+- "searchTerms": an array of 5 short image search terms biased toward fresh content — include the current date (${today}), "breaking", or "today" where relevant alongside specific people, cars, teams, and venues mentioned in the story`,
       }],
     })
 

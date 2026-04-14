@@ -535,7 +535,7 @@ export default function ApprovalsPage() {
                   const isActing = acting === item.id
                   const isRegenerating = regeneratingId === item.id
                   return (
-                    <div key={item.id} className="bg-white border border-stone-100 rounded-xl overflow-hidden">
+                    <div key={item.id} className="bg-white border border-stone-100 rounded-xl">
                       <div className="p-4 flex gap-3">
                         {item.slides[0]?.image && (
                           <div
@@ -571,9 +571,9 @@ export default function ApprovalsPage() {
                       </button>
 
                       {expandedId === item.id && (
-                        <div className="px-4 pb-3 flex gap-2 overflow-x-auto scrollbar-hide">
+                        <div className="px-4 pb-3 flex gap-2 overflow-x-auto scrollbar-hide" style={{ overflowX: 'auto' }}>
                           {item.slides.map((s, i) => (
-                            <div key={i} className="shrink-0 flex flex-col items-center gap-1.5">
+                            <div key={i} className="shrink-0 flex flex-col items-center gap-1.5" style={{ flexShrink: 0 }}>
                               <div className="w-[100px] h-[125px] rounded-lg bg-stone-800 relative overflow-hidden" style={{ background: s.image ? `url(${s.image}) center/cover` : '#1a1a1a' }}>
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
                                 <div className="absolute bottom-0 left-0 right-0 p-2">
