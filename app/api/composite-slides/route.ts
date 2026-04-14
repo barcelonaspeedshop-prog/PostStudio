@@ -54,7 +54,7 @@ type SlideInput = {
   badge: string
   accent: string
   image?: string
-  tileType?: 'hook' | 'brand' | 'story' | 'cta'
+  tileType?: 'hook' | 'brand' | 'story' | 'story-text' | 'cta'
   channel?: string
 }
 
@@ -304,7 +304,7 @@ function buildCtaSvg(slide: SlideInput, primary: string, channelName: string, ha
   return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`
 }
 
-function determineTileType(slide: SlideInput, index: number, total: number): 'hook' | 'brand' | 'story' | 'cta' {
+function determineTileType(slide: SlideInput, index: number, total: number): 'hook' | 'brand' | 'story' | 'story-text' | 'cta' {
   if (slide.tileType) return slide.tileType
   if (index === 0) return 'hook'
   if (index === 1) return 'brand'
@@ -328,8 +328,8 @@ export async function POST(req: NextRequest) {
 
       let base: sharp.Sharp
 
-      // Brand tile: always solid bg, never use image
-      if (tileType === 'brand') {
+      // Brand and story-text tiles: always solid bg, never use image
+      if (tileType === 'brand' || tileType === 'story-text') {
         base = sharp({
           create: { width: W, height: H, channels: 3, background: { r: bgr, g: bgg, b: bgb } },
         })
@@ -351,6 +351,9 @@ export async function POST(req: NextRequest) {
           break
         case 'brand':
           svgOverlay = buildBrandSvg(slide, ch.primary, ch.bg, ch.name, ch.handle)
+          break
+        case 'story-text':
+          svgOverlay = buildBrandSvg(slide, primary, bg, ch.name, ch.handle)
           break
         case 'story':
           svgOverlay = buildStorySvg(slide, ch.primary)

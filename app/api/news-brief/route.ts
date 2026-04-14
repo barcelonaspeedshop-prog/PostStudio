@@ -144,10 +144,10 @@ Return a JSON array of exactly ${slideCount} slide objects. Each object must hav
 Tile type rules:
 - Slide 1 MUST be "hook" (attention-grabbing intro over a full image)
 - Slide 2 MUST be "brand" (text-only brand slide, no image needed)
-- Slides 3 to ${slideCount - 1} MUST be "story" (narrative slides over images)
-- Slide ${slideCount} MUST be "cta" (call to action / verdict)
+- Story slides (3 to ${slideCount - 1}) MUST ALTERNATE: odd-numbered slides are "story" (image background), even-numbered slides are "story-text" (text-only, no image, solid dark background)
+- Slide ${slideCount} MUST be "cta" (call to action / verdict over an image)
 
-Make slide 1 a hook/intro. Slide 2 is the brand context slide — its body MUST be 5-7 sentences (80-120 words) of editorial copy giving the full background and context of THIS SPECIFIC STORY. Do NOT use generic channel promo text. Write real journalism about this topic. Slides 3 to ${slideCount - 1} tell the story with specific facts and details. Slide ${slideCount} is a CTA/verdict.
+Make slide 1 a hook/intro. Slide 2 is the brand context slide — its body MUST be 5-7 sentences (80-120 words) of editorial copy giving the full background and context of THIS SPECIFIC STORY. Do NOT use generic channel promo text. Write real journalism about this topic. Story slides with images (type "story") have a punchy headline and 2-3 sentence body. Story slides without images (type "story-text") have a larger body of 4-5 sentences with more detail and context — these are reading slides. Slide ${slideCount} is a CTA/verdict.
 Return only the JSON array, nothing else.`
 
     const message = await client.messages.create({
