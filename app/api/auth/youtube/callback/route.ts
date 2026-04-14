@@ -27,6 +27,7 @@ const CHANNEL_IDS: Record<string, string> = {
   'Omnira Golf': 'UCyUvDlet6Py9D30aCdv46SA',
   'Omnira NFL': 'UCR6DnL1k6Uq1lgHT27cKnHA',
   'Omnira Food': 'UC970CeC0HKQIlLuiqbvgkkA',
+  'Omnira Travel': 'UCkehLjuwibcMWVeP5xzWlJA',
 }
 
 export async function GET(req: NextRequest) {
