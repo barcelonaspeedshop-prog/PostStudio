@@ -78,10 +78,10 @@ Return a JSON array of ${slides.length} search query strings.`,
   } catch (e) {
     console.warn('[auto-generate] Claude image query extraction failed:', e instanceof Error ? e.message : e)
     // Fallback: use headline words, filtering out generic terms
-    const genericWords = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'is', 'was', 'are', 'vs', 'with', 'how', 'why', 'what', 'football', 'soccer', 'racing', 'sports', 'world', 'news', 'update', 'breaking', 'latest', 'big', 'new', 'top', 'major', 'shocking'])
+    const genericWords = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'is', 'was', 'are', 'vs', 'with'])
     return slides.map(s => {
-      const words = s.headline.split(/\s+/).filter(w => w.length > 2 && !genericWords.has(w.toLowerCase()))
-      return words.slice(0, 4).join(' ') + ' ' + channel
+      const words = s.headline.split(/\s+/).filter(w => !genericWords.has(w.toLowerCase()))
+      return words.slice(0, 5).join(' ')
     })
   }
 }
@@ -144,7 +144,7 @@ const CHANNEL_TAGS: Record<string, string[]> = {
 const DEFAULT_PLATFORMS = ['instagram', 'tiktok', 'youtube']
 
 type Slide = {
-  num: string; tag: string; headline: string; body: string; badge: string; accent: string; image?: string; imageOptions?: string[]
+  num: string; tag: string; headline: string; body: string; badge: string; accent: string; image?: string; imageOptions?: string[]; tileType?: string
 }
 
 function generateTags(channel: string, topic: string, slides: Slide[]): string[] {
@@ -202,14 +202,21 @@ export async function POST(req: NextRequest) {
       if (!newsRes.ok) throw new Error(newsData.error || 'News fetch failed')
 
       const slides: Slide[] = newsData.slides
-      // Force alternating story/story-text pattern on middle slides
-      slides.forEach((slide, idx) => {
-        if (idx >= 2 && idx < slides.length - 1) {
-          slide.tileType = (idx % 2 === 0) ? 'story' : 'story-text'
-          console.log(`[auto-generate] Slide ${idx} tileType set to: ${slide.tileType}`)
+
+      // Force the tile pattern regardless of what Claude returned:
+      // 0=hook, 1=brand, 2..N-2 alternate story/story-text, N-1=cta
+      slides.forEach((slide, i) => {
+        if (i === 0) {
+          slide.tileType = 'hook'
+        } else if (i === 1) {
+          slide.tileType = 'brand'
+        } else if (i === slides.length - 1) {
+          slide.tileType = 'cta'
+        } else {
+          // index 2 → story, index 3 → story-text, index 4 → story, etc.
+          slide.tileType = (i - 2) % 2 === 0 ? 'story' : 'story-text'
         }
       })
-      const topic: string = newsData.topic || newsData.story || ''
       const headline = slides[0]?.headline || topic
 
       // Step 2: Extract specific image search queries using Claude

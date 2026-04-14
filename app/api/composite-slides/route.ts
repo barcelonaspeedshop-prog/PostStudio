@@ -66,7 +66,7 @@ function buildHookSvg(slide: SlideInput, primary: string, channelName: string): 
   const pad = 72
 
   const tagLines = wrapText(slide.tag, 40)
-  const hedLines = wrapText(slide.headline, 20)
+  const hedLines = wrapText(slide.headline, 16)
   const bodyLines = wrapText(slide.body, 46)
 
   const hedLineH = 100
@@ -196,7 +196,7 @@ function buildStorySvg(slide: SlideInput, primary: string): string {
   const [pr, pg, pb] = hexToRgb(primary)
   const pad = 72
 
-  const hedLines = wrapText(slide.headline, 18)
+  const hedLines = wrapText(slide.headline, 14)
   const bodyLines = wrapText(slide.body, 46)
 
   const hedLineH = 110
@@ -257,7 +257,7 @@ function buildCtaSvg(slide: SlideInput, primary: string, channelName: string, ha
   const [pr, pg, pb] = hexToRgb(primary)
   const pad = 72
 
-  const hedLines = wrapText(slide.headline, 20)
+  const hedLines = wrapText(slide.headline, 16)
   const hedLineH = 100
   const hedH = hedLines.length * hedLineH
 
@@ -357,6 +357,9 @@ export async function POST(req: NextRequest) {
           break
         case 'story':
           svgOverlay = buildStorySvg(slide, ch.primary)
+          break
+        case 'story-text':
+          svgOverlay = buildBrandSvg(slide, ch.primary, ch.bg, ch.name, ch.handle)
           break
         case 'cta':
           svgOverlay = buildCtaSvg(slide, ch.primary, ch.name, ch.handle)

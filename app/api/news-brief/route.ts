@@ -3,6 +3,29 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+async function callClaudeWithRetry(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  params: any,
+  maxRetries = 3,
+) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await client.messages.create(params)
+    } catch (err: unknown) {
+      const status = (err as { status?: number }).status
+      if (status === 529 && attempt < maxRetries) {
+        console.warn(`[news-brief] Claude 529 overload, retrying in 10s (attempt ${attempt}/${maxRetries})`)
+        await sleep(10000)
+        continue
+      }
+      throw err
+    }
+  }
+  throw new Error('Unreachable')
+}
+
 const CHANNEL_TOPICS: Record<string, string> = {
   'Gentlemen of Fuel': 'classic cars, luxury cars, supercars, automotive',
   'Omnira F1': 'Formula 1, F1 racing, Grand Prix',
@@ -75,7 +98,7 @@ export async function POST(req: NextRequest) {
       ? `You are a news researcher. You MUST NOT cover any of the following topics under any circumstances — they are all banned:\n${exclusionList}\n\nFind a completely different story about different people, teams, and events. If any of the banned topics involve a specific person, team, or event, do NOT cover that person, team, or event at all even from a different angle.`
       : `You are a news researcher.`
 
-    const searchMessage = await client.messages.create({
+    const searchMessage = await callClaudeWithRetry({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1024,
       system: searchSystemPrompt,
@@ -135,22 +158,27 @@ Return a JSON array of exactly ${slideCount} slide objects. Each object must hav
 - "num": slide number as two-digit string e.g. "01"
 - "tag": short category label in CAPS (e.g. "THE ORIGIN STORY")
 - "headline": punchy headline (max 8 words)
-- "body": 2-3 sentence description (max 40 words)
+- "body": description text (see body length rules below)
 - "badge": short badge label in CAPS (max 5 words)
 - "accent": one of these color names: "red", "amber", "blue", "green", "purple", "teal"
 - "imageQuery": a specific image search term for this slide's visual (2-5 words, e.g. a specific car model, stadium, driver name)
 - "tileType": one of "hook", "brand", "story", "cta"
 
+Body length rules:
+- For "hook" and "cta" tiles: 2-3 sentences, max 40 words (short caption style)
+- For "story" tiles: 2-3 sentences, max 40 words (short caption style — the tile pattern is handled programmatically)
+- For the "brand" tile (slide 2): 5-7 sentences, 80-120 words. This must read like a full paragraph of editorial copy telling the complete background story in detail — context, history, stakes, and significance. NOT a short snippet.
+
 Tile type rules:
 - Slide 1 MUST be "hook" (attention-grabbing intro over a full image)
-- Slide 2 MUST be "brand" (text-only brand slide, no image needed)
-- Story slides (3 to ${slideCount - 1}) MUST ALTERNATE: odd-numbered slides are "story" (image background), even-numbered slides are "story-text" (text-only, no image, solid dark background)
-- Slide ${slideCount} MUST be "cta" (call to action / verdict over an image)
+- Slide 2 MUST be "brand" (text-only brand slide, no image needed — this is where the long-form story goes)
+- Slides 3 to ${slideCount - 1} MUST be "story"
+- Slide ${slideCount} MUST be "cta" (call to action / verdict)
 
 Make slide 1 a hook/intro. Slide 2 is the brand context slide — its body MUST be 5-7 sentences (80-120 words) of editorial copy giving the full background and context of THIS SPECIFIC STORY. Do NOT use generic channel promo text. Write real journalism about this topic. Story slides with images (type "story") have a punchy headline and 2-3 sentence body. Story slides without images (type "story-text") have a larger body of 4-5 sentences with more detail and context — these are reading slides. Slide ${slideCount} is a CTA/verdict.
 Return only the JSON array, nothing else.`
 
-    const message = await client.messages.create({
+    const message = await callClaudeWithRetry({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 2000,
       system,
