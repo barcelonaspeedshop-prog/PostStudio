@@ -206,6 +206,7 @@ export async function POST(req: NextRequest) {
       slides.forEach((slide, idx) => {
         if (idx >= 2 && idx < slides.length - 1) {
           slide.tileType = (idx % 2 === 0) ? 'story' : 'story-text'
+          console.log(`[auto-generate] Slide ${idx} tileType set to: ${slide.tileType}`)
         }
       })
       const topic: string = newsData.topic || newsData.story || ''
