@@ -215,7 +215,7 @@ function buildBrandSvg(slide: SlideInput, primary: string, bg: string, channelNa
   const tagLines = wrapText(slide.tag, 38)
 
   const hedLineH = Math.round(hedFontSize * 1.1)
-  const bodyLineH = 48
+  const bodyLineH = 62
   const tagLineH = 34
   const hedH = hedLines.length * hedLineH
   const bodyH = bodyLines.length * bodyLineH
@@ -326,54 +326,53 @@ function buildStorySvg(slide: SlideInput, primary: string): string {
 
 // ── Tile 4: STORY-TEXT ──────────────────────────────────────────────────────
 // Solid channel bg — NO image ever.
-// Top-left: accent tag 26px. Headline 72px/500 max 2 lines. 2px accent divider.
-// Body 36px/75% up to 5 lines. Optional chart below body.
+// Full-width accent bar at top (12px). All text centred horizontally.
+// Tag at y=180, headline at y=280, divider below headline, body from y=520.
+// Optional chart below body.
 function buildStoryTextSvg(slide: SlideInput, primary: string, bg: string): string {
   const [pr, pg, pb] = hexToRgb(primary)
   const [bgr, bgg, bgb] = hexToRgb(bg)
-  const pad = 72
+  const cx = W / 2  // horizontal centre
 
   const hedFontSize = dynamicFontSize(slide.headline, 900, 72)
   const hedLines = wrapText(slide.headline, Math.floor(900 / (hedFontSize * 0.55)))
   const bodyLines = wrapText(slide.body, 46).slice(0, 5)
 
   const hedLineH = Math.round(hedFontSize * 1.11)
-  const bodyLineH = 44
+  const bodyLineH = 62
 
   let svg = ''
 
   // Solid background
   svg += `<rect width="${W}" height="${H}" fill="rgb(${bgr},${bgg},${bgb})" fill-opacity="1"/>`
 
+  // Full-width accent bar at top
+  svg += `<rect x="0" y="0" width="${W}" height="12" fill="rgb(${pr},${pg},${pb})" fill-opacity="1"/>`
+
   // Slide number top-right white 25%
-  svg += `<text x="${W - pad}" y="88" font-family="${FONT_STACK}" font-size="30" fill="white" fill-opacity="0.25" text-anchor="end">${escapeXml(slide.num)}</text>`
+  svg += `<text x="${W - 72}" y="88" font-family="${FONT_STACK}" font-size="30" fill="white" fill-opacity="0.25" text-anchor="end">${escapeXml(slide.num)}</text>`
 
-  let y = 90
+  // Tag centred at y=180
+  svg += `<text x="${cx}" y="180" font-family="${FONT_STACK}" font-size="26" font-weight="500" fill="rgb(${pr},${pg},${pb})" fill-opacity="1" letter-spacing="2" text-anchor="middle">${escapeXml(slide.tag)}</text>`
 
-  // Tag top-left accent 26px
-  svg += `<text x="${pad}" y="${y}" font-family="${FONT_STACK}" font-size="26" font-weight="500" fill="rgb(${pr},${pg},${pb})" fill-opacity="1" letter-spacing="1">${escapeXml(slide.tag)}</text>`
-  y += 64
-
-  // Headline dynamic font size
+  // Headline centred starting at y=280
   hedLines.forEach((line, i) => {
-    svg += `<text x="${pad}" y="${y + i * hedLineH}" font-family="${FONT_STACK}" font-size="${hedFontSize}" font-weight="500" fill="white" fill-opacity="1">${escapeXml(line)}</text>`
+    svg += `<text x="${cx}" y="${280 + i * hedLineH}" font-family="${FONT_STACK}" font-size="${hedFontSize}" font-weight="500" fill="white" fill-opacity="1" text-anchor="middle">${escapeXml(line)}</text>`
   })
-  y += hedLines.length * hedLineH + 24
 
-  // Divider 160px
-  svg += `<rect x="${pad}" y="${y}" width="160" height="2" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.8"/>`
-  y += 48
+  // Divider below headline (centred 160px)
+  const dividerY = 280 + hedLines.length * hedLineH + 24
+  svg += `<rect x="${cx - 80}" y="${dividerY}" width="160" height="2" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.8"/>`
 
-  // Body 36px white 75%
+  // Body centred from y=520
   bodyLines.forEach((line, i) => {
-    svg += `<text x="${pad}" y="${y + i * bodyLineH}" font-family="${FONT_STACK}" font-size="36" fill="white" fill-opacity="0.75">${escapeXml(line)}</text>`
+    svg += `<text x="${cx}" y="${520 + i * bodyLineH}" font-family="${FONT_STACK}" font-size="36" fill="white" fill-opacity="0.75" text-anchor="middle">${escapeXml(line)}</text>`
   })
-  y += bodyLines.length * bodyLineH
 
-  // Chart if present
+  // Chart if present — left-aligned below body to preserve readability
   if (slide.chartData) {
-    y += 60
-    const { svg: chartSvg } = renderChart(slide.chartData, pad, y, pr, pg, pb)
+    const chartY = 520 + bodyLines.length * bodyLineH + 60
+    const { svg: chartSvg } = renderChart(slide.chartData, 72, chartY, pr, pg, pb)
     svg += chartSvg
   }
 
@@ -506,7 +505,7 @@ export async function POST(req: NextRequest) {
       } else if (slide.image && slide.image.startsWith('data:')) {
         const base64Data = slide.image.replace(/^data:image\/\w+;base64,/, '')
         const imgBuffer = Buffer.from(base64Data, 'base64')
-        base = sharp(imgBuffer).resize(W, H, { fit: 'cover', position: 'centre' })
+        base = sharp(imgBuffer).resize(W, H, { fit: 'cover', position: 'attention' })
       } else {
         base = sharp({
           create: { width: W, height: H, channels: 3, background: { r: bgr, g: bgg, b: bgb } },

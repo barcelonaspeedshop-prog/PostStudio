@@ -323,16 +323,16 @@ export default function ApprovalsPage() {
       const slide = item?.slides[imagePicker.slideIndex]
       if (slide) {
         try {
-          const controller = new AbortController()
-          const timeout = setTimeout(() => controller.abort(), 8000)
-          const searchRes = await fetch('/api/search-images', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: `${slide.headline} ${item?.channel} photo`, count: 10 }),
-            signal: controller.signal,
-          })
-          clearTimeout(timeout)
-          if (searchRes.ok) {
+          const result = await Promise.race([
+            fetch('/api/search-images', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query: `${slide.headline} ${item?.channel} photo`, count: 10 }),
+            }),
+            new Promise<null>(resolve => setTimeout(() => resolve(null), 8000)),
+          ])
+          const searchRes = result instanceof Response ? result : null
+          if (searchRes?.ok) {
             const searchData = await searchRes.json()
             const freshUrls: string[] = (searchData.images || [])
               .map((img: { url: string }) => img.url)
