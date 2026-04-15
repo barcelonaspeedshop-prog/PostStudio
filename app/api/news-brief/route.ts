@@ -177,7 +177,7 @@ Make slide 1 an attention-grabbing hook, slide 2 a deep-dive brand context slide
 Return only the JSON array, nothing else.`
 
     const message = await callClaudeWithRetry({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 3500,
       system,
       messages: [{ role: 'user', content: prompt }],

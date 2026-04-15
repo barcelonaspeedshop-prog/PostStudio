@@ -42,7 +42,7 @@ async function extractImageQueries(slides: Slide[], channel: string): Promise<st
     ).join('\n')
 
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 500,
       system: 'You extract specific image search queries. Return ONLY a JSON array of strings, one per slide. No markdown, no explanation.',
       messages: [{
@@ -343,6 +343,34 @@ export async function POST(req: NextRequest) {
     channels = body.channels && Array.isArray(body.channels) ? body.channels : DEFAULT_CHANNELS
   } catch {
     channels = DEFAULT_CHANNELS
+  }
+
+  // Credit balance check — skip generation if balance is critically low
+  try {
+    const creditRes = await fetch('https://api.anthropic.com/v1/organizations/usage', {
+      headers: {
+        'x-api-key': process.env.ANTHROPIC_API_KEY || '',
+        'anthropic-version': '2023-06-01',
+      },
+    })
+    if (creditRes.ok) {
+      const creditData = await creditRes.json() as { credit_balance?: number }
+      const balance = creditData.credit_balance ?? null
+      if (balance !== null && balance < 2.0) {
+        console.warn(`[auto-generate] Credit balance too low ($${balance.toFixed(2)}) — skipping generation`)
+        return NextResponse.json({
+          summary: 'Skipped — Anthropic credit balance below $2.00',
+          balance,
+          results: [],
+        }, { status: 200 })
+      }
+      if (balance !== null) {
+        console.log(`[auto-generate] Credit balance: $${balance.toFixed(2)}`)
+      }
+    }
+  } catch (e) {
+    // Non-fatal — log and continue if the balance check itself fails
+    console.warn('[auto-generate] Could not check credit balance:', e instanceof Error ? e.message : e)
   }
 
   const results: { channel: string; status: string; headline?: string; error?: string }[] = []
