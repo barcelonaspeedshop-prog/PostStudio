@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Sidebar from '@/components/Sidebar'
 
 const BLOCKED_IMAGE_DOMAINS = [
@@ -62,8 +62,13 @@ export default function ApprovalsPage() {
     options: string[]
     currentIdx: number
     saving: boolean
+    searchMode: boolean
+    searchQuery: string
+    searching: boolean
   } | null>(null)
   const [imageLoadError, setImageLoadError] = useState(false)
+  const [uploadTarget, setUploadTarget] = useState<{ itemId: string; slideIndex: number } | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -304,13 +309,18 @@ export default function ApprovalsPage() {
       } catch { /* ignore */ }
     }
 
-    if (options.length === 0) {
-      showToast('No images found for this slide', 'error')
-      return
-    }
-
+    const searchMode = options.length === 0
     setImageLoadError(false)
-    setImagePicker({ itemId, slideIndex, options, currentIdx: 0, saving: false })
+    setImagePicker({
+      itemId,
+      slideIndex,
+      options,
+      currentIdx: 0,
+      saving: false,
+      searchMode,
+      searchQuery: searchMode ? `${slide.headline} ${item.channel}` : '',
+      searching: false,
+    })
   }
 
   const skipImage = async () => {
@@ -412,6 +422,73 @@ export default function ApprovalsPage() {
     } finally {
       setImagePicker(prev => prev ? { ...prev, saving: false } : null)
     }
+  }
+
+  const searchInPicker = async () => {
+    if (!imagePicker || !imagePicker.searchQuery.trim()) return
+    setImagePicker(p => p ? { ...p, searching: true } : null)
+    try {
+      const res = await fetch('/api/search-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: imagePicker.searchQuery.trim(), count: 10 }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const urls: string[] = (data.images || [])
+          .map((img: { url: string }) => img.url)
+          .filter((u: string) => !isBlockedImageUrl(u))
+        if (urls.length > 0) {
+          setImageLoadError(false)
+          setImagePicker(p => p ? { ...p, options: urls, currentIdx: 0, searchMode: false, searching: false } : null)
+          return
+        }
+      }
+      showToast('No images found for that search — try different keywords', 'error')
+    } catch {
+      showToast('Search failed — check connection', 'error')
+    }
+    setImagePicker(p => p ? { ...p, searching: false } : null)
+  }
+
+  const uploadImageForSlide = useCallback(async (itemId: string, slideIndex: number, file: File) => {
+    const item = items.find(i => i.id === itemId)
+    if (!item) return
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      const updatedSlides = item.slides.map((s, i) =>
+        i === slideIndex ? { ...s, image: base64 } : s
+      )
+      await fetch('/api/approvals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: itemId, slides: updatedSlides }),
+      })
+      setItems(prev => prev.map(it => it.id === itemId ? { ...it, slides: updatedSlides, videoBase64: undefined } : it))
+      showToast(`Slide ${slideIndex + 1} image uploaded — regenerate video when ready`)
+    } catch {
+      showToast('Upload failed', 'error')
+    }
+  }, [items])
+
+  const handleUploadClick = (itemId: string, slideIndex: number) => {
+    setUploadTarget({ itemId, slideIndex })
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && uploadTarget) {
+      uploadImageForSlide(uploadTarget.itemId, uploadTarget.slideIndex, file)
+    }
+    // Reset so the same file can be re-selected
+    e.target.value = ''
+    setUploadTarget(null)
   }
 
   const handleAction = async (id: string, action: 'approve' | 'reject') => {
@@ -614,12 +691,20 @@ export default function ApprovalsPage() {
                                   </div>
                                   <span className="absolute top-1 right-1 text-white/50 text-[7px]">{i + 1}</span>
                                 </div>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); openImagePicker(item.id, i) }}
-                                  className="px-2.5 py-1 min-h-[28px] text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 font-medium transition-colors w-full text-center"
-                                >
-                                  ↺ New image
-                                </button>
+                                <div className="flex gap-1 w-full">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openImagePicker(item.id, i) }}
+                                    className="flex-1 py-1 min-h-[28px] text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 font-medium transition-colors text-center"
+                                  >
+                                    ↺ New
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleUploadClick(item.id, i) }}
+                                    className="flex-1 py-1 min-h-[28px] text-[11px] text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 font-medium transition-colors text-center"
+                                  >
+                                    ↑ Upload
+                                  </button>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -749,57 +834,100 @@ export default function ApprovalsPage() {
           <div className="bg-white rounded-2xl overflow-hidden max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-stone-100">
               <p className="text-[14px] font-medium text-stone-900">Choose image for slide {imagePicker.slideIndex + 1}</p>
-              <p className="text-[11px] text-stone-400 mt-0.5">
-                Image {imagePicker.currentIdx + 1} of {imagePicker.options.length} · Loaded in browser
-              </p>
-            </div>
-
-            {/* Browser-rendered image preview */}
-            <div className="bg-stone-100 flex items-center justify-center" style={{ minHeight: '280px', maxHeight: '400px' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={imagePicker.options[imagePicker.currentIdx]}
-                alt="Image option"
-                className="max-w-full max-h-[400px] object-contain"
-                onError={() => setImageLoadError(true)}
-                onLoad={() => setImageLoadError(false)}
-              />
-              {imageLoadError && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <p className="text-[12px] text-stone-400 bg-white/80 px-3 py-1.5 rounded-lg">Image failed to load — try Skip</p>
-                </div>
+              {!imagePicker.searchMode && (
+                <p className="text-[11px] text-stone-400 mt-0.5">
+                  Image {imagePicker.currentIdx + 1} of {imagePicker.options.length}
+                </p>
               )}
             </div>
 
-            {/* Source URL */}
-            <div className="px-4 py-2 border-t border-stone-50">
-              <p className="text-[10px] text-stone-400 truncate">{imagePicker.options[imagePicker.currentIdx]}</p>
+            {/* Custom search bar */}
+            <div className="px-4 pt-3 pb-2 flex gap-2">
+              <input
+                type="text"
+                value={imagePicker.searchQuery}
+                onChange={e => setImagePicker(p => p ? { ...p, searchQuery: e.target.value } : null)}
+                onKeyDown={e => e.key === 'Enter' && searchInPicker()}
+                placeholder="Search for a different image..."
+                className="flex-1 px-3 py-2 text-[12px] border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400"
+              />
+              <button
+                onClick={searchInPicker}
+                disabled={imagePicker.searching || !imagePicker.searchQuery.trim()}
+                className="px-3 py-2 text-[12px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-700 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+              >
+                {imagePicker.searching ? (
+                  <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                    <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                  </svg>
+                ) : 'Search'}
+              </button>
             </div>
 
+            {/* Image preview — hidden in search mode (no images yet) */}
+            {!imagePicker.searchMode && imagePicker.options.length > 0 && (
+              <>
+                <div className="bg-stone-100 flex items-center justify-center relative" style={{ minHeight: '260px', maxHeight: '360px' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imagePicker.options[imagePicker.currentIdx]}
+                    alt="Image option"
+                    className="max-w-full max-h-[360px] object-contain"
+                    onError={() => setImageLoadError(true)}
+                    onLoad={() => setImageLoadError(false)}
+                  />
+                  {imageLoadError && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <p className="text-[12px] text-stone-400 bg-white/80 px-3 py-1.5 rounded-lg">Image failed to load — try Skip</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Source URL */}
+                <div className="px-4 py-2 border-t border-stone-50">
+                  <p className="text-[10px] text-stone-400 truncate">{imagePicker.options[imagePicker.currentIdx]}</p>
+                </div>
+              </>
+            )}
+
+            {/* Search mode placeholder */}
+            {imagePicker.searchMode && (
+              <div className="flex items-center justify-center bg-stone-50 border-t border-stone-100" style={{ minHeight: '160px' }}>
+                <p className="text-[12px] text-stone-400 text-center px-6">
+                  No images found automatically.<br/>Type a search term above and tap Search.
+                </p>
+              </div>
+            )}
+
             {/* Actions */}
-            <div className="flex gap-2 p-4 pt-2">
-              <button
-                onClick={useSelectedImage}
-                disabled={imagePicker.saving || imageLoadError}
-                className="flex-1 px-4 py-2.5 min-h-[44px] bg-green-600 text-white text-[13px] font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {imagePicker.saving ? (
-                  <>
-                    <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
-                      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-                    </svg>
-                    Saving...
-                  </>
-                ) : '✓ Use this image'}
-              </button>
-              <button
-                onClick={skipImage}
-                disabled={imagePicker.saving}
-                className="px-4 py-2.5 min-h-[44px] bg-amber-500 text-white text-[13px] font-medium rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50"
-              >
-                Skip →
-              </button>
+            <div className="flex gap-2 p-4 pt-2 border-t border-stone-100">
+              {!imagePicker.searchMode && (
+                <>
+                  <button
+                    onClick={useSelectedImage}
+                    disabled={imagePicker.saving || imageLoadError}
+                    className="flex-1 px-4 py-2.5 min-h-[44px] bg-green-600 text-white text-[13px] font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {imagePicker.saving ? (
+                      <>
+                        <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                          <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                        </svg>
+                        Saving...
+                      </>
+                    ) : '✓ Use this image'}
+                  </button>
+                  <button
+                    onClick={skipImage}
+                    disabled={imagePicker.saving}
+                    className="px-4 py-2.5 min-h-[44px] bg-amber-500 text-white text-[13px] font-medium rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50"
+                  >
+                    Skip →
+                  </button>
+                </>
+              )}
               <button
                 onClick={() => setImagePicker(null)}
                 disabled={imagePicker.saving}
@@ -811,6 +939,15 @@ export default function ApprovalsPage() {
           </div>
         </div>
       )}
+
+      {/* Hidden file input for manual image upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={handleFileChange}
+      />
 
       {/* Video preview modal */}
       {previewItem?.videoBase64 && (

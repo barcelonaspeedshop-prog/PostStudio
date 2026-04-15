@@ -87,14 +87,14 @@ function renderChart(
   let svg = ''
   let y = startY
 
-  svg += `<text x="${padX}" y="${y}" font-family="${FONT_STACK}" font-size="26" font-weight="600" fill="rgb(${pr},${pg},${pb})" fill-opacity="1">${escapeXml(chart.title)}</text>`
-  y += 48
+  svg += `<text x="${padX}" y="${y}" font-family="${FONT_STACK}" font-size="30" font-weight="600" fill="rgb(${pr},${pg},${pb})" fill-opacity="1">${escapeXml(chart.title)}</text>`
+  y += 56
 
   if (chart.type === 'bar') {
     const labelAreaW = 210
-    const barMaxW = 560
+    const barMaxW = 540
     const barStartX = padX + labelAreaW + 20
-    const rowH = 52
+    const rowH = 64
 
     const numVals = chart.items.map(item =>
       typeof item.value === 'number' ? item.value : parseFloat(String(item.value)) || 0
@@ -106,9 +106,9 @@ function renderChart(
       const barW = Math.max(Math.round((numVals[i] / maxVal) * barMaxW), 4)
       const displayVal = item.unit ? `${item.value} ${item.unit}` : String(item.value)
 
-      svg += `<text x="${padX}" y="${y + 34}" font-family="${FONT_STACK}" font-size="24" fill="white" fill-opacity="0.75">${escapeXml(item.label)}</text>`
-      svg += `<rect x="${barStartX}" y="${y + 14}" width="${barW}" height="24" rx="4" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.85"/>`
-      svg += `<text x="${barStartX + barW + 12}" y="${y + 34}" font-family="${FONT_STACK}" font-size="22" fill="rgb(${pr},${pg},${pb})" fill-opacity="1">${escapeXml(displayVal)}</text>`
+      svg += `<text x="${padX}" y="${y + 38}" font-family="${FONT_STACK}" font-size="28" fill="white" fill-opacity="0.75">${escapeXml(item.label)}</text>`
+      svg += `<rect x="${barStartX}" y="${y + 16}" width="${barW}" height="26" rx="4" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.85"/>`
+      svg += `<text x="${barStartX + barW + 14}" y="${y + 38}" font-family="${FONT_STACK}" font-size="28" fill="rgb(${pr},${pg},${pb})" fill-opacity="1">${escapeXml(displayVal)}</text>`
       y += rowH
     }
   } else {
@@ -117,11 +117,11 @@ function renderChart(
     const colW = Math.floor((W - padX * 2) / Math.max(items.length, 1))
     items.forEach((item, i) => {
       const colX = padX + i * colW
-      svg += `<text x="${colX}" y="${y + 28}" font-family="${FONT_STACK}" font-size="22" fill="white" fill-opacity="0.65" letter-spacing="1">${escapeXml(item.label.toUpperCase())}</text>`
+      svg += `<text x="${colX}" y="${y + 28}" font-family="${FONT_STACK}" font-size="24" fill="white" fill-opacity="0.65" letter-spacing="1">${escapeXml(item.label.toUpperCase())}</text>`
       const valStr = item.unit ? `${item.value}${item.unit}` : String(item.value)
-      svg += `<text x="${colX}" y="${y + 112}" font-family="${FONT_STACK}" font-size="80" font-weight="700" fill="rgb(${pr},${pg},${pb})" fill-opacity="1">${escapeXml(valStr)}</text>`
+      svg += `<text x="${colX}" y="${y + 100}" font-family="${FONT_STACK}" font-size="64" font-weight="700" fill="rgb(${pr},${pg},${pb})" fill-opacity="1">${escapeXml(valStr)}</text>`
     })
-    y += 130
+    y += 120
   }
 
   return { svg, height: y - startY }
