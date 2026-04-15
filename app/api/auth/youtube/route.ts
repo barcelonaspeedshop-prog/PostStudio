@@ -50,6 +50,8 @@ export async function GET(req: NextRequest) {
     scope: [
       'https://www.googleapis.com/auth/youtube.upload',
       'https://www.googleapis.com/auth/youtube.readonly',
+      // drive.file lets PostStudio save generated slides to the shared Drive library
+      'https://www.googleapis.com/auth/drive.file',
     ],
     state: channel,
   })

@@ -1,9 +1,14 @@
 /**
  * Google Drive image library integration.
  *
- * Auth: uses the same OAuth2 client credentials as YouTube (YOUTUBE_CLIENT_ID /
- * YOUTUBE_CLIENT_SECRET) but with drive.file scope.  Tokens are stored
- * separately in /data/drive-token.json.
+ * Auth: reuses the existing YouTube OAuth token for the "Gentlemen of Fuel"
+ * channel (stored in /data/youtube-tokens.json).  That token must include the
+ * https://www.googleapis.com/auth/drive.file scope — added to the YouTube
+ * consent screen in app/api/auth/youtube/route.ts.  Re-connect GoF on the
+ * Accounts page once to pick up the new scope.
+ *
+ * The channel used for Drive auth is controlled by the DRIVE_AUTH_CHANNEL env
+ * var (defaults to "Gentlemen of Fuel").
  *
  * Folder structure inside the root GOOGLE_DRIVE_FOLDER_ID:
  *   <root>/
@@ -13,19 +18,10 @@
  */
 
 import { google, drive_v3 } from 'googleapis'
-import { readFile, writeFile, mkdir } from 'fs/promises'
-import { existsSync } from 'fs'
-import path from 'path'
-import { getOAuth2Client } from './youtube'
+import { getAuthenticatedClient } from './youtube'
 
-const TOKENS_DIR = process.env.TOKEN_STORAGE_PATH || '/data'
-const DRIVE_TOKEN_PATH = path.join(TOKENS_DIR, 'drive-token.json')
-
-export type DriveToken = {
-  access_token: string
-  refresh_token: string
-  expiry_date: number
-}
+// The YouTube channel whose token is used for all Drive operations.
+const DRIVE_AUTH_CHANNEL = process.env.DRIVE_AUTH_CHANNEL || 'Gentlemen of Fuel'
 
 export type DriveImageFile = {
   id: string
@@ -34,55 +30,19 @@ export type DriveImageFile = {
   createdTime?: string
 }
 
-// ── Token store ──────────────────────────────────────────────────────────────
-
-export async function loadDriveToken(): Promise<DriveToken | null> {
-  try {
-    if (!existsSync(DRIVE_TOKEN_PATH)) return null
-    const raw = await readFile(DRIVE_TOKEN_PATH, 'utf-8')
-    return JSON.parse(raw)
-  } catch {
-    return null
-  }
-}
-
-export async function saveDriveToken(token: DriveToken): Promise<void> {
-  if (!existsSync(TOKENS_DIR)) {
-    await mkdir(TOKENS_DIR, { recursive: true })
-  }
-  await writeFile(DRIVE_TOKEN_PATH, JSON.stringify(token, null, 2))
-}
-
 // ── Authenticated Drive client ───────────────────────────────────────────────
 
 export async function getDriveClient(): Promise<drive_v3.Drive> {
-  const token = await loadDriveToken()
-  if (!token) throw new Error('Google Drive not connected. Visit /api/auth/drive to authorise.')
-
-  const oauth2 = getOAuth2Client()
-  oauth2.setCredentials({
-    access_token: token.access_token,
-    refresh_token: token.refresh_token,
-    expiry_date: token.expiry_date,
-  })
-
-  // Auto-refresh if expired or expiring within 2 minutes
-  const isExpired = !token.expiry_date || Date.now() >= token.expiry_date - 120_000
-  if (isExpired) {
-    try {
-      const { credentials } = await oauth2.refreshAccessToken()
-      oauth2.setCredentials(credentials)
-      await saveDriveToken({
-        access_token: credentials.access_token ?? token.access_token,
-        refresh_token: credentials.refresh_token ?? token.refresh_token,
-        expiry_date: credentials.expiry_date ?? token.expiry_date,
-      })
-    } catch (e) {
-      throw new Error(`Drive token refresh failed: ${e instanceof Error ? e.message : String(e)}`)
-    }
+  try {
+    const oauth2 = await getAuthenticatedClient(DRIVE_AUTH_CHANNEL)
+    return google.drive({ version: 'v3', auth: oauth2 })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new Error(
+      `Drive auth failed (using "${DRIVE_AUTH_CHANNEL}" YouTube token): ${msg}. ` +
+      `Re-connect ${DRIVE_AUTH_CHANNEL} on the Accounts page to grant Drive access.`
+    )
   }
-
-  return google.drive({ version: 'v3', auth: oauth2 })
 }
 
 // ── Folder helpers ───────────────────────────────────────────────────────────
