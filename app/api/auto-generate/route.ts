@@ -3,6 +3,7 @@ import { readdir, readFile, writeFile, stat, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
 import Anthropic from '@anthropic-ai/sdk'
+import { saveToDrive } from '@/lib/drive-images'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -527,6 +528,16 @@ export async function POST(req: NextRequest) {
         ...s,
         image: compData.frames[i] || s.image,
       }))
+
+      // Save hook slide to Drive image library (fire-and-forget — never blocks the pipeline)
+      if (process.env.GOOGLE_DRIVE_FOLDER_ID && compositedSlides[0]?.image) {
+        const driveDate = new Date().toISOString().split('T')[0]
+        const driveSlug = topic.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60)
+        const driveFilename = `${channel.replace(/[^a-z0-9]+/gi, '-')}-${driveSlug}-${driveDate}.jpg`
+        saveToDrive(channel, 'Generated', compositedSlides[0].image, driveFilename)
+          .then(id => console.log(`[auto-generate] [${channel}] Saved hook slide to Drive: ${id} (${driveFilename})`))
+          .catch(e => console.warn(`[auto-generate] [${channel}] Drive save skipped:`, e instanceof Error ? e.message : e))
+      }
 
       console.log(`[auto-generate] [${channel}] Generating video...`)
       const musicBase64 = await pickRandomMusic()

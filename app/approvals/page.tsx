@@ -65,6 +65,12 @@ export default function ApprovalsPage() {
     searchMode: boolean
     searchQuery: string
     searching: boolean
+    // Drive tab
+    activeTab: 'search' | 'drive'
+    driveFiles: Array<{ id: string; name: string; thumbnailLink?: string }>
+    driveLoading: boolean
+    driveQuery: string
+    driveChannel: string
   } | null>(null)
   const [imageLoadError, setImageLoadError] = useState(false)
   const [uploadTarget, setUploadTarget] = useState<{ itemId: string; slideIndex: number } | null>(null)
@@ -320,6 +326,11 @@ export default function ApprovalsPage() {
       searchMode,
       searchQuery: searchMode ? `${slide.headline} ${item.channel}` : '',
       searching: false,
+      activeTab: 'search',
+      driveFiles: [],
+      driveLoading: false,
+      driveQuery: '',
+      driveChannel: item.channel,
     })
   }
 
@@ -449,6 +460,54 @@ export default function ApprovalsPage() {
       showToast('Search failed — check connection', 'error')
     }
     setImagePicker(p => p ? { ...p, searching: false } : null)
+  }
+
+  const loadDriveImages = async (channel: string, query = '') => {
+    if (!imagePicker) return
+    setImagePicker(p => p ? { ...p, driveLoading: true } : null)
+    try {
+      const qs = new URLSearchParams({ channel, category: 'Generated', query })
+      const res = await fetch(`/api/drive-images?${qs}`)
+      if (res.ok) {
+        const data = await res.json()
+        setImagePicker(p => p ? { ...p, driveFiles: data.files || [], driveLoading: false } : null)
+      } else {
+        setImagePicker(p => p ? { ...p, driveLoading: false } : null)
+      }
+    } catch {
+      setImagePicker(p => p ? { ...p, driveLoading: false } : null)
+    }
+  }
+
+  const useDriveImage = async (fileId: string, slideIndex: number, itemId: string) => {
+    setImagePicker(p => p ? { ...p, saving: true } : null)
+    try {
+      const res = await fetch('/api/drive-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileId }),
+      })
+      if (!res.ok) throw new Error('Failed to download Drive image')
+      const data = await res.json()
+      const base64: string = data.base64
+
+      const item = items.find(i => i.id === itemId)
+      if (!item) return
+      const updatedSlides = item.slides.map((s, i) =>
+        i === slideIndex ? { ...s, image: base64 } : s
+      )
+      await fetch('/api/approvals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: itemId, slides: updatedSlides }),
+      })
+      setItems(prev => prev.map(it => it.id === itemId ? { ...it, slides: updatedSlides, videoBase64: undefined } : it))
+      setImagePicker(null)
+      showToast(`Slide ${slideIndex + 1} updated from Drive — regenerate video when ready`)
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Failed to use Drive image', 'error')
+      setImagePicker(p => p ? { ...p, saving: false } : null)
+    }
   }
 
   const uploadImageForSlide = useCallback(async (itemId: string, slideIndex: number, file: File) => {
@@ -832,110 +891,234 @@ export default function ApprovalsPage() {
       {imagePicker && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => !imagePicker.saving && setImagePicker(null)}>
           <div className="bg-white rounded-2xl overflow-hidden max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
             <div className="p-4 border-b border-stone-100">
               <p className="text-[14px] font-medium text-stone-900">Choose image for slide {imagePicker.slideIndex + 1}</p>
-              {!imagePicker.searchMode && (
+              {!imagePicker.searchMode && imagePicker.activeTab === 'search' && imagePicker.options.length > 0 && (
                 <p className="text-[11px] text-stone-400 mt-0.5">
                   Image {imagePicker.currentIdx + 1} of {imagePicker.options.length}
                 </p>
               )}
             </div>
 
-            {/* Custom search bar */}
-            <div className="px-4 pt-3 pb-2 flex gap-2">
-              <input
-                type="text"
-                value={imagePicker.searchQuery}
-                onChange={e => setImagePicker(p => p ? { ...p, searchQuery: e.target.value } : null)}
-                onKeyDown={e => e.key === 'Enter' && searchInPicker()}
-                placeholder="Search for a different image..."
-                className="flex-1 px-3 py-2 text-[12px] border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400"
-              />
+            {/* Tab switcher */}
+            <div className="flex border-b border-stone-100">
               <button
-                onClick={searchInPicker}
-                disabled={imagePicker.searching || !imagePicker.searchQuery.trim()}
-                className="px-3 py-2 text-[12px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-700 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                onClick={() => setImagePicker(p => p ? { ...p, activeTab: 'search' } : null)}
+                className={`flex-1 py-2.5 text-[12px] font-medium transition-colors ${imagePicker.activeTab === 'search' ? 'text-stone-900 border-b-2 border-stone-900 -mb-px' : 'text-stone-400 hover:text-stone-600'}`}
               >
-                {imagePicker.searching ? (
-                  <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
-                    <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-                  </svg>
-                ) : 'Search'}
+                Web Search
+              </button>
+              <button
+                onClick={() => {
+                  setImagePicker(p => p ? { ...p, activeTab: 'drive' } : null)
+                  if (imagePicker.driveFiles.length === 0) {
+                    loadDriveImages(imagePicker.driveChannel || imagePicker.itemId)
+                  }
+                }}
+                className={`flex-1 py-2.5 text-[12px] font-medium transition-colors ${imagePicker.activeTab === 'drive' ? 'text-stone-900 border-b-2 border-stone-900 -mb-px' : 'text-stone-400 hover:text-stone-600'}`}
+              >
+                Drive Library
               </button>
             </div>
 
-            {/* Image preview — hidden in search mode (no images yet) */}
-            {!imagePicker.searchMode && imagePicker.options.length > 0 && (
+            {/* ── Search tab ── */}
+            {imagePicker.activeTab === 'search' && (
               <>
-                <div className="bg-stone-100 flex items-center justify-center relative" style={{ minHeight: '260px', maxHeight: '360px' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={imagePicker.options[imagePicker.currentIdx]}
-                    alt="Image option"
-                    className="max-w-full max-h-[360px] object-contain"
-                    onError={() => setImageLoadError(true)}
-                    onLoad={() => setImageLoadError(false)}
+                {/* Custom search bar */}
+                <div className="px-4 pt-3 pb-2 flex gap-2">
+                  <input
+                    type="text"
+                    value={imagePicker.searchQuery}
+                    onChange={e => setImagePicker(p => p ? { ...p, searchQuery: e.target.value } : null)}
+                    onKeyDown={e => e.key === 'Enter' && searchInPicker()}
+                    placeholder="Search for a different image..."
+                    className="flex-1 px-3 py-2 text-[12px] border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400"
                   />
-                  {imageLoadError && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <p className="text-[12px] text-stone-400 bg-white/80 px-3 py-1.5 rounded-lg">Image failed to load — try Skip</p>
-                    </div>
-                  )}
+                  <button
+                    onClick={searchInPicker}
+                    disabled={imagePicker.searching || !imagePicker.searchQuery.trim()}
+                    className="px-3 py-2 text-[12px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-700 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                  >
+                    {imagePicker.searching ? (
+                      <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                      </svg>
+                    ) : 'Search'}
+                  </button>
                 </div>
 
-                {/* Source URL */}
-                <div className="px-4 py-2 border-t border-stone-50">
-                  <p className="text-[10px] text-stone-400 truncate">{imagePicker.options[imagePicker.currentIdx]}</p>
+                {/* Image preview — hidden in search mode (no images yet) */}
+                {!imagePicker.searchMode && imagePicker.options.length > 0 && (
+                  <>
+                    <div className="bg-stone-100 flex items-center justify-center relative" style={{ minHeight: '260px', maxHeight: '360px' }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={imagePicker.options[imagePicker.currentIdx]}
+                        alt="Image option"
+                        className="max-w-full max-h-[360px] object-contain"
+                        onError={() => setImageLoadError(true)}
+                        onLoad={() => setImageLoadError(false)}
+                      />
+                      {imageLoadError && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <p className="text-[12px] text-stone-400 bg-white/80 px-3 py-1.5 rounded-lg">Image failed to load — try Skip</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Source URL */}
+                    <div className="px-4 py-2 border-t border-stone-50">
+                      <p className="text-[10px] text-stone-400 truncate">{imagePicker.options[imagePicker.currentIdx]}</p>
+                    </div>
+                  </>
+                )}
+
+                {/* Search mode placeholder */}
+                {imagePicker.searchMode && (
+                  <div className="flex items-center justify-center bg-stone-50 border-t border-stone-100" style={{ minHeight: '160px' }}>
+                    <p className="text-[12px] text-stone-400 text-center px-6">
+                      No images found automatically.<br/>Type a search term above and tap Search.
+                    </p>
+                  </div>
+                )}
+
+                {/* Search-tab actions */}
+                <div className="flex gap-2 p-4 pt-2 border-t border-stone-100">
+                  {!imagePicker.searchMode && imagePicker.options.length > 0 && (
+                    <>
+                      <button
+                        onClick={useSelectedImage}
+                        disabled={imagePicker.saving || imageLoadError}
+                        className="flex-1 px-4 py-2.5 min-h-[44px] bg-green-600 text-white text-[13px] font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {imagePicker.saving ? (
+                          <>
+                            <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                            </svg>
+                            Saving...
+                          </>
+                        ) : '✓ Use this image'}
+                      </button>
+                      <button
+                        onClick={skipImage}
+                        disabled={imagePicker.saving}
+                        className="px-4 py-2.5 min-h-[44px] bg-amber-500 text-white text-[13px] font-medium rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50"
+                      >
+                        Skip →
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => setImagePicker(null)}
+                    disabled={imagePicker.saving}
+                    className="px-4 py-2.5 min-h-[44px] border border-stone-200 text-stone-500 text-[13px] font-medium rounded-lg hover:bg-stone-50 transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </>
             )}
 
-            {/* Search mode placeholder */}
-            {imagePicker.searchMode && (
-              <div className="flex items-center justify-center bg-stone-50 border-t border-stone-100" style={{ minHeight: '160px' }}>
-                <p className="text-[12px] text-stone-400 text-center px-6">
-                  No images found automatically.<br/>Type a search term above and tap Search.
-                </p>
-              </div>
-            )}
+            {/* ── Drive tab ── */}
+            {imagePicker.activeTab === 'drive' && (
+              <>
+                {/* Drive search bar */}
+                <div className="px-4 pt-3 pb-2 flex gap-2">
+                  <input
+                    type="text"
+                    value={imagePicker.driveQuery}
+                    onChange={e => setImagePicker(p => p ? { ...p, driveQuery: e.target.value } : null)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') loadDriveImages(imagePicker.driveChannel, imagePicker.driveQuery)
+                    }}
+                    placeholder="Filter by filename..."
+                    className="flex-1 px-3 py-2 text-[12px] border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400"
+                  />
+                  <button
+                    onClick={() => loadDriveImages(imagePicker.driveChannel, imagePicker.driveQuery)}
+                    disabled={imagePicker.driveLoading}
+                    className="px-3 py-2 text-[12px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-700 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                  >
+                    {imagePicker.driveLoading ? (
+                      <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                      </svg>
+                    ) : 'Filter'}
+                  </button>
+                </div>
 
-            {/* Actions */}
-            <div className="flex gap-2 p-4 pt-2 border-t border-stone-100">
-              {!imagePicker.searchMode && (
-                <>
+                {/* Drive file grid */}
+                {imagePicker.driveLoading && imagePicker.driveFiles.length === 0 ? (
+                  <div className="flex items-center justify-center bg-stone-50" style={{ minHeight: '200px' }}>
+                    <svg className="w-5 h-5 animate-spin text-stone-400" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                    </svg>
+                  </div>
+                ) : imagePicker.driveFiles.length === 0 ? (
+                  <div className="flex items-center justify-center bg-stone-50 border-t border-stone-100" style={{ minHeight: '200px' }}>
+                    <p className="text-[12px] text-stone-400 text-center px-6">
+                      No images in Drive for this channel yet.<br/>Generated carousels are saved automatically.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-y-auto border-t border-stone-100" style={{ maxHeight: '340px' }}>
+                    <div className="grid grid-cols-3 gap-1.5 p-3">
+                      {imagePicker.driveFiles.map(file => (
+                        <button
+                          key={file.id}
+                          onClick={() => useDriveImage(file.id, imagePicker.slideIndex, imagePicker.itemId)}
+                          disabled={imagePicker.saving}
+                          className="relative rounded-lg overflow-hidden border-2 border-transparent hover:border-green-500 transition-all focus:outline-none focus:border-green-500 disabled:opacity-50 group"
+                        >
+                          {file.thumbnailLink ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={file.thumbnailLink}
+                              alt={file.name}
+                              className="w-full aspect-square object-cover"
+                            />
+                          ) : (
+                            <div className="w-full aspect-square bg-stone-100 flex items-center justify-center">
+                              <svg className="w-6 h-6 text-stone-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                            </div>
+                          )}
+                          <div className="absolute inset-x-0 bottom-0 bg-black/60 px-1 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <p className="text-[9px] text-white truncate">{file.name}</p>
+                          </div>
+                          {imagePicker.saving && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-white/70">
+                              <svg className="w-4 h-4 animate-spin text-stone-600" viewBox="0 0 24 24" fill="none">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                              </svg>
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Drive-tab actions */}
+                <div className="flex gap-2 p-4 pt-2 border-t border-stone-100">
                   <button
-                    onClick={useSelectedImage}
-                    disabled={imagePicker.saving || imageLoadError}
-                    className="flex-1 px-4 py-2.5 min-h-[44px] bg-green-600 text-white text-[13px] font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {imagePicker.saving ? (
-                      <>
-                        <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
-                          <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-                        </svg>
-                        Saving...
-                      </>
-                    ) : '✓ Use this image'}
-                  </button>
-                  <button
-                    onClick={skipImage}
+                    onClick={() => setImagePicker(null)}
                     disabled={imagePicker.saving}
-                    className="px-4 py-2.5 min-h-[44px] bg-amber-500 text-white text-[13px] font-medium rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50"
+                    className="flex-1 px-4 py-2.5 min-h-[44px] border border-stone-200 text-stone-500 text-[13px] font-medium rounded-lg hover:bg-stone-50 transition-colors disabled:opacity-50"
                   >
-                    Skip →
+                    Cancel
                   </button>
-                </>
-              )}
-              <button
-                onClick={() => setImagePicker(null)}
-                disabled={imagePicker.saving}
-                className="px-4 py-2.5 min-h-[44px] border border-stone-200 text-stone-500 text-[13px] font-medium rounded-lg hover:bg-stone-50 transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

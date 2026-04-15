@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - '3000:3000'
+    volumes:
+      - poststudio_data:/data
+    environment:
+      # App
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://app.premirafirst.com}
+      TOKEN_STORAGE_PATH: /data
+
+      # Anthropic
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+
+      # Google OAuth (shared by YouTube + Drive)
+      YOUTUBE_CLIENT_ID: ${YOUTUBE_CLIENT_ID}
+      YOUTUBE_CLIENT_SECRET: ${YOUTUBE_CLIENT_SECRET}
+      YOUTUBE_REDIRECT_URI: ${YOUTUBE_REDIRECT_URI}
+
+      # Google Drive image library
+      # Set this to the ID of the 'Premira First — Image Library' root folder
+      # Find it in the Drive URL: drive.google.com/drive/folders/{FOLDER_ID}
+      GOOGLE_DRIVE_FOLDER_ID: ${GOOGLE_DRIVE_FOLDER_ID}
+
+      # Image search (Serper)
+      SERPER_API_KEY: ${SERPER_API_KEY}
+
+      # Music for video export (path inside the container)
+      MUSIC_FOLDER: ${MUSIC_FOLDER:-/data/music}
+
+      # ElevenLabs (optional — voice-over generation)
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+
+    restart: unless-stopped
+
+volumes:
+  poststudio_data:
+    driver: local
