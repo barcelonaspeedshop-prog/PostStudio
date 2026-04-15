@@ -20,10 +20,11 @@ services:
       YOUTUBE_CLIENT_SECRET: ${YOUTUBE_CLIENT_SECRET}
       YOUTUBE_REDIRECT_URI: ${YOUTUBE_REDIRECT_URI}
 
-      # Google Drive image library
-      # Set this to the ID of the 'Premira First — Image Library' root folder
-      # Find it in the Drive URL: drive.google.com/drive/folders/{FOLDER_ID}
-      GOOGLE_DRIVE_FOLDER_ID: ${GOOGLE_DRIVE_FOLDER_ID}
+      # Google Drive image library root folder
+      GOOGLE_DRIVE_FOLDER_ID: 1wtB_6-2kTfPs7fnvo905MCw7Qr5Gk--Z
+
+      # Service account key for Drive API access (mounted via the data volume)
+      GOOGLE_SERVICE_ACCOUNT_KEY_FILE: /data/service-account.json
 
       # Image search (Serper)
       SERPER_API_KEY: ${SERPER_API_KEY}

@@ -1,14 +1,12 @@
 /**
  * Google Drive image library integration.
  *
- * Auth: reuses the existing YouTube OAuth token for the "Gentlemen of Fuel"
- * channel (stored in /data/youtube-tokens.json).  That token must include the
- * https://www.googleapis.com/auth/drive.file scope — added to the YouTube
- * consent screen in app/api/auth/youtube/route.ts.  Re-connect GoF on the
- * Accounts page once to pick up the new scope.
+ * Auth: Google service account JSON key file.
+ * Path: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE  (default: /data/service-account.json)
  *
- * The channel used for Drive auth is controlled by the DRIVE_AUTH_CHANNEL env
- * var (defaults to "Gentlemen of Fuel").
+ * The service account must have Editor access to the root Drive folder
+ * (GOOGLE_DRIVE_FOLDER_ID).  Share the folder with the service account's
+ * email address (found in the key file as "client_email").
  *
  * Folder structure inside the root GOOGLE_DRIVE_FOLDER_ID:
  *   <root>/
@@ -18,10 +16,10 @@
  */
 
 import { google, drive_v3 } from 'googleapis'
-import { getAuthenticatedClient } from './youtube'
+import { readFileSync } from 'fs'
 
-// The YouTube channel whose token is used for all Drive operations.
-const DRIVE_AUTH_CHANNEL = process.env.DRIVE_AUTH_CHANNEL || 'Gentlemen of Fuel'
+const SERVICE_ACCOUNT_PATH =
+  process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE || '/data/service-account.json'
 
 export type DriveImageFile = {
   id: string
@@ -33,16 +31,23 @@ export type DriveImageFile = {
 // ── Authenticated Drive client ───────────────────────────────────────────────
 
 export async function getDriveClient(): Promise<drive_v3.Drive> {
+  let key: Record<string, string>
   try {
-    const oauth2 = await getAuthenticatedClient(DRIVE_AUTH_CHANNEL)
-    return google.drive({ version: 'v3', auth: oauth2 })
+    key = JSON.parse(readFileSync(SERVICE_ACCOUNT_PATH, 'utf-8'))
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
     throw new Error(
-      `Drive auth failed (using "${DRIVE_AUTH_CHANNEL}" YouTube token): ${msg}. ` +
-      `Re-connect ${DRIVE_AUTH_CHANNEL} on the Accounts page to grant Drive access.`
+      `Cannot load service account key from ${SERVICE_ACCOUNT_PATH}: ` +
+      (e instanceof Error ? e.message : String(e)) +
+      '. Place the JSON key file at that path or set GOOGLE_SERVICE_ACCOUNT_KEY_FILE.'
     )
   }
+
+  const auth = new google.auth.GoogleAuth({
+    credentials: key,
+    scopes: ['https://www.googleapis.com/auth/drive'],
+  })
+
+  return google.drive({ version: 'v3', auth })
 }
 
 // ── Folder helpers ───────────────────────────────────────────────────────────
