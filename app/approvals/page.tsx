@@ -66,11 +66,16 @@ export default function ApprovalsPage() {
     searchQuery: string
     searching: boolean
     // Drive tab
-    activeTab: 'search' | 'drive'
+    activeTab: 'search' | 'drive' | 'ai'
     driveFiles: Array<{ id: string; name: string; thumbnailLink?: string }>
     driveLoading: boolean
     driveQuery: string
     driveChannel: string
+    // AI tab
+    topic: string
+    aiGenerating: boolean
+    aiImage: string | null
+    aiError: string | null
   } | null>(null)
   const [imageLoadError, setImageLoadError] = useState(false)
   const [uploadTarget, setUploadTarget] = useState<{ itemId: string; slideIndex: number } | null>(null)
@@ -331,6 +336,10 @@ export default function ApprovalsPage() {
       driveLoading: false,
       driveQuery: '',
       driveChannel: item.channel,
+      topic: item.topic || slide.headline,
+      aiGenerating: false,
+      aiImage: null,
+      aiError: null,
     })
   }
 
@@ -506,6 +515,55 @@ export default function ApprovalsPage() {
       showToast(`Slide ${slideIndex + 1} updated from Drive — regenerate video when ready`)
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Failed to use Drive image', 'error')
+      setImagePicker(p => p ? { ...p, saving: false } : null)
+    }
+  }
+
+  const generateAiImage = async () => {
+    if (!imagePicker) return
+    setImagePicker(p => p ? { ...p, aiGenerating: true, aiImage: null, aiError: null } : null)
+    try {
+      const res = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: imagePicker.driveChannel, topic: imagePicker.topic }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Generation failed')
+      setImagePicker(p => p ? { ...p, aiGenerating: false, aiImage: data.base64 } : null)
+    } catch (e: unknown) {
+      setImagePicker(p => p ? { ...p, aiGenerating: false, aiError: e instanceof Error ? e.message : 'Generation failed' } : null)
+    }
+  }
+
+  const useAiImage = async () => {
+    if (!imagePicker?.aiImage) return
+    const { itemId, slideIndex, aiImage, driveChannel, topic } = imagePicker
+    setImagePicker(p => p ? { ...p, saving: true } : null)
+    try {
+      const item = items.find(i => i.id === itemId)
+      if (!item) return
+      const updatedSlides = item.slides.map((s, i) =>
+        i === slideIndex ? { ...s, image: aiImage } : s
+      )
+      await fetch('/api/approvals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: itemId, slides: updatedSlides }),
+      })
+      setItems(prev => prev.map(it => it.id === itemId ? { ...it, slides: updatedSlides, videoBase64: undefined } : it))
+      // Save to Drive AI Generated folder (fire-and-forget)
+      const aiDate = new Date().toISOString().split('T')[0]
+      const aiSlug = topic.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60)
+      fetch('/api/drive-images/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: driveChannel, category: 'AI Generated', image: aiImage, filename: `ai-${driveChannel.replace(/[^a-z0-9]+/gi, '-')}-${aiSlug}-${aiDate}.jpg` }),
+      }).catch(() => { /* non-blocking */ })
+      setImagePicker(null)
+      showToast(`Slide ${slideIndex + 1} updated with AI image — regenerate video when ready`)
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Failed to save AI image', 'error')
       setImagePicker(p => p ? { ...p, saving: false } : null)
     }
   }
@@ -920,6 +978,12 @@ export default function ApprovalsPage() {
               >
                 Drive Library
               </button>
+              <button
+                onClick={() => setImagePicker(p => p ? { ...p, activeTab: 'ai' } : null)}
+                className={`flex-1 py-2.5 text-[12px] font-medium transition-colors ${imagePicker.activeTab === 'ai' ? 'text-stone-900 border-b-2 border-stone-900 -mb-px' : 'text-stone-400 hover:text-stone-600'}`}
+              >
+                ✦ AI Generate
+              </button>
             </div>
 
             {/* ── Search tab ── */}
@@ -1113,6 +1177,112 @@ export default function ApprovalsPage() {
                     onClick={() => setImagePicker(null)}
                     disabled={imagePicker.saving}
                     className="flex-1 px-4 py-2.5 min-h-[44px] border border-stone-200 text-stone-500 text-[13px] font-medium rounded-lg hover:bg-stone-50 transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* ── AI Generate tab ── */}
+            {imagePicker.activeTab === 'ai' && (
+              <>
+                {/* Context info */}
+                <div className="px-4 pt-3 pb-2 space-y-1.5">
+                  <p className="text-[11px] text-stone-400 uppercase tracking-wide font-medium">Channel</p>
+                  <p className="text-[13px] text-stone-800 font-medium">{imagePicker.driveChannel}</p>
+                  <p className="text-[11px] text-stone-400 uppercase tracking-wide font-medium mt-2">Topic</p>
+                  <input
+                    type="text"
+                    value={imagePicker.topic}
+                    onChange={e => setImagePicker(p => p ? { ...p, topic: e.target.value } : null)}
+                    className="w-full px-3 py-2 text-[12px] border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400"
+                    placeholder="Describe what to generate..."
+                  />
+                </div>
+
+                {/* Generated image preview / placeholder */}
+                {imagePicker.aiGenerating ? (
+                  <div className="flex flex-col items-center justify-center bg-stone-50 border-t border-stone-100 gap-3" style={{ minHeight: '260px' }}>
+                    <svg className="w-7 h-7 animate-spin text-stone-400" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                    </svg>
+                    <p className="text-[12px] text-stone-400">Generating with DALL-E 3…</p>
+                    <p className="text-[10px] text-stone-300">Usually takes 10–20 seconds</p>
+                  </div>
+                ) : imagePicker.aiImage ? (
+                  <div className="bg-stone-100 border-t border-stone-100 flex items-center justify-center relative" style={{ minHeight: '260px', maxHeight: '380px' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={imagePicker.aiImage}
+                      alt="AI generated"
+                      className="max-w-full max-h-[380px] object-contain"
+                    />
+                    <div className="absolute top-2 right-2 bg-black/50 text-white text-[9px] font-medium px-2 py-0.5 rounded-full">
+                      DALL-E 3
+                    </div>
+                  </div>
+                ) : imagePicker.aiError ? (
+                  <div className="flex flex-col items-center justify-center bg-red-50 border-t border-stone-100 gap-2 px-6" style={{ minHeight: '160px' }}>
+                    <p className="text-[12px] text-red-600 text-center">{imagePicker.aiError}</p>
+                    <p className="text-[11px] text-stone-400 text-center">Check that OPENAI_API_KEY is set in your environment.</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center bg-stone-50 border-t border-stone-100 gap-2 px-6" style={{ minHeight: '180px' }}>
+                    <p className="text-[13px] text-stone-500 text-center font-medium">Generate a unique image with AI</p>
+                    <p className="text-[11px] text-stone-400 text-center">Uses DALL-E 3 with a channel-specific style prompt. Portrait format, 1024 × 1792.</p>
+                  </div>
+                )}
+
+                {/* AI-tab actions */}
+                <div className="flex gap-2 p-4 pt-2 border-t border-stone-100">
+                  {imagePicker.aiImage ? (
+                    <>
+                      <button
+                        onClick={useAiImage}
+                        disabled={imagePicker.saving}
+                        className="flex-1 px-4 py-2.5 min-h-[44px] bg-green-600 text-white text-[13px] font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {imagePicker.saving ? (
+                          <>
+                            <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                            </svg>
+                            Saving...
+                          </>
+                        ) : '✓ Use this image'}
+                      </button>
+                      <button
+                        onClick={generateAiImage}
+                        disabled={imagePicker.aiGenerating || imagePicker.saving}
+                        className="px-4 py-2.5 min-h-[44px] bg-stone-100 text-stone-700 text-[13px] font-medium rounded-lg hover:bg-stone-200 transition-colors disabled:opacity-50"
+                      >
+                        Retry
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={generateAiImage}
+                      disabled={imagePicker.aiGenerating || !imagePicker.topic.trim()}
+                      className="flex-1 px-4 py-2.5 min-h-[44px] bg-violet-600 text-white text-[13px] font-medium rounded-lg hover:bg-violet-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {imagePicker.aiGenerating ? (
+                        <>
+                          <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                          </svg>
+                          Generating…
+                        </>
+                      ) : '✦ Generate with DALL-E 3'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setImagePicker(null)}
+                    disabled={imagePicker.saving}
+                    className="px-4 py-2.5 min-h-[44px] border border-stone-200 text-stone-500 text-[13px] font-medium rounded-lg hover:bg-stone-50 transition-colors disabled:opacity-50"
                   >
                     Cancel
                   </button>
