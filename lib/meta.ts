@@ -12,6 +12,8 @@ export type MetaChannelConfig = {
   pageAccessToken: string
   instagramAccountId: string
   facebookPageId: string
+  /** 'permanent' = long-lived page token (never expires); 'short' = original token as-is */
+  tokenType?: 'permanent' | 'short'
 }
 
 export type MetaTokenStore = Record<string, MetaChannelConfig>

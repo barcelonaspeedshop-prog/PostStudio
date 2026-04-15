@@ -26,6 +26,10 @@ services:
       # Service account key for Drive API access (mounted via the data volume)
       GOOGLE_SERVICE_ACCOUNT_KEY_FILE: /data/service-account.json
 
+      # Meta (Facebook / Instagram) — app credentials for token exchange
+      META_APP_ID: "915633637891649"
+      META_APP_SECRET: ${META_APP_SECRET}
+
       # Image search (Serper)
       SERPER_API_KEY: ${SERPER_API_KEY}
 
