@@ -138,6 +138,24 @@ The JSON object must contain:
       )
     }
 
+    // Validate topic — reject fallback/no-news responses before generating slides
+    const topicLower = (trend.topic || '').toLowerCase()
+    const noNewsPatterns = [
+      'no news', 'no stories', 'nothing found', 'no results', 'no articles',
+      'no recent', 'no coverage', 'no updates', 'could not find', 'unable to find',
+      'no golf news', 'no f1 news', 'no football news', 'no cricket news',
+    ]
+    const isNoNews = noNewsPatterns.some(p => topicLower.includes(p))
+      // Also reject if topic looks like a date-only fallback e.g. "April 15, 2026"
+      || /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}/i.test(trend.topic || '')
+    if (isNoNews || !trend.topic || trend.topic.trim().length < 10) {
+      console.warn('[news-brief] No fresh news found — topic rejected:', trend.topic)
+      return NextResponse.json(
+        { error: 'No fresh news found for this channel today' },
+        { status: 503, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+      )
+    }
+
     // Step 2: Fetch the article's featured image
     let articleImageUrl: string | null = null
     if (trend.articleUrl) {

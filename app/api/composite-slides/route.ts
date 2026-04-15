@@ -505,7 +505,12 @@ export async function POST(req: NextRequest) {
       } else if (slide.image && slide.image.startsWith('data:')) {
         const base64Data = slide.image.replace(/^data:image\/\w+;base64,/, '')
         const imgBuffer = Buffer.from(base64Data, 'base64')
-        base = sharp(imgBuffer).resize(W, H, { fit: 'cover', position: 'attention' })
+        // Detect orientation to choose crop anchor:
+        // portrait images (taller than wide) → crop from top third where subjects typically appear
+        // landscape images (wider than tall) → crop from centre
+        const meta = await sharp(imgBuffer).metadata()
+        const isPortrait = (meta.height ?? 0) >= (meta.width ?? 1)
+        base = sharp(imgBuffer).resize(W, H, { fit: 'cover', position: isPortrait ? 'top' : 'centre' })
       } else {
         base = sharp({
           create: { width: W, height: H, channels: 3, background: { r: bgr, g: bgg, b: bgb } },
