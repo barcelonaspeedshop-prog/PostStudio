@@ -184,18 +184,25 @@ export async function publishCarouselToInstagram(
   }
 
   try {
-    // Step 1: Upload each image as a carousel item container
+    // Step 1: Upload each image as a carousel item container and wait for each to finish
     const childIds: string[] = []
-    for (const url of publicUrls) {
+    for (let i = 0; i < publicUrls.length; i++) {
+      const url = publicUrls[i]
+      console.log(`[meta] Creating child container ${i + 1}/${publicUrls.length} for ${channelName}`)
       const data = await graphPost(
         `/${igId}/media`,
         { image_url: url, is_carousel_item: 'true' },
         token,
       )
-      childIds.push(data.id as string)
+      const childId = data.id as string
+      // Each child must reach FINISHED before the carousel container can be created
+      console.log(`[meta] Polling child container ${childId}`)
+      await waitForContainer(childId, token, 12, 5000)
+      childIds.push(childId)
     }
 
     // Step 2: Create the carousel container
+    console.log(`[meta] Creating carousel container for ${channelName} with ${childIds.length} children`)
     const carousel = await graphPost(
       `/${igId}/media`,
       {
@@ -207,10 +214,12 @@ export async function publishCarouselToInstagram(
     )
     const carouselId = carousel.id as string
 
-    // Step 3: Poll until ready
-    await waitForContainer(carouselId, token)
+    // Step 3: Poll carousel container until ready
+    console.log(`[meta] Polling carousel container ${carouselId}`)
+    await waitForContainer(carouselId, token, 20, 5000)
 
     // Step 4: Publish
+    console.log(`[meta] Publishing carousel ${carouselId} for ${channelName}`)
     const published = await graphPost(
       `/${igId}/media_publish`,
       { creation_id: carouselId },

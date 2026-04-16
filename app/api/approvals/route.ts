@@ -153,7 +153,8 @@ export async function PATCH(req: NextRequest) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               content: caption,
-              mediaUrl: item.videoBase64,
+              // Do NOT send videoBase64 here — it's 5-10MB and unused by the carousel path.
+              // The carousel publisher uses slide.image fields directly.
               platforms: ['instagram'],
               firstSlideHeadline: item.headline,
               channel: item.channel,

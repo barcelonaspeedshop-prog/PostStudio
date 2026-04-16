@@ -7,7 +7,7 @@ import {
 } from '@/lib/meta'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120
+export const maxDuration = 300
 
 const VALID_PLATFORMS = ['instagram', 'tiktok', 'twitter', 'facebook', 'youtube'] as const
 type Platform = (typeof VALID_PLATFORMS)[number]
