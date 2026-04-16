@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Sidebar from '@/components/Sidebar'
@@ -86,7 +86,7 @@ type ConnectForm = {
   error: string
 }
 
-export default function AccountsPage() {
+function AccountsPageInner() {
   const [metaStatus, setMetaStatus] = useState<MetaStatus>({})
   const [connectForm, setConnectForm] = useState<ConnectForm | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
@@ -507,5 +507,13 @@ export default function AccountsPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function AccountsPage() {
+  return (
+    <Suspense>
+      <AccountsPageInner />
+    </Suspense>
   )
 }
