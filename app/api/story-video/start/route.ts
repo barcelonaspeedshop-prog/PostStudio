@@ -288,6 +288,7 @@ async function assembleInBackground(
       updateJob(jobId, { progress: 'Mixing background music...' })
       const masterWithMusic = path.join(tmpDir, 'master_with_music.mp4')
       const vol = Math.max(0, Math.min(1, musicVolume))
+
       // Probe the video file for audio streams
       const hasAudioStream = await new Promise<boolean>((resolve) => {
         const proc = spawn('ffprobe', [
@@ -300,30 +301,60 @@ async function assembleInBackground(
         proc.on('error', () => resolve(false))
       })
       console.log(`[story-video] Video has audio stream: ${hasAudioStream}`)
-      if (hasAudioStream) {
-        // Mix music with existing voiceover audio
+
+      // Pre-loop the music track to exactly the video duration before mixing.
+      // Using -stream_loop + -shortest at mix time can truncate the full video
+      // to the music track length when the track is shorter than the video.
+      const videoDuration = await probeDuration(masterFinal)
+      console.log(`[story-video] Pre-looping music to ${videoDuration.toFixed(2)}s`)
+      const loopedMusicPath = path.join(tmpDir, 'bg_music_looped.aac')
+      try {
         await runFfmpeg([
-          '-i', masterFinal,
           '-stream_loop', '-1', '-i', musicPath,
-          '-filter_complex', `[1:a]volume=${vol}[music];[0:a][music]amix=inputs=2:duration=first:dropout_transition=2[aout]`,
-          '-map', '0:v', '-map', '[aout]',
-          '-c:v', 'copy',
-          '-c:a', 'aac', '-b:a', '192k',
-          '-shortest', '-movflags', '+faststart', '-y', masterWithMusic,
+          '-t', videoDuration.toFixed(3),
+          '-vn', '-c:a', 'aac', '-b:a', '128k',
+          '-y', loopedMusicPath,
         ])
-      } else {
-        // No audio in video — add music as the only audio track
-        await runFfmpeg([
-          '-i', masterFinal,
-          '-stream_loop', '-1', '-i', musicPath,
-          '-filter_complex', `[1:a]volume=${vol}[aout]`,
-          '-map', '0:v', '-map', '[aout]',
-          '-c:v', 'copy',
-          '-c:a', 'aac', '-b:a', '192k',
-          '-shortest', '-movflags', '+faststart', '-y', masterWithMusic,
-        ])
+      } catch {
+        // Fallback: trim without looping (music fades out if shorter than video)
+        console.warn('[story-video] Music pre-loop failed, trimming without loop')
+        try {
+          await runFfmpeg([
+            '-i', musicPath,
+            '-t', videoDuration.toFixed(3),
+            '-vn', '-c:a', 'aac', '-b:a', '128k',
+            '-y', loopedMusicPath,
+          ])
+        } catch {
+          console.warn('[story-video] Music trim also failed — skipping music')
+        }
       }
-      outputVideo = masterWithMusic
+      const musicInput = existsSync(loopedMusicPath) ? loopedMusicPath : null
+
+      if (musicInput) {
+        if (hasAudioStream) {
+          // Mix music under existing voiceover audio
+          await runFfmpeg([
+            '-i', masterFinal,
+            '-i', musicInput,
+            '-filter_complex', `[1:a]volume=${vol}[music];[0:a][music]amix=inputs=2:duration=first:dropout_transition=2[aout]`,
+            '-map', '0:v', '-map', '[aout]',
+            '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k',
+            '-movflags', '+faststart', '-y', masterWithMusic,
+          ])
+        } else {
+          // No voiceover — add music as the only audio track
+          await runFfmpeg([
+            '-i', masterFinal,
+            '-i', musicInput,
+            '-filter_complex', `[1:a]volume=${vol}[aout]`,
+            '-map', '0:v', '-map', '[aout]',
+            '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k',
+            '-movflags', '+faststart', '-y', masterWithMusic,
+          ])
+        }
+        outputVideo = masterWithMusic
+      }
     }
 
     const totalDuration = Object.values(chapterDurations).reduce((a, b) => a + b, 0)
@@ -423,6 +454,7 @@ export async function POST(req: NextRequest) {
         }
       } catch (e) {
         console.warn(`[story-video] Failed to fetch Drive music for mood "${musicMood}":`, e instanceof Error ? e.message : e)
+        musicPath = null // Don't leave a partial file path; assembly continues without music
       }
     }
     if (musicVolumeRaw) {
