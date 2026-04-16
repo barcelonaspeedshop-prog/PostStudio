@@ -51,9 +51,12 @@ export async function POST(req: NextRequest) {
     console.log(`[youtube-publish] Uploading ${(buffer.length / 1024 / 1024).toFixed(1)}MB to YouTube channel ${channelId} for "${channelName}"`)
     console.log(`[youtube-publish] Title: "${title}", Tags: [${(tags || []).join(', ')}], Description length: ${(description || '').length}`)
 
-    // Upload to YouTube — channelId ensures it goes to the correct channel
+    // Upload to YouTube.
+    // onBehalfOfContentOwnerChannel directs the upload to the correct Brand
+    // Account channel when the OAuth token belongs to the managing Google account.
     const res = await youtube.videos.insert({
       part: ['snippet', 'status'],
+      onBehalfOfContentOwnerChannel: channelId,
       requestBody: {
         snippet: {
           channelId,
