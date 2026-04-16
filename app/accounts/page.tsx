@@ -66,7 +66,14 @@ const PLATFORM_TIPS: Record<string, string> = {
   Facebook: 'Facebook Pages unlock Meta Business Suite for cross-posting',
 }
 
-type MetaStatus = Record<string, { connected: boolean; instagramAccountId?: string; facebookPageId?: string }>
+type MetaStatus = Record<string, {
+  connected: boolean
+  instagramAccountId?: string
+  facebookPageId?: string
+  tokenType?: 'permanent' | 'short'
+  tokenSavedAt?: number
+  hasUserToken?: boolean
+}>
 
 type ConnectForm = {
   channel: string
@@ -82,6 +89,10 @@ export default function AccountsPage() {
   const [connectForm, setConnectForm] = useState<ConnectForm | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [disconnecting, setDisconnecting] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState<string | 'all' | null>(null)
+  const [setupPanel, setSetupPanel] = useState(false)
+  const [setupToken, setSetupToken] = useState('')
+  const [setupRunning, setSetupRunning] = useState(false)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -164,15 +175,118 @@ export default function AccountsPage() {
     }
   }
 
+  const refreshChannel = async (channel: string) => {
+    setRefreshing(channel)
+    try {
+      const res = await fetch('/api/meta-auth/refresh-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Refresh failed')
+      const result = data.results?.[0]
+      if (result?.success) {
+        await fetchMetaStatus()
+        showToast(`Token refreshed for ${channel} (${result.tokenType})`)
+      } else {
+        throw new Error(result?.error || result?.skipped || 'Refresh failed')
+      }
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Refresh failed', 'error')
+    } finally {
+      setRefreshing(null)
+    }
+  }
+
+  const runBulkSetup = async () => {
+    if (!setupToken.trim()) return
+    setSetupRunning(true)
+    try {
+      const res = await fetch('/api/meta-auth/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userAccessToken: setupToken.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Setup failed')
+      await fetchMetaStatus()
+      setSetupPanel(false)
+      setSetupToken('')
+      showToast(`Bulk setup complete — ${data.summary?.matched ?? 0} channels updated`)
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Setup failed', 'error')
+    } finally {
+      setSetupRunning(false)
+    }
+  }
+
+  const tokenAge = (savedAt?: number): string => {
+    if (!savedAt) return 'unknown age'
+    const days = Math.floor((Date.now() - savedAt) / 86_400_000)
+    if (days === 0) return 'saved today'
+    if (days === 1) return '1 day ago'
+    return `${days} days ago`
+  }
+
   return (
     <div className="flex h-screen bg-stone-50">
       <Sidebar />
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-5xl mx-auto px-6 py-8">
-          <div className="mb-8">
-            <h1 className="text-xl font-semibold text-stone-900">Accounts</h1>
-            <p className="text-[13px] text-stone-400 mt-1">All connected social accounts across your channels</p>
+          <div className="mb-8 flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-xl font-semibold text-stone-900">Accounts</h1>
+              <p className="text-[13px] text-stone-400 mt-1">All connected social accounts across your channels</p>
+            </div>
+            <button
+              onClick={() => setSetupPanel(v => !v)}
+              className="shrink-0 px-3 py-2 text-[12px] font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              ⚡ Bulk Token Setup
+            </button>
           </div>
+
+          {/* Bulk setup panel */}
+          {setupPanel && (
+            <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-5">
+              <h3 className="text-[14px] font-semibold text-blue-900 mb-1">Bulk Meta Token Setup</h3>
+              <p className="text-[12px] text-blue-700 mb-4">
+                Paste a <strong>User Access Token</strong> from{' '}
+                <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener noreferrer" className="underline">
+                  Graph API Explorer
+                </a>{' '}
+                with <code className="bg-blue-100 px-1 rounded">pages_manage_posts</code>,{' '}
+                <code className="bg-blue-100 px-1 rounded">instagram_content_publish</code>,{' '}
+                <code className="bg-blue-100 px-1 rounded">pages_read_engagement</code> permissions.
+                PostStudio will automatically exchange it for a permanent token and update all channels whose Facebook Page IDs are already saved.
+              </p>
+              <div className="flex gap-2">
+                <textarea
+                  rows={2}
+                  value={setupToken}
+                  onChange={e => setSetupToken(e.target.value)}
+                  placeholder="EAABwzLixnjYBO..."
+                  className="flex-1 px-3 py-2 text-[12px] border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 font-mono resize-none bg-white"
+                />
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={runBulkSetup}
+                    disabled={setupRunning || !setupToken.trim()}
+                    className="px-4 py-2 text-[12px] font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+                  >
+                    {setupRunning ? 'Running…' : 'Apply to all channels'}
+                  </button>
+                  <button
+                    onClick={() => { setSetupPanel(false); setSetupToken('') }}
+                    className="px-4 py-2 text-[12px] text-blue-600 hover:text-blue-800 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {ACCOUNT_DATA.map((ch) => {
               const config = CHANNELS[ch.channel]
@@ -211,18 +325,45 @@ export default function AccountsPage() {
 
                     {/* Meta (Instagram + Facebook) direct API connection */}
                     <div className="mt-4 pt-4 border-t border-stone-100">
-                      <div className="flex items-center justify-between">
-                        <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
                           <p className="text-[12px] font-medium text-stone-700">Meta Graph API</p>
-                          <p className="text-[11px] text-stone-400 mt-0.5">
-                            {metaConnected
-                              ? `Instagram ID: ${metaStatus[ch.channel]?.instagramAccountId}`
-                              : 'Connect to publish directly via the Meta API'}
-                          </p>
+                          {metaConnected ? (
+                            <div className="mt-0.5 space-y-0.5">
+                              {metaStatus[ch.channel]?.instagramAccountId && (
+                                <p className="text-[11px] text-stone-400 truncate">
+                                  IG: {metaStatus[ch.channel]?.instagramAccountId}
+                                </p>
+                              )}
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
+                                  metaStatus[ch.channel]?.tokenType === 'permanent'
+                                    ? 'bg-emerald-50 text-emerald-700'
+                                    : 'bg-amber-50 text-amber-700'
+                                }`}>
+                                  {metaStatus[ch.channel]?.tokenType === 'permanent' ? 'PERMANENT' : 'SHORT-LIVED'}
+                                </span>
+                                <span className="text-[10px] text-stone-400">
+                                  {tokenAge(metaStatus[ch.channel]?.tokenSavedAt)}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-stone-400 mt-0.5">
+                              Connect to publish directly via the Meta API
+                            </p>
+                          )}
                         </div>
                         {metaConnected ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700">CONNECTED</span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => refreshChannel(ch.channel)}
+                              disabled={refreshing === ch.channel}
+                              title="Refresh token using the stored user access token"
+                              className="px-2 py-1 text-[10px] font-medium bg-blue-50 text-blue-700 rounded hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                            >
+                              {refreshing === ch.channel ? '…' : '↻ Refresh'}
+                            </button>
                             <button
                               onClick={() => disconnect(ch.channel)}
                               disabled={disconnecting === ch.channel}
@@ -234,7 +375,7 @@ export default function AccountsPage() {
                         ) : (
                           <button
                             onClick={() => openConnectForm(ch.channel)}
-                            className="px-3 py-1.5 text-[12px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-700 transition-colors"
+                            className="shrink-0 px-3 py-1.5 text-[12px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-700 transition-colors"
                           >
                             Connect
                           </button>

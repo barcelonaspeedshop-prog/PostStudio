@@ -14,6 +14,8 @@ export async function GET() {
       instagramAccountId?: string
       facebookPageId?: string
       tokenType?: 'permanent' | 'short'
+      tokenSavedAt?: number
+      hasUserToken?: boolean
     }> = {}
 
     for (const [channel, cfg] of Object.entries(store)) {
@@ -22,6 +24,8 @@ export async function GET() {
         instagramAccountId: cfg.instagramAccountId || undefined,
         facebookPageId: cfg.facebookPageId,
         tokenType: cfg.tokenType,
+        tokenSavedAt: cfg.tokenSavedAt,
+        hasUserToken: Boolean(cfg.userAccessToken),
       }
     }
 
@@ -131,6 +135,9 @@ export async function POST(req: NextRequest) {
       instagramAccountId: instagramAccountId || '',
       facebookPageId,
       tokenType,
+      // Keep the original user token for future refresh operations
+      userAccessToken: pageAccessToken,
+      tokenSavedAt: Date.now(),
     }
     await saveMetaTokens(store)
 

@@ -14,6 +14,10 @@ export type MetaChannelConfig = {
   facebookPageId: string
   /** 'permanent' = long-lived page token (never expires); 'short' = original token as-is */
   tokenType?: 'permanent' | 'short'
+  /** The original user access token — kept for token refresh flows */
+  userAccessToken?: string
+  /** Unix ms timestamp when the token was last saved / refreshed */
+  tokenSavedAt?: number
 }
 
 export type MetaTokenStore = Record<string, MetaChannelConfig>
