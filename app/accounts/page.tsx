@@ -306,14 +306,25 @@ export default function AccountsPage() {
                       <p className="text-[12px] text-stone-400 mt-0.5">{config?.tagline}</p>
                     </div>
                     <div className="space-y-2.5">
-                      {ch.accounts.map((acc) => (
+                      {ch.accounts.map((acc) => {
+                        // Instagram and Facebook statuses are driven by live Meta token data
+                        const isMetaPlatform = acc.platform === 'Instagram' || acc.platform === 'Facebook'
+                        const metaChannelStatus = metaStatus[ch.channel]
+                        const effectiveStatus = isMetaPlatform
+                          ? (acc.status === 'connected' ||
+                              (acc.platform === 'Instagram' && Boolean(metaChannelStatus?.instagramAccountId)) ||
+                              (acc.platform === 'Facebook' && Boolean(metaChannelStatus?.facebookPageId))
+                            ) ? 'connected' : 'pending'
+                          : acc.status
+
+                        return (
                         <div key={acc.platform} className="flex items-center justify-between py-2 border-b border-stone-50 last:border-0">
                           <div className="flex items-center gap-3">
                             <span className="text-[12px] font-medium text-stone-600 w-20">{acc.platform}</span>
                             <span className="text-[12px] text-stone-400">{acc.handle}</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            {acc.status === 'connected' ? (
+                            {effectiveStatus === 'connected' ? (
                               <>
                                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">CONNECTED</span>
                                 {acc.url && <a href={acc.url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-stone-400 hover:text-stone-600 transition-colors">Visit &#8594;</a>}
@@ -323,7 +334,8 @@ export default function AccountsPage() {
                             )}
                           </div>
                         </div>
-                      ))}
+                        )
+                      })}
                     </div>
 
                     {/* Meta (Instagram + Facebook) direct API connection */}
