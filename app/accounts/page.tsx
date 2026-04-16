@@ -1,5 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import Sidebar from '@/components/Sidebar'
 import { CHANNELS } from '@/lib/channels'
 
@@ -93,6 +95,7 @@ export default function AccountsPage() {
   const [setupPanel, setSetupPanel] = useState(false)
   const [setupToken, setSetupToken] = useState('')
   const [setupRunning, setSetupRunning] = useState(false)
+  const searchParams = useSearchParams()
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -109,7 +112,16 @@ export default function AccountsPage() {
     } catch { /* ignore */ }
   }
 
-  useEffect(() => { fetchMetaStatus() }, [])
+  useEffect(() => {
+    fetchMetaStatus()
+    // Show result of OAuth callback redirect
+    const connected = searchParams.get('meta_connected')
+    const igCount   = searchParams.get('meta_ig')
+    const metaErr   = searchParams.get('meta_error')
+    if (connected) showToast(`Meta connected — ${connected} channel${connected === '1' ? '' : 's'} updated, ${igCount ?? 0} Instagram IDs saved`)
+    if (metaErr)   showToast(`Meta connection failed: ${metaErr}`, 'error')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const openConnectForm = (channel: string) => {
     setConnectForm({
@@ -239,54 +251,21 @@ export default function AccountsPage() {
               <h1 className="text-xl font-semibold text-stone-900">Accounts</h1>
               <p className="text-[13px] text-stone-400 mt-1">All connected social accounts across your channels</p>
             </div>
-            <button
-              onClick={() => setSetupPanel(v => !v)}
-              className="shrink-0 px-3 py-2 text-[12px] font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              ⚡ Bulk Token Setup
-            </button>
-          </div>
-
-          {/* Bulk setup panel */}
-          {setupPanel && (
-            <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-5">
-              <h3 className="text-[14px] font-semibold text-blue-900 mb-1">Bulk Meta Token Setup</h3>
-              <p className="text-[12px] text-blue-700 mb-4">
-                Paste a <strong>User Access Token</strong> from{' '}
-                <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener noreferrer" className="underline">
-                  Graph API Explorer
-                </a>{' '}
-                with <code className="bg-blue-100 px-1 rounded">pages_manage_posts</code>,{' '}
-                <code className="bg-blue-100 px-1 rounded">instagram_content_publish</code>,{' '}
-                <code className="bg-blue-100 px-1 rounded">pages_read_engagement</code> permissions.
-                PostStudio will automatically exchange it for a permanent token and update all channels whose Facebook Page IDs are already saved.
-              </p>
-              <div className="flex gap-2">
-                <textarea
-                  rows={2}
-                  value={setupToken}
-                  onChange={e => setSetupToken(e.target.value)}
-                  placeholder="EAABwzLixnjYBO..."
-                  className="flex-1 px-3 py-2 text-[12px] border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 font-mono resize-none bg-white"
-                />
-                <div className="flex flex-col gap-2">
-                  <button
-                    onClick={runBulkSetup}
-                    disabled={setupRunning || !setupToken.trim()}
-                    className="px-4 py-2 text-[12px] font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors whitespace-nowrap"
-                  >
-                    {setupRunning ? 'Running…' : 'Apply to all channels'}
-                  </button>
-                  <button
-                    onClick={() => { setSetupPanel(false); setSetupToken('') }}
-                    className="px-4 py-2 text-[12px] text-blue-600 hover:text-blue-800 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href="/api/auth/meta"
+                className="px-3 py-2 text-[12px] font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Connect Meta Accounts
+              </a>
+              <Link
+                href="/meta-setup"
+                className="px-3 py-2 text-[12px] font-medium border border-stone-200 text-stone-600 rounded-lg hover:bg-stone-100 transition-colors"
+              >
+                Manual setup
+              </Link>
             </div>
-          )}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {ACCOUNT_DATA.map((ch) => {
               const config = CHANNELS[ch.channel]
