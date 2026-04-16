@@ -98,6 +98,9 @@ export default function CarouselPage() {
   const [ytTitle, setYtTitle] = useState('')
   const [ytDescription, setYtDescription] = useState('')
   const [ytTags, setYtTags] = useState('')
+  const [draftSaved, setDraftSaved] = useState(false)
+  const [isRestored, setIsRestored] = useState(false)
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const generateYtTags = () => {
     const tags: string[] = []
@@ -149,6 +152,45 @@ export default function CarouselPage() {
       setYtTags(generateYtTags())
     }
   }, [slides, channel])
+
+  const DRAFT_KEY = 'draft_carousel'
+
+  // Restore draft on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY)
+      if (raw) {
+        const d = JSON.parse(raw)
+        if (d.topic) setTopic(d.topic)
+        if (d.channel) setChannel(d.channel)
+        if (typeof d.slideCount === 'number') setSlideCount(d.slideCount)
+        if (Array.isArray(d.slides) && d.slides.length > 0) {
+          setSlides(d.slides)
+          setSelectedSlide(d.selectedSlide ?? 0)
+        }
+        if (typeof d.slideDuration === 'number') setSlideDuration(d.slideDuration)
+        if (typeof d.musicVolume === 'number') setMusicVolume(d.musicVolume)
+        if (Array.isArray(d.publishPlatforms)) setPublishPlatforms(d.publishPlatforms)
+      }
+    } catch {}
+    setIsRestored(true)
+  }, [])
+
+  // Save draft when state changes (only after restore)
+  useEffect(() => {
+    if (!isRestored) return
+    if (!topic && slides.length === 0) return
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        topic, channel, slideCount, slides, selectedSlide, slideDuration, musicVolume, publishPlatforms,
+      }))
+      setDraftSaved(true)
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+      draftTimerRef.current = setTimeout(() => setDraftSaved(false), 2000)
+    } catch {
+      // Quota exceeded (large images) — fail silently
+    }
+  }, [isRestored, topic, channel, slideCount, slides, selectedSlide, slideDuration, musicVolume, publishPlatforms])
 
   const PUBLISH_PLATFORMS = [
     { id: 'instagram', label: 'Instagram', icon: 'IG' },
@@ -560,6 +602,22 @@ export default function CarouselPage() {
     }
   }
 
+  const clearDraft = () => {
+    localStorage.removeItem(DRAFT_KEY)
+    setTopic('')
+    setChannel('Gentlemen of Fuel')
+    setSlideCount(6)
+    setSlides([])
+    setSelectedSlide(null)
+    setSlideDuration(3)
+    setMusicVolume(20)
+    setPublishPlatforms([])
+    setVideoUrl(null)
+    setAudioFile(null)
+    setDraftSaved(false)
+    showToast('Draft cleared')
+  }
+
   const reorderSlide = (fromIndex: number, direction: 'up' | 'down') => {
     const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1
     if (toIndex < 0 || toIndex >= slides.length) return
@@ -611,8 +669,21 @@ export default function CarouselPage() {
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* Topbar */}
         <div className="h-12 bg-white border-b border-stone-100 flex items-center justify-between px-5 pl-14 md:pl-5 shrink-0">
-          <span className="text-[14px] font-medium text-stone-900">Carousel builder</span>
+          <div className="flex items-center gap-3">
+            <span className="text-[14px] font-medium text-stone-900">Carousel builder</span>
+            {draftSaved && (
+              <span className="hidden md:inline text-[11px] text-stone-400">Draft saved</span>
+            )}
+          </div>
           <div className="flex gap-2">
+            {(topic || slides.length > 0) && (
+              <button
+                onClick={clearDraft}
+                className="px-3 py-2 min-h-[44px] text-[13px] font-medium border border-stone-200 text-stone-500 rounded-lg hover:bg-stone-50 transition-colors"
+              >
+                Clear draft
+              </button>
+            )}
             {slides.length > 0 && (
               <>
                 <button

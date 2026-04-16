@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Sidebar from '@/components/Sidebar'
 
 type Chapter = { id: number; title: string; type: string; narration: string; visual: string }
@@ -42,11 +42,48 @@ export default function LongFormPage() {
   const [selectedVoice, setSelectedVoice] = useState(VOICES[0].id)
   const [clippingVideo, setClippingVideo] = useState(false)
   const [clips, setClips] = useState<{ filename: string; duration: number }[]>([])
+  const [draftSaved, setDraftSaved] = useState(false)
+  const [isRestored, setIsRestored] = useState(false)
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Auto-default music mood based on channel
+
+  const DRAFT_KEY = 'draft_longvideo'
+
+  // Restore draft on mount
   useEffect(() => {
-    setMusicMood(CALM_CHANNELS.includes(channel) ? 'calm' : 'energy')
-  }, [channel])
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY)
+      if (raw) {
+        const d = JSON.parse(raw)
+        if (d.topic) setTopic(d.topic)
+        if (d.channel) setChannel(d.channel)
+        if (d.script) setScript(d.script)
+        if (d.musicMood) setMusicMood(d.musicMood)
+        if (d.selectedVoice) setSelectedVoice(d.selectedVoice)
+        if (d.chapterAudio && typeof d.chapterAudio === 'object') setChapterAudio(d.chapterAudio)
+        if (d.voiceoverStatus && typeof d.voiceoverStatus === 'object') setVoiceoverStatus(d.voiceoverStatus)
+        if (typeof d.testMode === 'boolean') setTestMode(d.testMode)
+        if (d.testDuration) setTestDuration(d.testDuration)
+      }
+    } catch {}
+    setIsRestored(true)
+  }, [])
+
+  // Save draft when state changes (only after restore)
+  useEffect(() => {
+    if (!isRestored) return
+    if (!topic && !script) return
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        topic, channel, script, musicMood, selectedVoice, chapterAudio, voiceoverStatus, testMode, testDuration,
+      }))
+      setDraftSaved(true)
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
+      draftTimerRef.current = setTimeout(() => setDraftSaved(false), 2000)
+    } catch {
+      // Quota exceeded (large audio) — fail silently
+    }
+  }, [isRestored, topic, channel, script, musicMood, selectedVoice, chapterAudio, voiceoverStatus, testMode, testDuration])
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -223,6 +260,22 @@ export default function LongFormPage() {
     }
   }
 
+  const clearDraft = () => {
+    localStorage.removeItem(DRAFT_KEY)
+    setTopic('')
+    setChannel(CHANNELS[0])
+    setScript(null)
+    setMusicMood('energy')
+    setSelectedVoice(VOICES[0].id)
+    setChapterAudio({})
+    setVoiceoverStatus({})
+    setChapterMedia({})
+    setVideoUrl(null)
+    setClips([])
+    setDraftSaved(false)
+    showToast('Draft cleared')
+  }
+
   const downloadVideo = () => {
     if (!videoUrl) return
     const a = document.createElement('a')
@@ -337,12 +390,25 @@ export default function LongFormPage() {
                 <span className="hidden md:inline text-[11px] text-amber-600 font-medium">Test mode — no ElevenLabs charges</span>
               </>
             )}
+            {draftSaved && (
+              <span className="hidden md:inline text-[11px] text-stone-400">Draft saved</span>
+            )}
           </div>
-          {videoUrl && (
-            <button onClick={downloadVideo} className="px-3 py-2 min-h-[44px] text-[13px] font-medium border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors">
-              Download Video
-            </button>
-          )}
+          <div className="flex gap-2">
+            {(topic || script) && (
+              <button
+                onClick={clearDraft}
+                className="px-3 py-2 min-h-[44px] text-[13px] font-medium border border-stone-200 text-stone-500 rounded-lg hover:bg-stone-50 transition-colors"
+              >
+                Clear draft
+              </button>
+            )}
+            {videoUrl && (
+              <button onClick={downloadVideo} className="px-3 py-2 min-h-[44px] text-[13px] font-medium border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors">
+                Download Video
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
@@ -355,7 +421,7 @@ export default function LongFormPage() {
 
             <div>
               <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-2">Channel</p>
-              <select value={channel} onChange={(e) => setChannel(e.target.value)} className="w-full text-[16px] md:text-[13px] border border-stone-200 rounded-lg px-3 py-2.5 min-h-[44px] bg-white focus:outline-none focus:ring-1 focus:ring-stone-400">
+              <select value={channel} onChange={(e) => { setChannel(e.target.value); setMusicMood(CALM_CHANNELS.includes(e.target.value) ? 'calm' : 'energy') }} className="w-full text-[16px] md:text-[13px] border border-stone-200 rounded-lg px-3 py-2.5 min-h-[44px] bg-white focus:outline-none focus:ring-1 focus:ring-stone-400">
                 {CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
