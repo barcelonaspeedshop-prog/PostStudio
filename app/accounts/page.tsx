@@ -266,6 +266,30 @@ export default function AccountsPage() {
               </Link>
             </div>
           </div>
+
+          {/* One-time Meta redirect URI setup note */}
+          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
+            <p className="text-[13px] font-semibold text-amber-800 mb-1">⚠ One-time setup required before connecting Meta accounts</p>
+            <p className="text-[12px] text-amber-700 leading-relaxed">
+              Before the <strong>Connect Meta Accounts</strong> button will work, add this redirect URI in the{' '}
+              <a
+                href="https://developers.facebook.com/apps/915633637891649/fb-login/settings/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline font-medium"
+              >
+                Meta Developer Console
+              </a>
+              {' '}(App ID <code className="bg-amber-100 px-1 rounded text-[11px]">915633637891649</code> → Facebook Login → Valid OAuth Redirect URIs):
+            </p>
+            <code className="mt-2 block text-[12px] bg-amber-100 text-amber-900 px-3 py-1.5 rounded-lg font-mono break-all">
+              https://app.premirafirst.com/api/auth/meta/callback
+            </code>
+            <p className="text-[11px] text-amber-600 mt-2">
+              This only needs to be done once. Once the URI is saved in Meta, the OAuth flow will work automatically.
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {ACCOUNT_DATA.map((ch) => {
               const config = CHANNELS[ch.channel]
