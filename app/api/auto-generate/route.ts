@@ -16,6 +16,14 @@ type UsedTopics = Record<string, string[]>
 async function loadUsedTopics(): Promise<UsedTopics> {
   try {
     if (!existsSync(USED_TOPICS_PATH)) return {}
+    // Reset exclusions each new day — yesterday's topics should not block today's search
+    const fileStat = await stat(USED_TOPICS_PATH)
+    const fileDate = fileStat.mtime.toISOString().split('T')[0]
+    const today = new Date().toISOString().split('T')[0]
+    if (fileDate < today) {
+      console.log(`[auto-generate] used-topics.json is from ${fileDate} — resetting for today (${today})`)
+      return {}
+    }
     const raw = await readFile(USED_TOPICS_PATH, 'utf-8')
     return JSON.parse(raw)
   } catch {

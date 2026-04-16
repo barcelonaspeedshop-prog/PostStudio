@@ -106,7 +106,10 @@ export async function POST(req: NextRequest) {
       tools: [{ type: 'web_search_20250305', name: 'web_search' }] as any,
       messages: [{
         role: 'user',
-        content: `Today is ${today}. Search for news published TODAY only. You must verify the publication date is ${today} before selecting a story. Reject any story published before ${today}. Search in ${topicKeywords}. If you genuinely cannot find a story published on ${today}, pick the most recent available story, but you must try ${today} first and state why no story from ${today} was found.${hasExclusions ? `\n\nIMPORTANT: You MUST NOT cover any of these topics — they are all banned:\n${exclusionList}\n\nFind a completely different, unrelated story from today's news.` : ''}
+        content: `Today is ${today}. Search for news published TODAY (${today}) only. You MUST verify the publication date before selecting a story — reject any story published before ${today}. When calling web_search, always include "${today}" or "today" in your search query to bias toward fresh results. Search in ${topicKeywords}.${hasExclusions ? `\n\nIMPORTANT: You MUST NOT cover any of these topics — they are all banned:\n${exclusionList}\n\nFind a completely different, unrelated story from today's news.` : ''}
+
+If you cannot find a story published on ${today}, respond with ONLY this JSON: {"topic":"No fresh news found for ${today}","headline":"No story available","articleUrl":"","searchTerms":[]}
+Do NOT fall back to older stories under any circumstances.
 
 Respond with ONLY a JSON object. No explanatory text before or after. No markdown. Just the raw JSON.
 

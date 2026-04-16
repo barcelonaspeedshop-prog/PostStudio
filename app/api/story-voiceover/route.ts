@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'text is required' }, { status: 400 })
     }
 
-    const voice = voiceId || 'P9S3WZL3JE8uQqgYH5B7' // Default voice
+    const voice = voiceId || 'v1Oa3bMmaLK6LwTzVkOy' // Default voice
 
     const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}`, {
       method: 'POST',
