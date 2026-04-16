@@ -7,6 +7,14 @@ type Script = { title: string; summary: string; chapters: Chapter[] }
 
 const CHANNELS = ['Gentlemen of Fuel', 'Omnira F1', 'Road & Trax', 'Omnira Football']
 
+const VOICES = [
+  { id: 'v1Oa3bMmaLK6LwTzVkOy', label: 'Peter — BBC Type' },
+  { id: 'P9S3WZL3JE8uQqgYH5B7', label: 'James — Softer UK' },
+  { id: 'B9PDs7mcHTMxHUw5U8Cf', label: 'Holly — Soft UK' },
+  { id: 'yl2ZDV1MzN4HbQJbMihG', label: 'Alex — Energy USA' },
+  { id: 'gnPxliFHTp6OK6tcoA6i', label: 'Sam — Sports USA' },
+]
+
 const Spinner = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
   <svg className={`${className} animate-spin`} viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
@@ -33,6 +41,9 @@ export default function LongFormPage() {
   const [bgMusicName, setBgMusicName] = useState('')
   const [musicVolume, setMusicVolume] = useState(0.15)
   const bgMusicRef = useRef<HTMLInputElement>(null)
+  const [selectedVoice, setSelectedVoice] = useState(VOICES[0].id)
+  const [clippingVideo, setClippingVideo] = useState(false)
+  const [clips, setClips] = useState<{ filename: string; duration: number }[]>([])
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -129,6 +140,7 @@ export default function LongFormPage() {
     setAssembling(true)
     setAssemblyProgress('Uploading media...')
     setVideoUrl(null)
+    setClips([])
     try {
       const formData = new FormData()
       formData.append('chapters', JSON.stringify(script.chapters.map(ch => ({ id: ch.id, narration: ch.narration }))))
@@ -182,6 +194,26 @@ export default function LongFormPage() {
 
       setVideoUrl(result.downloadUrl)
       showToast(`Video ready — ${Math.round(result.duration)}s`)
+
+      // Auto-cut into ≤60s short clips
+      setClippingVideo(true)
+      setAssemblyProgress('Splitting into short clips...')
+      try {
+        const clipRes = await fetch('/api/story-video/clip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId: startData.jobId, channel, title: script.title }),
+        })
+        const clipData = await clipRes.json()
+        if (clipRes.ok && clipData.clips) {
+          setClips(clipData.clips)
+          showToast(`${clipData.clipCount} clip${clipData.clipCount !== 1 ? 's' : ''} scheduled for reels`)
+        }
+      } catch {
+        // Non-fatal — video is still available
+      } finally {
+        setClippingVideo(false)
+      }
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Error assembling video', 'error')
     } finally {
@@ -205,7 +237,7 @@ export default function LongFormPage() {
       const res = await fetch('/api/story-voiceover', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, voiceId: selectedVoice }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -335,6 +367,22 @@ export default function LongFormPage() {
             {script && (
               <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 flex flex-col gap-3">
                 <p className="text-[10px] font-medium text-violet-700 uppercase tracking-widest">Voiceover</p>
+                {!testMode && (
+                  <div>
+                    <p className="text-[10px] text-violet-500 mb-1">Voice</p>
+                    <select
+                      value={selectedVoice}
+                      onChange={(e) => {
+                        setSelectedVoice(e.target.value)
+                        setChapterAudio({})
+                        setVoiceoverStatus({})
+                      }}
+                      className="w-full text-[12px] border border-violet-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-violet-400"
+                    >
+                      {VOICES.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+                    </select>
+                  </div>
+                )}
                 <button
                   onClick={generateAllVoiceovers}
                   disabled={generatingAllVoiceovers || allVoiceoversReady}
@@ -384,12 +432,35 @@ export default function LongFormPage() {
                 <button onClick={assembleVideo} disabled={assembling || !hasAnyMedia} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-[13px] font-medium rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50">
                   {assembling ? <><Spinner /> Assembling...</> : !hasAnyMedia ? 'Upload images first' : <><span className="text-[11px]">&#9654;</span> Assemble video</>}
                 </button>
-                {assembling && assemblyProgress && <p className="text-[10px] text-emerald-600">{assemblyProgress}</p>}
+                {(assembling || clippingVideo) && assemblyProgress && <p className="text-[10px] text-emerald-600">{assemblyProgress}</p>}
                 {!hasAnyMedia && <p className="text-[10px] text-emerald-500">Add images to chapters to enable</p>}
                 {videoUrl && (
                   <button onClick={downloadVideo} className="w-full px-3 py-2 text-[12px] font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
                     &#8595; Download 16:9 Video
                   </button>
+                )}
+                {clippingVideo && (
+                  <div className="flex items-center gap-2 text-[11px] text-emerald-600">
+                    <Spinner className="w-3 h-3" />
+                    <span>Creating short clips...</span>
+                  </div>
+                )}
+                {clips.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-medium text-emerald-700">{clips.length} clip{clips.length !== 1 ? 's' : ''} scheduled for reels</p>
+                    {clips.map((clip, i) => (
+                      <div key={i} className="flex items-center justify-between text-[11px] text-stone-500 bg-white rounded px-2 py-1">
+                        <span>Part {i + 1} &middot; {clip.duration}s</span>
+                        <a
+                          href={`/api/clips/${clip.filename}`}
+                          download={clip.filename}
+                          className="text-emerald-600 hover:text-emerald-700 font-medium"
+                        >
+                          &#8595;
+                        </a>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}

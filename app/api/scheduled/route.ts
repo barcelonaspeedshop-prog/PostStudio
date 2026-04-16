@@ -19,6 +19,7 @@ export type ScheduledItem = {
   status: 'pending' | 'published' | 'failed'
   error?: string
   approvalId?: string
+  clipFile?: string
   createdAt: string
 }
 
@@ -49,7 +50,7 @@ export async function GET() {
 // POST — add a new scheduled item
 export async function POST(req: NextRequest) {
   try {
-    const { channel, headline, format, platform, scheduledTime, approvalId } = await req.json()
+    const { channel, headline, format, platform, scheduledTime, approvalId, clipFile } = await req.json()
 
     if (!channel || !headline || !format || !platform || !scheduledTime) {
       return NextResponse.json(
@@ -67,6 +68,7 @@ export async function POST(req: NextRequest) {
       scheduledTime,
       status: 'pending',
       approvalId: approvalId || undefined,
+      clipFile: clipFile || undefined,
       createdAt: new Date().toISOString(),
     }
 

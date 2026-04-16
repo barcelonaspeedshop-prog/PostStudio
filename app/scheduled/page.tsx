@@ -13,6 +13,7 @@ type ScheduledItem = {
   status: 'pending' | 'published' | 'failed'
   error?: string
   approvalId?: string
+  clipFile?: string
   createdAt: string
 }
 
@@ -183,6 +184,16 @@ export default function ScheduledPage() {
 
         {item.error && (
           <p className="text-[11px] text-red-500 bg-red-50 rounded px-2 py-1">{item.error}</p>
+        )}
+
+        {item.clipFile && (
+          <a
+            href={`/api/clips/${item.clipFile}`}
+            download={item.clipFile}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium border border-stone-200 rounded-lg text-stone-600 hover:bg-stone-50 transition-colors w-fit"
+          >
+            &#8595; Download clip
+          </a>
         )}
 
         {isEditing ? (
