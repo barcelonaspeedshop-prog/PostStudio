@@ -52,14 +52,20 @@ export async function POST(req: NextRequest) {
     console.log(`[youtube-publish] Title: "${title}", Tags: [${(tags || []).join(', ')}], Description length: ${(description || '').length}`)
 
     // Upload to YouTube.
-    // onBehalfOfContentOwnerChannel directs the upload to the correct Brand
-    // Account channel when the OAuth token belongs to the managing Google account.
+    // onBehalfOfContentOwner + onBehalfOfContentOwnerChannel are the correct
+    // parameters for targeting a specific Brand Account channel when the OAuth
+    // token belongs to the managing Google account.
+    // NOTE: onBehalfOfContentOwner must be an empty string (not omitted) when
+    // you are the content owner — omitting it causes the API to ignore
+    // onBehalfOfContentOwnerChannel entirely.
+    // channelId inside the snippet object is ignored by the YouTube API and
+    // has been removed.
     const res = await youtube.videos.insert({
       part: ['snippet', 'status'],
+      onBehalfOfContentOwner: '',
       onBehalfOfContentOwnerChannel: channelId,
       requestBody: {
         snippet: {
-          channelId,
           title: (title || 'Carousel Video').slice(0, 100),
           description: (description || '').slice(0, 5000),
           tags: tags || [],
