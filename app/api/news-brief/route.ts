@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
         role: 'user',
         content: `Today is ${today}. Search for news published TODAY (${today}) only. You MUST verify the publication date before selecting a story — reject any story published before ${today}. When calling web_search, always include "${today}" or "today" in your search query to bias toward fresh results. Search in ${topicKeywords}.${hasExclusions ? `\n\nIMPORTANT: You MUST NOT cover any of these topics — they are all banned:\n${exclusionList}\n\nFind a completely different, unrelated story from today's news.` : ''}
 
-If you cannot find a story published on ${today}, respond with ONLY this JSON: {"topic":"No fresh news found for ${today}","headline":"No story available","articleUrl":"","searchTerms":[]}
+If you cannot find a story published on ${today}, respond with ONLY this JSON: {"topic":"no news found for ${today}","headline":"No story available","articleUrl":"","searchTerms":[]}
 Do NOT fall back to older stories under any circumstances.
 
 Respond with ONLY a JSON object. No explanatory text before or after. No markdown. Just the raw JSON.
@@ -147,6 +147,7 @@ The JSON object must contain:
       'no news', 'no stories', 'nothing found', 'no results', 'no articles',
       'no recent', 'no coverage', 'no updates', 'could not find', 'unable to find',
       'no golf news', 'no f1 news', 'no football news', 'no cricket news',
+      'no fresh news', 'no story available', 'story not found',
     ]
     const isNoNews = noNewsPatterns.some(p => topicLower.includes(p))
       // Also reject if topic looks like a date-only fallback e.g. "April 15, 2026"
