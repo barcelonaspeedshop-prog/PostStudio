@@ -869,6 +869,15 @@ export default function ApprovalsPage() {
                               <span className="text-[11px]">▶</span> Preview
                             </button>
                           )}
+                          {hasVideo && (
+                            <a
+                              href={`/api/approvals/${item.id}/video`}
+                              download
+                              className="px-4 py-2.5 min-h-[44px] border border-red-200 text-red-600 text-[13px] font-medium rounded-lg hover:bg-red-50 transition-colors flex items-center gap-1.5"
+                            >
+                              <span className="text-[11px]">↓</span> Download for YouTube
+                            </a>
+                          )}
                           <button
                             onClick={() => regenerateItem(item)}
                             disabled={isRegenerating || isActing}
@@ -937,6 +946,15 @@ export default function ApprovalsPage() {
                     }`}>
                       {item.status}
                     </span>
+                    {item.status === 'approved' && item.videoBase64 && (
+                      <a
+                        href={`/api/approvals/${item.id}/video`}
+                        download
+                        className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-600 hover:bg-red-100 transition-colors whitespace-nowrap"
+                      >
+                        ↓ YouTube
+                      </a>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1363,6 +1381,13 @@ export default function ApprovalsPage() {
                 >
                   Close
                 </button>
+                <a
+                  href={`/api/approvals/${previewItem.id}/video`}
+                  download
+                  className="px-4 py-2.5 min-h-[44px] border border-red-200 text-red-600 text-[13px] font-medium rounded-lg hover:bg-red-50 transition-colors flex items-center gap-1.5"
+                >
+                  <span className="text-[11px]">↓</span> YouTube
+                </a>
               </div>
             </div>
           </div>
