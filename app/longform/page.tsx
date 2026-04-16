@@ -1,11 +1,12 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 
 type Chapter = { id: number; title: string; type: string; narration: string; visual: string }
 type Script = { title: string; summary: string; chapters: Chapter[] }
 
 const CHANNELS = ['Gentlemen of Fuel', 'Omnira F1', 'Road & Trax', 'Omnira Football']
+const CALM_CHANNELS = ['Omnira Food', 'Omnira Travel']
 
 const VOICES = [
   { id: 'v1Oa3bMmaLK6LwTzVkOy', label: 'Peter — BBC Type' },
@@ -37,13 +38,15 @@ export default function LongFormPage() {
   const [generatingAllVoiceovers, setGeneratingAllVoiceovers] = useState(false)
   const [testMode, setTestMode] = useState(false)
   const [testDuration, setTestDuration] = useState<10 | 30>(10)
-  const [bgMusic, setBgMusic] = useState<File | null>(null)
-  const [bgMusicName, setBgMusicName] = useState('')
-  const [musicVolume, setMusicVolume] = useState(0.15)
-  const bgMusicRef = useRef<HTMLInputElement>(null)
+  const [musicMood, setMusicMood] = useState<'calm' | 'energy'>('energy')
   const [selectedVoice, setSelectedVoice] = useState(VOICES[0].id)
   const [clippingVideo, setClippingVideo] = useState(false)
   const [clips, setClips] = useState<{ filename: string; duration: number }[]>([])
+
+  // Auto-default music mood based on channel
+  useEffect(() => {
+    setMusicMood(CALM_CHANNELS.includes(channel) ? 'calm' : 'energy')
+  }, [channel])
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -165,11 +168,9 @@ export default function LongFormPage() {
         formData.append('audioChapterIds', chIdStr)
       }
 
-      // Send background music if provided
-      if (bgMusic) {
-        formData.append('music', bgMusic, bgMusic.name)
-        formData.append('musicVolume', String(musicVolume))
-      }
+      // Send music mood — server picks a random track from Drive
+      formData.append('musicMood', musicMood)
+      formData.append('musicVolume', '0.15')
 
       const startRes = await fetch('/api/story-video/start', { method: 'POST', body: formData })
       const startData = await startRes.json()
@@ -406,22 +407,29 @@ export default function LongFormPage() {
             {script && (
               <div className="bg-stone-50 border border-stone-100 rounded-xl p-4 flex flex-col gap-3">
                 <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Background music</p>
-                <input ref={bgMusicRef} type="file" accept="audio/*" className="hidden" onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) { setBgMusic(file); setBgMusicName(file.name); showToast(`Music: ${file.name}`) }
-                }} />
-                <button onClick={() => bgMusicRef.current?.click()} className="w-full px-3 py-2 text-[12px] border border-stone-200 rounded-lg hover:bg-white transition-colors text-stone-600 text-left">
-                  {bgMusic ? `\u2713 ${bgMusicName}` : '+ Add music track (optional)'}
-                </button>
-                {bgMusic && (
-                  <>
-                    <button onClick={() => { setBgMusic(null); setBgMusicName('') }} className="text-[11px] text-red-500 hover:text-red-700 text-left">Remove</button>
-                    <div>
-                      <p className="text-[11px] text-stone-400 mb-1">Volume — {Math.round(musicVolume * 100)}%</p>
-                      <input type="range" min="0" max="1" step="0.05" value={musicVolume} onChange={(e) => setMusicVolume(parseFloat(e.target.value))} className="w-full" />
-                    </div>
-                  </>
-                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setMusicMood('calm')}
+                    className={`flex-1 py-2 text-[12px] font-medium rounded-lg border transition-colors ${
+                      musicMood === 'calm'
+                        ? 'bg-sky-100 text-sky-700 border-sky-300'
+                        : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'
+                    }`}
+                  >
+                    Calm
+                  </button>
+                  <button
+                    onClick={() => setMusicMood('energy')}
+                    className={`flex-1 py-2 text-[12px] font-medium rounded-lg border transition-colors ${
+                      musicMood === 'energy'
+                        ? 'bg-amber-100 text-amber-700 border-amber-300'
+                        : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'
+                    }`}
+                  >
+                    Energy
+                  </button>
+                </div>
+                <p className="text-[10px] text-stone-400">Track auto-selected from library</p>
               </div>
             )}
 

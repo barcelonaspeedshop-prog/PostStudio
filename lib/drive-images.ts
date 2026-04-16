@@ -181,3 +181,48 @@ export async function getDriveImageAsBase64(fileId: string): Promise<string> {
   const buf = Buffer.from(res.data as ArrayBuffer)
   return `data:image/jpeg;base64,${buf.toString('base64')}`
 }
+
+/**
+ * Pick a random audio file from the music/<mood> folder in Drive.
+ * Folder path: <root>/music/<mood>/
+ * Returns null if the folder is empty or doesn't exist yet.
+ */
+export async function getRandomDriveMusicTrack(
+  mood: 'calm' | 'energy',
+): Promise<{ id: string; name: string } | null> {
+  const drive = await getDriveClient()
+  const rootId = process.env.GOOGLE_DRIVE_FOLDER_ID
+  if (!rootId) throw new Error('GOOGLE_DRIVE_FOLDER_ID is not set')
+
+  const musicFolderId = await findOrCreateFolder(drive, 'music', rootId)
+  const moodFolderId = await findOrCreateFolder(drive, mood, musicFolderId)
+
+  const res = await drive.files.list({
+    q: `'${moodFolderId}' in parents and (mimeType contains 'audio/' or name contains '.mp3' or name contains '.m4a' or name contains '.wav') and trashed=false`,
+    fields: 'files(id,name)',
+    pageSize: 100,
+  })
+
+  const files = res.data.files || []
+  if (files.length === 0) return null
+
+  const picked = files[Math.floor(Math.random() * files.length)]
+  return { id: picked.id!, name: picked.name! }
+}
+
+/**
+ * Download a Drive file by ID directly to a local file path.
+ */
+export async function downloadDriveFileToPath(
+  fileId: string,
+  destPath: string,
+): Promise<void> {
+  const drive = await getDriveClient()
+  const res = await drive.files.get(
+    { fileId, alt: 'media' },
+    { responseType: 'stream' },
+  )
+  const { pipeline } = await import('stream/promises')
+  const { createWriteStream } = await import('fs')
+  await pipeline(res.data as NodeJS.ReadableStream, createWriteStream(destPath))
+}

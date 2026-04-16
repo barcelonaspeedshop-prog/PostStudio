@@ -6,6 +6,7 @@ import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import path from 'path'
 import { createJob, updateJob, cleanOldJobs } from '../jobs'
+import { getRandomDriveMusicTrack, downloadDriveFileToPath } from '@/lib/drive-images'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -396,15 +397,33 @@ export async function POST(req: NextRequest) {
     }
     console.log(`[story-video] Audio files received for ${Object.keys(audioByChapter).length} chapters: [${Object.keys(audioByChapter).join(', ')}]`)
 
-    // Stream background music to disk if provided
+    // Stream background music to disk — either uploaded file or Drive mood pick
     let musicPath: string | null = null
     let musicVolume = 0.15
     const musicFile = formData.get('music') as File | null
+    const musicMood = formData.get('musicMood') as string | null
     const musicVolumeRaw = formData.get('musicVolume') as string | null
+
     if (musicFile && musicFile.size > 0) {
+      // Legacy: uploaded file
       const ext = musicFile.name.split('.').pop() || 'mp3'
       musicPath = path.join(tmpDir, `bg_music.${ext}`)
       await streamToDisk(musicFile, musicPath)
+    } else if (musicMood === 'calm' || musicMood === 'energy') {
+      // New: pick a random track from Drive music/<mood>/
+      try {
+        const track = await getRandomDriveMusicTrack(musicMood)
+        if (track) {
+          const ext = track.name.split('.').pop() || 'mp3'
+          musicPath = path.join(tmpDir, `bg_music.${ext}`)
+          await downloadDriveFileToPath(track.id, musicPath)
+          console.log(`[story-video] Drive music track (${musicMood}): ${track.name}`)
+        } else {
+          console.warn(`[story-video] No tracks found in Drive music/${musicMood}/ — continuing without music`)
+        }
+      } catch (e) {
+        console.warn(`[story-video] Failed to fetch Drive music for mood "${musicMood}":`, e instanceof Error ? e.message : e)
+      }
     }
     if (musicVolumeRaw) {
       musicVolume = Math.max(0, Math.min(1, parseFloat(musicVolumeRaw) || 0.15))
