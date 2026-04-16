@@ -27,15 +27,64 @@ async function callClaudeWithRetry(
 }
 
 const CHANNEL_TOPICS: Record<string, string> = {
-  'Gentlemen of Fuel': 'classic cars, luxury cars, supercars, automotive',
-  'Omnira F1': 'Formula 1, F1 racing, Grand Prix',
-  'Road & Trax': 'motorsport, racing, rally, endurance racing, NASCAR, IndyCar',
-  'Omnira Football': 'football, soccer, Premier League, Champions League, La Liga, Bundesliga, Serie A, Ligue 1 — NOT American football, NOT NFL, NOT rugby',
-  'Omnira Cricket': 'cricket, Test cricket, T20, IPL, international cricket',
-  'Omnira Golf': 'golf, PGA Tour, Masters, Ryder Cup, LIV Golf',
-  'Omnira NFL': 'NFL, American football, Super Bowl, NFL draft, touchdowns',
-  'Omnira Food': 'food, recipes, restaurants, cuisine, cooking, chefs',
-  'Omnira Travel': 'travel, destinations, tourism, adventure, hotels, flights',
+  'Gentlemen of Fuel': 'classic cars, luxury cars, supercars, exotic cars, automotive, car launches, car auctions',
+  'Omnira F1': 'Formula 1, F1 racing, Grand Prix, F1 driver news, F1 team news, F1 championship',
+  'Road & Trax': 'motorsport, racing, rally, endurance racing, NASCAR, IndyCar, WRC, IMSA, DTM',
+  'Omnira Football': 'football, soccer, Premier League, Champions League, La Liga, Bundesliga, Serie A, Ligue 1, transfer news — NOT American football, NOT NFL, NOT rugby',
+  'Omnira Cricket': 'cricket, Test cricket, T20, IPL, international cricket, county cricket, ODI',
+  'Omnira Golf': 'golf, PGA Tour, Masters, Ryder Cup, LIV Golf, European Tour, DP World Tour, golf tournament',
+  'Omnira NFL': 'NFL, American football, NFL draft, NFL free agency, Super Bowl, quarterback, touchdowns',
+  'Omnira Food': 'food, recipes, restaurants, cuisine, cooking, chefs, Michelin star, food trends, dining',
+  'Omnira Travel': 'travel, destinations, tourism, adventure, hotels, flights, travel news, holiday',
+}
+
+// 2-3 search angles per channel — tried in order if the first yields nothing
+const CHANNEL_SEARCH_ANGLES: Record<string, string[]> = {
+  'Gentlemen of Fuel': [
+    'luxury supercar new model reveal',
+    'exotic car auction sale record',
+    'classic car news collector',
+  ],
+  'Omnira F1': [
+    'Formula 1 race Grand Prix news',
+    'F1 driver team announcement result',
+    'Formula One qualifying championship standings',
+  ],
+  'Road & Trax': [
+    'motorsport race result news',
+    'NASCAR IndyCar WRC rally latest',
+    'endurance racing Le Mans IMSA update',
+  ],
+  'Omnira Football': [
+    'Premier League Champions League news',
+    'soccer football transfer signing',
+    'La Liga Bundesliga Serie A match result',
+  ],
+  'Omnira Cricket': [
+    'IPL cricket match result score',
+    'international cricket Test T20 ODI series',
+    'cricket news player team update',
+  ],
+  'Omnira Golf': [
+    'PGA Tour golf tournament leaderboard result',
+    'LIV Golf DP World Tour news',
+    'golf player news Masters Ryder Cup',
+  ],
+  'Omnira NFL': [
+    'NFL draft pick news trade',
+    'NFL free agency signing quarterback',
+    'American football NFL team news update',
+  ],
+  'Omnira Food': [
+    'restaurant chef Michelin star news',
+    'food trend recipe celebrity chef',
+    'dining food industry news opening',
+  ],
+  'Omnira Travel': [
+    'travel destination news tourism',
+    'airline hotel travel deal news',
+    'holiday adventure travel update',
+  ],
 }
 
 const VALID_CHANNELS = Object.keys(CHANNEL_TOPICS)
@@ -73,6 +122,99 @@ async function fetchArticleImage(url: string): Promise<string | null> {
   }
 }
 
+// Build the search prompt for a given attempt
+function buildSearchPrompt(opts: {
+  channel: string
+  topicKeywords: string
+  angles: string[]
+  today: string
+  yesterday: string
+  hasExclusions: boolean
+  exclusionList: string
+  broadFallback: boolean
+}): string {
+  const { topicKeywords, angles, today, yesterday, hasExclusions, exclusionList, broadFallback } = opts
+  const anglesText = angles.map((a, i) => `${i + 1}. "${a} news"`).join('\n')
+  const dateWindow = broadFallback
+    ? `the last 72 hours (since ${opts.yesterday})`
+    : `the last 48 hours (today ${today} or yesterday ${yesterday})`
+  const dateHint = broadFallback
+    ? `Include date terms like "${yesterday}" or "${today}" in your searches.`
+    : `Include "${today}" or "${yesterday}" in your web searches to find fresh results.`
+
+  return `Today is ${today}. Find a news story published in ${dateWindow} about: ${topicKeywords}.
+
+Try these search angles in order — use whichever finds the most recent story:
+${anglesText}
+
+${dateHint}
+${hasExclusions ? `\nYou MUST NOT cover any of these topics:\n${exclusionList}\nFind a completely different story.\n` : ''}
+If you genuinely cannot find any story from the last ${broadFallback ? '72' : '48'} hours, respond with ONLY this JSON:
+{"topic":"no news found","headline":"No story available","articleUrl":"","searchTerms":[]}
+
+Otherwise respond with ONLY a JSON object (no markdown, no extra text):
+- "topic": concise descriptive topic string (15-25 words)
+- "headline": short 5-8 word headline
+- "articleUrl": URL of the best source article
+- "searchTerms": array of 5 specific image search terms (player names, team names, venues, car models)`
+}
+
+function isNoNewsResponse(topic: string): boolean {
+  const t = (topic || '').toLowerCase().trim()
+  if (!t || t.length < 10) return true
+  const patterns = [
+    'no news found', 'no story available', 'no stories', 'nothing found',
+    'no results', 'no articles', 'no recent', 'no coverage', 'no updates',
+    'could not find', 'unable to find', 'no fresh news', 'story not found',
+    'no news available',
+  ]
+  return patterns.some(p => t.includes(p))
+}
+
+async function searchForNews(opts: {
+  channel: string
+  topicKeywords: string
+  angles: string[]
+  today: string
+  yesterday: string
+  hasExclusions: boolean
+  exclusionList: string
+  excludeTopics: string[]
+  broadFallback: boolean
+}): Promise<{ topic: string; headline: string; articleUrl?: string; searchTerms?: string[] } | null> {
+  const systemPrompt = opts.hasExclusions
+    ? `You are a news researcher. You MUST NOT cover any of the following topics:\n${opts.exclusionList}\nFind a completely different story about different people, teams, and events.`
+    : `You are a news researcher.`
+
+  const userContent = buildSearchPrompt(opts)
+
+  const searchMessage = await callClaudeWithRetry({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1024,
+    system: systemPrompt,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    tools: [{ type: 'web_search_20250305', name: 'web_search' }] as any,
+    messages: [{ role: 'user', content: userContent }],
+  })
+
+  const searchText = searchMessage.content
+    .filter((b) => b.type === 'text')
+    .map((b) => (b as { type: 'text'; text: string }).text)
+    .join('')
+
+  try {
+    const cleaned = searchText.replace(/```json|```/g, '').trim()
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/)?.[0]
+    if (!jsonMatch) return null
+    const parsed = JSON.parse(jsonMatch)
+    if (isNoNewsResponse(parsed.topic)) return null
+    return parsed
+  } catch {
+    console.error('[news-brief] Failed to parse search response:', searchText.substring(0, 300))
+    return null
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { channel, exclude_topic, exclude_topics: rawExcludeTopics } = await req.json()
@@ -89,71 +231,29 @@ export async function POST(req: NextRequest) {
     }
 
     const topicKeywords = CHANNEL_TOPICS[channel]
+    const angles = CHANNEL_SEARCH_ANGLES[channel] || [topicKeywords]
     const today = new Date().toISOString().split('T')[0]
+    const yesterdayDate = new Date()
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+    const yesterday = yesterdayDate.toISOString().split('T')[0]
 
-    // Step 1: Use Claude with web search to find today's top story
     const hasExclusions = exclude_topics.length > 0
     const exclusionList = exclude_topics.map((t, i) => `${i + 1}. "${t}"`).join('\n')
-    const searchSystemPrompt = hasExclusions
-      ? `You are a news researcher. You MUST NOT cover any of the following topics under any circumstances — they are all banned:\n${exclusionList}\n\nFind a completely different story about different people, teams, and events. If any of the banned topics involve a specific person, team, or event, do NOT cover that person, team, or event at all even from a different angle.`
-      : `You are a news researcher.`
 
-    const searchMessage = await callClaudeWithRetry({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      system: searchSystemPrompt,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tools: [{ type: 'web_search_20250305', name: 'web_search' }] as any,
-      messages: [{
-        role: 'user',
-        content: `Today is ${today}. Search for news published TODAY (${today}) only. You MUST verify the publication date before selecting a story — reject any story published before ${today}. When calling web_search, always include "${today}" or "today" in your search query to bias toward fresh results. Search in ${topicKeywords}.${hasExclusions ? `\n\nIMPORTANT: You MUST NOT cover any of these topics — they are all banned:\n${exclusionList}\n\nFind a completely different, unrelated story from today's news.` : ''}
+    const searchOpts = { channel, topicKeywords, angles, today, yesterday, hasExclusions, exclusionList, excludeTopics: exclude_topics }
 
-If you cannot find a story published on ${today}, respond with ONLY this JSON: {"topic":"no news found for ${today}","headline":"No story available","articleUrl":"","searchTerms":[]}
-Do NOT fall back to older stories under any circumstances.
+    // Attempt 1: last 48 hours with channel-specific search angles
+    console.log(`[news-brief] [${channel}] Attempt 1 — 48h window, ${angles.length} angles`)
+    let trend = await searchForNews({ ...searchOpts, broadFallback: false })
 
-Respond with ONLY a JSON object. No explanatory text before or after. No markdown. Just the raw JSON.
-
-The JSON object must contain:
-- "topic": a concise but descriptive topic string (15-25 words) that captures the story
-- "headline": a short 5-8 word headline summary
-- "articleUrl": the URL of the best source article you found
-- "searchTerms": an array of 5 short image search terms biased toward fresh content — include the current date (${today}), "breaking", or "today" where relevant alongside specific people, cars, teams, and venues mentioned in the story`,
-      }],
-    })
-
-    // Extract the final text response (after tool use)
-    const searchText = searchMessage.content
-      .filter((b) => b.type === 'text')
-      .map((b) => (b as { type: 'text'; text: string }).text)
-      .join('')
-
-    let trend: { topic: string; headline: string; articleUrl?: string; searchTerms?: string[] }
-    try {
-      const cleaned = searchText.replace(/```json|```/g, '').trim()
-      const jsonMatch = cleaned.match(/\{[\s\S]*\}/)?.[0]
-      if (!jsonMatch) throw new Error('No JSON object found in response')
-      trend = JSON.parse(jsonMatch)
-    } catch {
-      console.error('[news-brief] Failed to parse search response:', searchText.substring(0, 500))
-      return NextResponse.json(
-        { error: 'Failed to parse trending topic response from AI' },
-        { status: 502, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
-      )
+    // Attempt 2: widen to 72 hours with broader terms if first attempt found nothing
+    if (!trend) {
+      console.warn(`[news-brief] [${channel}] Attempt 1 returned no news — retrying with 72h window`)
+      trend = await searchForNews({ ...searchOpts, broadFallback: true })
     }
 
-    // Validate topic — reject fallback/no-news responses before generating slides
-    const topicLower = (trend.topic || '').toLowerCase()
-    const noNewsPatterns = [
-      'no news', 'no stories', 'nothing found', 'no results', 'no articles',
-      'no recent', 'no coverage', 'no updates', 'could not find', 'unable to find',
-      'no golf news', 'no f1 news', 'no football news', 'no cricket news',
-      'no fresh news', 'no story available', 'story not found',
-    ]
-    const isNoNews = noNewsPatterns.some(p => topicLower.includes(p))
-      // Also reject if topic looks like a date-only fallback e.g. "April 15, 2026"
-      || /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}/i.test(trend.topic || '')
-    if (isNoNews || !trend.topic || trend.topic.trim().length < 10) {
-      console.warn('[news-brief] No fresh news found — topic rejected:', trend.topic)
+    if (!trend) {
+      console.warn(`[news-brief] [${channel}] Both attempts returned no news`)
       return NextResponse.json(
         { error: 'No fresh news found for this channel today' },
         { status: 503, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
