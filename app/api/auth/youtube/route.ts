@@ -46,7 +46,10 @@ export async function GET(req: NextRequest) {
   const oauth2 = getOAuth2Client()
   const authUrl = oauth2.generateAuthUrl({
     access_type: 'offline',
-    prompt: 'consent',
+    // 'select_account consent' forces Google to always show the account-picker
+    // AND the full consent screen, so the user can switch to the correct Brand
+    // Account for each channel instead of silently reusing the last session.
+    prompt: 'select_account consent',
     scope: [
       'https://www.googleapis.com/auth/youtube.upload',
       'https://www.googleapis.com/auth/youtube.readonly',

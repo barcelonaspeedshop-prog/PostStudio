@@ -62,6 +62,20 @@ const ACCOUNT_DATA = [
   ]},
 ]
 
+// Expected YouTube channel IDs — used to detect when the wrong Brand Account
+// was connected (all 8 Omnira channels sharing GoF's token is a known issue).
+const EXPECTED_YT_CHANNEL_IDS: Record<string, string> = {
+  'Gentlemen of Fuel': 'UCRul9-FAiGqwz7yKa7WRCwQ',
+  'Omnira F1':         'UCpJHo_MnHVZ2cCydZVAND2Q',
+  'Road & Trax':       'UCL2hKeQUBiEG36rfTs9bhbw',
+  'Omnira Football':   'UClMPeEgy_Q21K0v5GrOh4kw',
+  'Omnira Cricket':    'UCiXqVtRt-KYsRlS0LYl_iBw',
+  'Omnira Golf':       'UCyUvDlet6Py9D30aCdv46SA',
+  'Omnira NFL':        'UCR6DnL1k6Uq1lgHT27cKnHA',
+  'Omnira Food':       'UC970CeC0HKQIlLuiqbvgkkA',
+  'Omnira Travel':     'UCkehLjuwibcMWVeP5xzWlJA',
+}
+
 const PLATFORM_TIPS: Record<string, string> = {
   TikTok: 'Set up TikTok to reach a younger, high-engagement audience',
   Instagram: 'Instagram Reels drive significant organic reach',
@@ -377,51 +391,77 @@ function AccountsPageInner() {
                     </div>
 
                     {/* YouTube API connection */}
-                    <div className="mt-4 pt-4 border-t border-stone-100">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-[12px] font-medium text-stone-700">YouTube API</p>
-                          {ytStatus[ch.channel]?.connected ? (
-                            <div className="mt-0.5 space-y-0.5">
-                              <p className="text-[11px] text-stone-400 truncate">
-                                {ytStatus[ch.channel]?.youtube_handle || ytStatus[ch.channel]?.youtube_channel_name || 'Connected'}
-                              </p>
-                              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
-                                CONNECTED
-                              </span>
+                    {(() => {
+                      const yt = ytStatus[ch.channel]
+                      const expectedId = EXPECTED_YT_CHANNEL_IDS[ch.channel]
+                      const connectedId = yt?.youtube_channel_id
+                      const wrongChannel = yt?.connected && expectedId && connectedId && connectedId !== expectedId
+                      return (
+                        <div className="mt-4 pt-4 border-t border-stone-100">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-[12px] font-medium text-stone-700">YouTube API</p>
+                              {yt?.connected ? (
+                                <div className="mt-0.5 space-y-1">
+                                  <p className="text-[11px] text-stone-400 truncate">
+                                    {yt?.youtube_handle || yt?.youtube_channel_name || 'Connected'}
+                                  </p>
+                                  {wrongChannel ? (
+                                    <div>
+                                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-red-50 text-red-700">
+                                        ⚠ WRONG CHANNEL
+                                      </span>
+                                      <p className="text-[10px] text-red-600 mt-1 leading-tight">
+                                        Connected to <code className="font-mono">{connectedId?.slice(0,12)}…</code> — expected <code className="font-mono">{expectedId?.slice(0,12)}…</code>. Reconnect and select the correct Brand Account.
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
+                                      CONNECTED
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-[11px] text-stone-400 mt-0.5">
+                                  Connect to publish videos to YouTube
+                                </p>
+                              )}
                             </div>
-                          ) : (
-                            <p className="text-[11px] text-stone-400 mt-0.5">
-                              Connect to publish videos to YouTube
-                            </p>
+                            {yt?.connected ? (
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <a
+                                  href={`/api/auth/youtube?channel=${encodeURIComponent(ch.channel)}`}
+                                  className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${wrongChannel ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
+                                >
+                                  ↻ Reconnect
+                                </a>
+                                <button
+                                  onClick={() => disconnectYt(ch.channel)}
+                                  disabled={ytDisconnecting === ch.channel}
+                                  className="text-[11px] text-stone-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                                >
+                                  {ytDisconnecting === ch.channel ? 'Removing...' : 'Remove'}
+                                </button>
+                              </div>
+                            ) : (
+                              <a
+                                href={`/api/auth/youtube?channel=${encodeURIComponent(ch.channel)}`}
+                                className="shrink-0 px-3 py-1.5 text-[12px] font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                              >
+                                Connect
+                              </a>
+                            )}
+                          </div>
+                          {wrongChannel && (
+                            <div className="mt-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                              <p className="text-[10px] text-red-700 leading-relaxed">
+                                <strong>Action required:</strong> Click <strong>↻ Reconnect</strong>. On Google&apos;s screen, click <strong>&quot;Switch account&quot;</strong> or <strong>&quot;Use another account&quot;</strong> and sign in as the <strong>{ch.channel}</strong> Brand Account.
+                              </p>
+                            </div>
                           )}
                         </div>
-                        {ytStatus[ch.channel]?.connected ? (
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <a
-                              href={`/api/auth/youtube?channel=${encodeURIComponent(ch.channel)}`}
-                              className="px-2 py-1 text-[10px] font-medium bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors"
-                            >
-                              ↻ Reconnect
-                            </a>
-                            <button
-                              onClick={() => disconnectYt(ch.channel)}
-                              disabled={ytDisconnecting === ch.channel}
-                              className="text-[11px] text-stone-400 hover:text-red-500 transition-colors disabled:opacity-50"
-                            >
-                              {ytDisconnecting === ch.channel ? 'Removing...' : 'Remove'}
-                            </button>
-                          </div>
-                        ) : (
-                          <a
-                            href={`/api/auth/youtube?channel=${encodeURIComponent(ch.channel)}`}
-                            className="shrink-0 px-3 py-1.5 text-[12px] font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                          >
-                            Connect
-                          </a>
-                        )}
-                      </div>
-                    </div>
+                      )
+                    })()}
 
                     {/* Meta (Instagram + Facebook) direct API connection */}
                     <div className="mt-4 pt-4 border-t border-stone-100">
