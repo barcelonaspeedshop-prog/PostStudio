@@ -12,6 +12,13 @@ export type Job = {
   error?: string
   tmpDir?: string
   createdAt: number
+  // Chapter timing data — used by the clip route to cut at boundaries
+  chapterOrder?: number[]
+  chapterDurations?: Record<number, number>
+  chapterTitles?: Record<number, string>
+  // Cached format variants (created on first request)
+  squarePath?: string
+  reelsPath?: string
 }
 
 const jobs = new Map<string, Job>()

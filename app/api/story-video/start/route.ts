@@ -86,7 +86,7 @@ async function streamToDisk(file: File, dest: string): Promise<void> {
 
 // ─── Subtitle generation ───
 
-type ChapterInfo = { id: number; narration?: string }
+type ChapterInfo = { id: number; narration?: string; title?: string }
 
 function buildAss(chapters: ChapterInfo[], chapterDurations: Record<number, number>, W: number, H: number): string {
   const fmtTime = (s: number) => {
@@ -382,6 +382,11 @@ async function assembleInBackground(
       videoPath: outputVideo,
       duration: totalDuration,
       tmpDir,
+      chapterOrder: chapters.map(c => c.id),
+      chapterDurations,
+      chapterTitles: Object.fromEntries(
+        chapters.filter(c => c.title).map(c => [c.id, c.title!])
+      ),
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'

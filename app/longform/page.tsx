@@ -40,8 +40,9 @@ export default function LongFormPage() {
   const [testDuration, setTestDuration] = useState<10 | 30>(10)
   const [musicMood, setMusicMood] = useState<'calm' | 'energy'>('energy')
   const [selectedVoice, setSelectedVoice] = useState(VOICES[0].id)
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null)
   const [clippingVideo, setClippingVideo] = useState(false)
-  const [clips, setClips] = useState<{ filename: string; duration: number }[]>([])
+  const [clips, setClips] = useState<{ chapterId: number; title: string; duration: number; clipFile: string; thumbFile: string }[]>([])
   const [draftSaved, setDraftSaved] = useState(false)
   const [isRestored, setIsRestored] = useState(false)
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -190,7 +191,7 @@ export default function LongFormPage() {
     setClips([])
     try {
       const formData = new FormData()
-      formData.append('chapters', JSON.stringify(script.chapters.map(ch => ({ id: ch.id, narration: ch.narration }))))
+      formData.append('chapters', JSON.stringify(script.chapters.map(ch => ({ id: ch.id, narration: ch.narration, title: ch.title }))))
 
       for (const [chIdStr, files] of Object.entries(chapterMedia)) {
         for (const file of files) {
@@ -237,28 +238,10 @@ export default function LongFormPage() {
         poll()
       })
 
+      setCurrentJobId(startData.jobId)
       setVideoUrl(result.downloadUrl)
+      setClips([])
       showToast(`Video ready — ${Math.round(result.duration)}s`)
-
-      // Auto-cut into ≤60s short clips
-      setClippingVideo(true)
-      setAssemblyProgress('Splitting into short clips...')
-      try {
-        const clipRes = await fetch('/api/story-video/clip', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jobId: startData.jobId, channel, title: script.title }),
-        })
-        const clipData = await clipRes.json()
-        if (clipRes.ok && clipData.clips) {
-          setClips(clipData.clips)
-          showToast(`${clipData.clipCount} clip${clipData.clipCount !== 1 ? 's' : ''} scheduled for reels`)
-        }
-      } catch {
-        // Non-fatal — video is still available
-      } finally {
-        setClippingVideo(false)
-      }
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Error assembling video', 'error')
     } finally {
@@ -278,6 +261,7 @@ export default function LongFormPage() {
     setVoiceoverStatus({})
     setChapterMedia({})
     setVideoUrl(null)
+    setCurrentJobId(null)
     setClips([])
     setDraftSaved(false)
     showToast('Draft cleared')
@@ -289,6 +273,28 @@ export default function LongFormPage() {
     a.href = videoUrl
     a.download = `${channel.replace(/\s+/g, '_')}_story.mp4`
     a.click()
+  }
+
+  // ─── Create chapter clips ───
+  const createClips = async () => {
+    if (!currentJobId) return
+    setClippingVideo(true)
+    setClips([])
+    try {
+      const clipRes = await fetch('/api/story-video/clip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: currentJobId }),
+      })
+      const clipData = await clipRes.json()
+      if (!clipRes.ok) throw new Error(clipData.error || 'Clip creation failed')
+      setClips(clipData.clips || [])
+      showToast(`${clipData.clipCount} chapter clip${clipData.clipCount !== 1 ? 's' : ''} ready`)
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Clip creation failed', 'error')
+    } finally {
+      setClippingVideo(false)
+    }
   }
 
   // ─── Voiceover generation ───
@@ -469,9 +475,13 @@ export default function LongFormPage() {
               </button>
             )}
             {videoUrl && (
-              <button onClick={downloadVideo} className="px-3 py-2 min-h-[44px] text-[13px] font-medium border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors">
-                Download Video
-              </button>
+              <a
+                href={`${videoUrl}?format=youtube`}
+                download="story_youtube_16x9.mp4"
+                className="px-3 py-2 min-h-[44px] text-[13px] font-medium border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors flex items-center"
+              >
+                ↓ Download Video
+              </a>
             )}
           </div>
         </div>
@@ -616,31 +626,72 @@ export default function LongFormPage() {
                 {(assembling || clippingVideo) && assemblyProgress && <p className="text-[10px] text-emerald-600">{assemblyProgress}</p>}
                 {!hasAnyMedia && <p className="text-[10px] text-emerald-500">Add images to chapters to enable</p>}
                 {videoUrl && (
-                  <button onClick={downloadVideo} className="w-full px-3 py-2 text-[12px] font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
-                    &#8595; Download 16:9 Video
-                  </button>
-                )}
-                {clippingVideo && (
-                  <div className="flex items-center gap-2 text-[11px] text-emerald-600">
-                    <Spinner className="w-3 h-3" />
-                    <span>Creating short clips...</span>
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-medium text-emerald-700 uppercase tracking-widest">Download format</p>
+                    <a
+                      href={`${videoUrl}?format=youtube`}
+                      download="story_youtube_16x9.mp4"
+                      className="flex items-center justify-between w-full px-3 py-2 text-[12px] font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                    >
+                      <span>YouTube</span><span className="opacity-75 text-[10px]">16:9 ↓</span>
+                    </a>
+                    <a
+                      href={`${videoUrl}?format=square`}
+                      download="story_instagram_square.mp4"
+                      className="flex items-center justify-between w-full px-3 py-2 text-[12px] font-medium border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors"
+                    >
+                      <span>Instagram Square</span><span className="opacity-75 text-[10px]">1:1 ↓</span>
+                    </a>
+                    <a
+                      href={`${videoUrl}?format=reels`}
+                      download="story_instagram_reels.mp4"
+                      className="flex items-center justify-between w-full px-3 py-2 text-[12px] font-medium border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors"
+                    >
+                      <span>Reels (full video)</span><span className="opacity-75 text-[10px]">9:16 ↓</span>
+                    </a>
                   </div>
                 )}
-                {clips.length > 0 && (
-                  <div className="space-y-1.5">
-                    <p className="text-[10px] font-medium text-emerald-700">{clips.length} clip{clips.length !== 1 ? 's' : ''} scheduled for reels</p>
-                    {clips.map((clip, i) => (
-                      <div key={i} className="flex items-center justify-between text-[11px] text-stone-500 bg-white rounded px-2 py-1">
-                        <span>Part {i + 1} &middot; {clip.duration}s</span>
-                        <a
-                          href={`/api/clips/${clip.filename}`}
-                          download={clip.filename}
-                          className="text-emerald-600 hover:text-emerald-700 font-medium"
-                        >
-                          &#8595;
-                        </a>
+
+                {/* Chapter clips section */}
+                {currentJobId && (
+                  <div className="pt-1 border-t border-emerald-200">
+                    <button
+                      onClick={createClips}
+                      disabled={clippingVideo}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[12px] font-medium border border-emerald-400 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                    >
+                      {clippingVideo ? <><Spinner className="w-3 h-3" /> Creating chapter clips...</> : '✂ Create chapter clips (9:16)'}
+                    </button>
+                    {clips.length > 0 && (
+                      <div className="mt-2 space-y-2">
+                        <p className="text-[10px] font-medium text-emerald-700">{clips.length} chapter clip{clips.length !== 1 ? 's' : ''} ready</p>
+                        {clips.map((clip) => (
+                          <div key={clip.chapterId} className="bg-white rounded-lg border border-stone-100 overflow-hidden">
+                            {clip.thumbFile && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={`/api/clips/${clip.thumbFile}`}
+                                alt={clip.title}
+                                className="w-full aspect-square object-cover"
+                              />
+                            )}
+                            <div className="flex items-center justify-between px-2 py-1.5">
+                              <span className="text-[11px] text-stone-600 truncate max-w-[130px]">{clip.title}</span>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-[10px] text-stone-400">{clip.duration}s</span>
+                                <a
+                                  href={`/api/clips/${clip.clipFile}`}
+                                  download={clip.clipFile}
+                                  className="text-emerald-600 hover:text-emerald-700 font-bold text-[13px]"
+                                >
+                                  ↓
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
                 )}
               </div>

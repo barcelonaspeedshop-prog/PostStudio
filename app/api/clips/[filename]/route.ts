@@ -18,9 +18,11 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid filename' }, { status: 400 })
   }
 
-  // Only allow .mp4 files from the clips directory
-  if (!filename.endsWith('.mp4')) {
-    return NextResponse.json({ error: 'Only mp4 files are served here' }, { status: 400 })
+  // Only allow .mp4 and .jpg files from the clips directory
+  const isVideo = filename.endsWith('.mp4')
+  const isImage = filename.endsWith('.jpg') || filename.endsWith('.jpeg')
+  if (!isVideo && !isImage) {
+    return NextResponse.json({ error: 'Only mp4 and jpg files are served here' }, { status: 400 })
   }
 
   const filePath = path.join(CLIPS_DIR, filename)
@@ -29,6 +31,7 @@ export async function GET(
     return NextResponse.json({ error: 'Clip not found' }, { status: 404 })
   }
 
+  const contentType = isVideo ? 'video/mp4' : 'image/jpeg'
   const stat = statSync(filePath)
   const stream = createReadStream(filePath)
 
@@ -45,10 +48,12 @@ export async function GET(
 
   return new NextResponse(webStream, {
     headers: {
-      'Content-Type': 'video/mp4',
+      'Content-Type': contentType,
       'Content-Length': String(stat.size),
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Cache-Control': 'no-store',
+      'Content-Disposition': isImage
+        ? `inline; filename="${filename}"`
+        : `attachment; filename="${filename}"`,
+      'Cache-Control': isImage ? 'public, max-age=86400' : 'no-store',
     },
   })
 }
