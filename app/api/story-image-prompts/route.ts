@@ -35,17 +35,20 @@ async function promptsForChapter(ch: ChapterInput, styleGuide: string): Promise<
     max_tokens: 1500,
     system: `You are an image prompt writer for Midjourney and DALL-E 3.
 
-TASK: Read the chapter narration and write 4 to 6 image prompts — one per distinct visual scene or moment.
+TASK: Read the chapter narration sentence by sentence. Extract every SPECIFIC moment, named person, named place, specific action, or specific event. Write one image prompt per specific moment.
 
-STRICT RULES:
-- You MUST return between 4 and 6 prompts. Never fewer than 4, even for short chapters.
-- Output is a JSON array of strings ONLY. No keys, no wrapping object, no markdown.
+STRICT RULES — READ CAREFULLY:
+- You MUST return between 4 and 6 prompts. Never fewer than 4.
+- Output is a JSON array of strings ONLY. No keys, no wrapping object, no markdown fences.
 - Each string is one self-contained image prompt (2-3 sentences).
-- Each prompt MUST describe a different visual scene from the others.
-- Every prompt must start with the main subject (a specific person, object, place).
-- Include: subject · setting · lighting · mood · render style cue.
-- Never narrate — describe only what would be visible in a photograph or illustration.
-- If the chapter covers few topics, invent related visual scenes that would logically appear in a video about this subject.`,
+- SPECIFICITY IS MANDATORY: every prompt must reference something explicitly named or described in the narration. Named people, specific ages, specific actions, specific locations, specific time periods.
+- BAD (generic, forbidden): "A golfer practising on a driving range at sunset, warm tones."
+- GOOD (specific, required): "Earl Woods crouching behind a 2-year-old Tiger Woods in a suburban garage, guiding his tiny hands around a cut-down golf club, 1970s fluorescent workshop lighting."
+- Include era/decade where the text mentions it (1970s, 1980s, etc.) — it anchors the visual.
+- Include named individuals with their role and approximate age if stated in the text.
+- Include specific settings named in the text — a named city, stadium, course, or country.
+- Never invent people or events not mentioned. Only illustrate what the text actually says.
+- End every prompt with a render cue: "photorealistic, cinematic lighting" or "editorial illustration, dramatic shadows" etc.`,
     messages: [
       {
         role: 'user',
@@ -57,10 +60,9 @@ ${visual ? `\nVISUAL DIRECTION:\n${visual}` : ''}
 
 CHANNEL STYLE: ${styleGuide}
 
-Write 4-6 image prompts covering the distinct visual moments in this chapter.
+Read the narration carefully. List the specific moments, named people, and events mentioned. Then write 4-6 image prompts — each one illustrating a specific moment from the text, not generic imagery.
 Start your response with [ to open the JSON array.`,
       },
-      // Pre-fill assistant response to force JSON array start
       {
         role: 'assistant',
         content: '[',
