@@ -15,8 +15,10 @@ const SCOPES = [
 // On approval the user lands at /api/auth/meta/callback.
 export async function GET() {
   const appId      = process.env.META_APP_ID
-  const baseUrl    = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
-  const redirectUri = `${baseUrl}/api/auth/meta/callback`
+  // META_REDIRECT_BASE lets us use a domain already whitelisted in the Meta app
+  // (e.g. the legacy hostname) while keeping NEXT_PUBLIC_APP_URL for all other links.
+  const redirectBase = process.env.META_REDIRECT_BASE || process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
+  const redirectUri = `${redirectBase}/api/auth/meta/callback`
 
   if (!appId) {
     return NextResponse.json({ error: 'META_APP_ID is not configured' }, { status: 503 })
