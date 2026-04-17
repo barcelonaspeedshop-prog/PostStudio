@@ -6,7 +6,6 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
-// Channel-specific art direction so prompts match each brand's visual identity
 const CHANNEL_STYLE: Record<string, string> = {
   'Gentlemen of Fuel':  'cinematic automotive photography, dramatic studio lighting, rich dark backgrounds, luxury feel, shallow depth of field, magazine quality',
   'Omnira F1':          'high-speed motorsport photography, motion blur, pit lane energy, cockpit close-ups, tarmac-level angles, vivid F1 team colours',
@@ -21,57 +20,83 @@ const CHANNEL_STYLE: Record<string, string> = {
 
 type ChapterInput = { id: number; title: string; narration: string; visual?: string }
 
-/**
- * For one chapter, identify all distinct visual scenes and return one short
- * image prompt per scene (3-6 prompts depending on content richness).
- * Returns a plain JSON array of strings — no wrapping object.
- */
 async function promptsForChapter(ch: ChapterInput, styleGuide: string): Promise<string[]> {
+  const narration = (ch.narration || '').trim()
+  const visual = (ch.visual || '').trim()
+
+  console.log(
+    `[story-image-prompts] Chapter ${ch.id} "${ch.title}" — narration length: ${narration.length} chars, visual: ${visual.length} chars`
+  )
+
+  // Pre-fill the assistant turn with "[" to force Claude to open a JSON array immediately.
+  // This is the most reliable technique for guaranteed JSON array output.
   const message = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
-    max_tokens: 1200,
-    system: `You are an expert AI image prompt writer for Midjourney and DALL-E 3.
+    max_tokens: 1500,
+    system: `You are an image prompt writer for Midjourney and DALL-E 3.
 
-Your job: read a chapter's narration, identify every distinct visual scene or moment, and write one short image prompt per scene.
+TASK: Read the chapter narration and write 4 to 6 image prompts — one per distinct visual scene or moment.
 
-Rules for each prompt:
-- Start with the primary subject (a specific person, object, or place — never abstract)
-- 2-3 sentences only
-- Pure visual description — no storytelling, no "this shows…", no narration
-- Cover: subject · setting · lighting · mood · one render/style cue at the end
-- Each prompt must describe a DIFFERENT scene from the others in this chapter
+STRICT RULES:
+- You MUST return between 4 and 6 prompts. Never fewer than 4, even for short chapters.
+- Output is a JSON array of strings ONLY. No keys, no wrapping object, no markdown.
+- Each string is one self-contained image prompt (2-3 sentences).
+- Each prompt MUST describe a different visual scene from the others.
+- Every prompt must start with the main subject (a specific person, object, place).
+- Include: subject · setting · lighting · mood · render style cue.
+- Never narrate — describe only what would be visible in a photograph or illustration.
+- If the chapter covers few topics, invent related visual scenes that would logically appear in a video about this subject.`,
+    messages: [
+      {
+        role: 'user',
+        content: `Chapter ${ch.id}: "${ch.title}"
 
-Output format: a JSON array of strings — nothing else. No preamble, no keys, no markdown.
-Example output: ["A worn leather steering wheel...", "Two mechanics argue...", "Rain hammers a pit-lane garage..."]
+NARRATION:
+${narration || '(no narration provided)'}
+${visual ? `\nVISUAL DIRECTION:\n${visual}` : ''}
 
-Aim for 3-6 prompts depending on how many distinct scenes the chapter contains.`,
-    messages: [{
-      role: 'user',
-      content: `Chapter: "${ch.title}"
-Narration: ${ch.narration}${ch.visual ? `\nVisual direction: ${ch.visual}` : ''}
-Channel visual style: ${styleGuide}
+CHANNEL STYLE: ${styleGuide}
 
-Identify all distinct visual scenes in this chapter and write one image prompt per scene.
-Return a JSON array of strings.`,
-    }],
+Write 4-6 image prompts covering the distinct visual moments in this chapter.
+Start your response with [ to open the JSON array.`,
+      },
+      // Pre-fill assistant response to force JSON array start
+      {
+        role: 'assistant',
+        content: '[',
+      },
+    ],
   })
 
-  const raw = message.content
+  // Claude's response continues from the "[" we pre-filled — prepend it back
+  const continuation = message.content
     .filter(b => b.type === 'text')
     .map(b => (b as { type: 'text'; text: string }).text)
     .join('')
     .trim()
 
+  const raw = '[' + continuation
+  console.log(`[story-image-prompts] Chapter ${ch.id} raw response (${raw.length} chars): ${raw.substring(0, 300)}`)
+
   try {
-    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim())
+    // Strip trailing markdown fence if present
+    const cleaned = raw.replace(/```[\s\S]*$/, '').trim()
+    const parsed = JSON.parse(cleaned)
+
     if (Array.isArray(parsed)) {
       const valid = parsed.filter((p): p is string => typeof p === 'string' && p.trim().length > 10)
+      console.log(`[story-image-prompts] Chapter ${ch.id} parsed OK — ${valid.length} prompts`)
       if (valid.length > 0) return valid
     }
-  } catch { /* fall through */ }
 
-  // Fallback: treat the whole response as a single prompt
-  return [raw]
+    console.warn(`[story-image-prompts] Chapter ${ch.id} parsed but got unexpected shape:`, typeof parsed)
+  } catch (e) {
+    console.warn(`[story-image-prompts] Chapter ${ch.id} JSON parse failed:`, e instanceof Error ? e.message : e)
+    console.warn(`[story-image-prompts] Chapter ${ch.id} raw was:`, raw.substring(0, 500))
+  }
+
+  // Last-resort fallback: return the whole response as one prompt
+  return [continuation.replace(/[\[\]"]/g, '').trim()]
 }
 
 export async function POST(req: NextRequest) {
@@ -82,26 +107,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'chapters array is required' }, { status: 400 })
     }
 
+    console.log(`[story-image-prompts] Received ${chapters.length} chapters for channel "${channel}"`)
+    // Log each chapter's narration length so we can verify content is arriving
+    ;(chapters as ChapterInput[]).forEach(ch => {
+      console.log(`  ch${ch.id} "${ch.title}" narration=${ch.narration?.length ?? 0}ch`)
+    })
+
     const styleGuide = CHANNEL_STYLE[channel] || 'cinematic photography, dramatic lighting, high production value'
 
-    // One parallel API call per chapter — guarantees correct chapter assignment
     const settled = await Promise.allSettled(
       (chapters as ChapterInput[]).map(ch => promptsForChapter(ch, styleGuide))
     )
 
     const prompts = (chapters as ChapterInput[]).map((ch, i) => {
       const result = settled[i]
+      if (result.status === 'rejected') {
+        console.error(`[story-image-prompts] Chapter ${ch.id} rejected:`, result.reason)
+      }
       return {
         chapterId: ch.id,
         title: ch.title,
         prompts: result.status === 'fulfilled'
           ? result.value
-          : [`[Failed to generate prompts for "${ch.title}"]`],
+          : [`[Generation failed for chapter "${ch.title}"]`],
       }
     })
 
     const total = prompts.reduce((s, p) => s + p.prompts.length, 0)
-    console.log(`[story-image-prompts] Generated ${total} prompts across ${prompts.length} chapters for "${channel}"`)
+    console.log(`[story-image-prompts] Done — ${total} prompts across ${prompts.length} chapters`)
     return NextResponse.json({ prompts })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
