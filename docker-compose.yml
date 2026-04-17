@@ -45,6 +45,12 @@ services:
       # ElevenLabs (optional — voice-over generation)
       ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
 
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.poststudio.rule=Host(`app.premirafirst.com`)"
+      - "traefik.http.routers.poststudio.entrypoints=websecure"
+      - "traefik.http.routers.poststudio.tls.certresolver=letsencrypt"
+      - "traefik.http.services.poststudio.loadbalancer.server.port=3000"
     restart: unless-stopped
 
 volumes:
