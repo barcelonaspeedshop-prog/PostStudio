@@ -47,11 +47,11 @@ export default function LongFormPage() {
   const [isRestored, setIsRestored] = useState(false)
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // AI image prompts
-  const [imagePrompts, setImagePrompts] = useState<Record<number, string>>({})
+  // AI image prompts — keyed by chapterId, value is array of scene prompts
+  const [imagePrompts, setImagePrompts] = useState<Record<number, string[]>>({})
   const [promptTitles, setPromptTitles] = useState<Record<number, string>>({})
   const [generatingPrompts, setGeneratingPrompts] = useState(false)
-  const [copiedPromptId, setCopiedPromptId] = useState<number | null>(null)
+  const [copiedPromptKey, setCopiedPromptKey] = useState<string | null>(null) // "{chapterId}-{index}"
   const [showPromptsPanel, setShowPromptsPanel] = useState(false)
 
 
@@ -380,15 +380,16 @@ export default function LongFormPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
 
-      const promptMap: Record<number, string> = {}
+      const promptMap: Record<number, string[]> = {}
       const titleMap: Record<number, string> = {}
       for (const item of data.prompts) {
-        promptMap[item.chapterId] = item.prompt
+        promptMap[item.chapterId] = item.prompts  // array of scene prompts
         titleMap[item.chapterId] = item.title
       }
       setImagePrompts(promptMap)
       setPromptTitles(titleMap)
-      showToast('Image prompts generated!')
+      const total = Object.values(promptMap).reduce((s, arr) => s + arr.length, 0)
+      showToast(`${total} image prompts generated across ${data.prompts.length} chapters`)
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Failed to generate prompts', 'error')
     } finally {
@@ -396,12 +397,13 @@ export default function LongFormPage() {
     }
   }
 
-  const copyPrompt = (chapterId: number) => {
-    const prompt = imagePrompts[chapterId]
-    if (!prompt) return
-    navigator.clipboard.writeText(prompt).then(() => {
-      setCopiedPromptId(chapterId)
-      setTimeout(() => setCopiedPromptId(null), 2000)
+  const copyPrompt = (chapterId: number, index: number) => {
+    const prompts = imagePrompts[chapterId]
+    if (!prompts || !prompts[index]) return
+    const key = `${chapterId}-${index}`
+    navigator.clipboard.writeText(prompts[index]).then(() => {
+      setCopiedPromptKey(key)
+      setTimeout(() => setCopiedPromptKey(null), 2000)
     })
   }
 
@@ -409,8 +411,10 @@ export default function LongFormPage() {
     if (!script) return
     const all = script.chapters
       .map(ch => {
-        const p = imagePrompts[ch.id]
-        return p ? `=== ${ch.title} ===\n${p}` : null
+        const prompts = imagePrompts[ch.id]
+        if (!prompts || prompts.length === 0) return null
+        return `=== Chapter ${ch.id} — ${ch.title} ===\n` +
+          prompts.map((p, i) => `Image ${i + 1}: ${p}`).join('\n\n')
       })
       .filter(Boolean)
       .join('\n\n')
@@ -610,9 +614,10 @@ export default function LongFormPage() {
                     ⎘ Copy all prompts
                   </button>
                 )}
-                {Object.keys(imagePrompts).length > 0 && (
-                  <p className="text-[10px] text-indigo-500">{Object.keys(imagePrompts).length} prompts ready</p>
-                )}
+                {Object.keys(imagePrompts).length > 0 && (() => {
+                  const total = Object.values(imagePrompts).reduce((s, arr) => s + arr.length, 0)
+                  return <p className="text-[10px] text-indigo-500">{total} prompts across {Object.keys(imagePrompts).length} chapters</p>
+                })()}
               </div>
             )}
 
@@ -766,31 +771,38 @@ export default function LongFormPage() {
                       <p className="text-[12px] text-stone-500">{chapter.visual}</p>
                     </div>
 
-                    {/* AI Image Prompt */}
-                    {showPromptsPanel && imagePrompts[chapter.id] && (
+                    {/* AI Image Prompts — grouped by chapter, numbered per scene */}
+                    {showPromptsPanel && imagePrompts[chapter.id] && imagePrompts[chapter.id].length > 0 && (
                       <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2.5">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-[10px] font-medium text-indigo-600 uppercase tracking-widest">
-                            Image Prompt #{chapter.id}
-                          </p>
-                          <button
-                            onClick={() => copyPrompt(chapter.id)}
-                            className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${
-                              copiedPromptId === chapter.id
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
-                            }`}
-                          >
-                            {copiedPromptId === chapter.id ? '✓ Copied' : '⎘ Copy'}
-                          </button>
+                        <p className="text-[10px] font-medium text-indigo-600 uppercase tracking-widest mb-2">
+                          {imagePrompts[chapter.id].length} image prompt{imagePrompts[chapter.id].length !== 1 ? 's' : ''}
+                        </p>
+                        <div className="space-y-3">
+                          {imagePrompts[chapter.id].map((prompt, i) => (
+                            <div key={i} className={i > 0 ? 'border-t border-indigo-100 pt-3' : ''}>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] font-semibold text-indigo-500">Image {i + 1}</span>
+                                <button
+                                  onClick={() => copyPrompt(chapter.id, i)}
+                                  className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${
+                                    copiedPromptKey === `${chapter.id}-${i}`
+                                      ? 'bg-green-100 text-green-700'
+                                      : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                                  }`}
+                                >
+                                  {copiedPromptKey === `${chapter.id}-${i}` ? '✓ Copied' : '⎘ Copy'}
+                                </button>
+                              </div>
+                              <p className="text-[12px] text-indigo-800 leading-relaxed">{prompt}</p>
+                            </div>
+                          ))}
                         </div>
-                        <p className="text-[12px] text-indigo-800 leading-relaxed">{imagePrompts[chapter.id]}</p>
                       </div>
                     )}
-                    {showPromptsPanel && generatingPrompts && !imagePrompts[chapter.id] && (
+                    {showPromptsPanel && generatingPrompts && (!imagePrompts[chapter.id] || imagePrompts[chapter.id].length === 0) && (
                       <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2.5 flex items-center gap-2">
                         <Spinner className="w-3 h-3 text-indigo-400" />
-                        <p className="text-[11px] text-indigo-400">Generating prompt #{chapter.id}…</p>
+                        <p className="text-[11px] text-indigo-400">Generating image prompts…</p>
                       </div>
                     )}
 

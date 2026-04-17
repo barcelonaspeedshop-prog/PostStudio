@@ -21,36 +21,57 @@ const CHANNEL_STYLE: Record<string, string> = {
 
 type ChapterInput = { id: number; title: string; narration: string; visual?: string }
 
-// Generate one image prompt for a single chapter — called in parallel for each chapter.
-async function promptForChapter(
-  ch: ChapterInput,
-  styleGuide: string,
-): Promise<string> {
+/**
+ * For one chapter, identify all distinct visual scenes and return one short
+ * image prompt per scene (3-6 prompts depending on content richness).
+ * Returns a plain JSON array of strings — no wrapping object.
+ */
+async function promptsForChapter(ch: ChapterInput, styleGuide: string): Promise<string[]> {
   const message = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
-    max_tokens: 200,
+    max_tokens: 1200,
     system: `You are an expert AI image prompt writer for Midjourney and DALL-E 3.
-Write ONE image prompt for the scene described. Rules:
-- Start with the primary subject (a person, object, or place — be specific)
+
+Your job: read a chapter's narration, identify every distinct visual scene or moment, and write one short image prompt per scene.
+
+Rules for each prompt:
+- Start with the primary subject (a specific person, object, or place — never abstract)
 - 2-3 sentences only
-- Pure visual description — no narrative, no "this chapter shows…"
-- Include: subject, setting, lighting, mood, and a render style cue at the end
-- Output ONLY the prompt text — no labels, no JSON, no preamble`,
+- Pure visual description — no storytelling, no "this shows…", no narration
+- Cover: subject · setting · lighting · mood · one render/style cue at the end
+- Each prompt must describe a DIFFERENT scene from the others in this chapter
+
+Output format: a JSON array of strings — nothing else. No preamble, no keys, no markdown.
+Example output: ["A worn leather steering wheel...", "Two mechanics argue...", "Rain hammers a pit-lane garage..."]
+
+Aim for 3-6 prompts depending on how many distinct scenes the chapter contains.`,
     messages: [{
       role: 'user',
       content: `Chapter: "${ch.title}"
 Narration: ${ch.narration}${ch.visual ? `\nVisual direction: ${ch.visual}` : ''}
-Channel style: ${styleGuide}
+Channel visual style: ${styleGuide}
 
-Write the image prompt now.`,
+Identify all distinct visual scenes in this chapter and write one image prompt per scene.
+Return a JSON array of strings.`,
     }],
   })
 
-  return message.content
+  const raw = message.content
     .filter(b => b.type === 'text')
     .map(b => (b as { type: 'text'; text: string }).text)
     .join('')
     .trim()
+
+  try {
+    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim())
+    if (Array.isArray(parsed)) {
+      const valid = parsed.filter((p): p is string => typeof p === 'string' && p.trim().length > 10)
+      if (valid.length > 0) return valid
+    }
+  } catch { /* fall through */ }
+
+  // Fallback: treat the whole response as a single prompt
+  return [raw]
 }
 
 export async function POST(req: NextRequest) {
@@ -63,10 +84,9 @@ export async function POST(req: NextRequest) {
 
     const styleGuide = CHANNEL_STYLE[channel] || 'cinematic photography, dramatic lighting, high production value'
 
-    // Generate all prompts in parallel — one API call per chapter.
-    // This guarantees exactly one prompt per chapter with no ID confusion.
+    // One parallel API call per chapter — guarantees correct chapter assignment
     const settled = await Promise.allSettled(
-      (chapters as ChapterInput[]).map(ch => promptForChapter(ch, styleGuide))
+      (chapters as ChapterInput[]).map(ch => promptsForChapter(ch, styleGuide))
     )
 
     const prompts = (chapters as ChapterInput[]).map((ch, i) => {
@@ -74,11 +94,14 @@ export async function POST(req: NextRequest) {
       return {
         chapterId: ch.id,
         title: ch.title,
-        prompt: result.status === 'fulfilled' ? result.value : `[Failed to generate prompt for "${ch.title}"]`,
+        prompts: result.status === 'fulfilled'
+          ? result.value
+          : [`[Failed to generate prompts for "${ch.title}"]`],
       }
     })
 
-    console.log(`[story-image-prompts] Generated ${prompts.length} prompts for channel "${channel}"`)
+    const total = prompts.reduce((s, p) => s + p.prompts.length, 0)
+    console.log(`[story-image-prompts] Generated ${total} prompts across ${prompts.length} chapters for "${channel}"`)
     return NextResponse.json({ prompts })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
