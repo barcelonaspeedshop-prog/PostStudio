@@ -137,7 +137,9 @@ export async function PATCH(req: NextRequest) {
 
     // Approved — publish to Instagram and Facebook only
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
-    const caption = item.slides.map(s => `${s.headline} — ${s.body}`).join('\n\n')
+    const rawCaption = item.slides.map(s => `${s.headline} — ${s.body}`).join('\n\n')
+    // Instagram hard limit is 2,200 characters (Meta API error 36004 if exceeded)
+    const caption = rawCaption.length > 2200 ? rawCaption.slice(0, 2197) + '...' : rawCaption
 
     type PlatformResult = { platform: string; success: boolean; error?: string; url?: string }
 
