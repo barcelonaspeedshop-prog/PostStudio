@@ -2,6 +2,8 @@ node_modules
 .next
 .env.local
 .vercel
+credentials.json
+data/credentials.json
 app/api/composite-slides/route.ts.bak
 app/api/video-export/route.ts.bak
 next.config.js.bak
