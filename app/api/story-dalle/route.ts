@@ -1,8 +1,6 @@
 import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
@@ -15,6 +13,7 @@ export const maxDuration = 60
  * Size: 1792×1024 (landscape, suits 16:9 video), quality: hd, style: vivid.
  */
 export async function POST(req: NextRequest) {
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   try {
     const { prompt, chapterId } = await req.json()
 
