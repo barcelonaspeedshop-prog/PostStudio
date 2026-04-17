@@ -532,33 +532,74 @@ export default function LongFormPage() {
       const totalPrompts = Object.values(promptMap).reduce((s, arr) => s + arr.length, 0)
       setBuildMessage(`${totalPrompts} prompts across ${generatedScript.chapters.length} chapters`)
 
-      // ── Step 3: DALL-E images ──
+      // ── Step 3: Images (Pexels → DALL-E fallback) ──
       setBuildPhase('images')
       const localMedia: Record<number, File[]> = {}
+      let pexelsCount = 0
+      let dalleCount = 0
+
       for (let i = 0; i < generatedScript.chapters.length; i++) {
         const ch = generatedScript.chapters[i]
         setBuildSubProgress({ done: i, total: generatedScript.chapters.length })
-        setBuildMessage(`Generating image ${i + 1} of ${generatedScript.chapters.length}`)
+        setBuildMessage(`Finding image ${i + 1} of ${generatedScript.chapters.length}…`)
         const prompts = promptMap[ch.id]
         if (!prompts || prompts.length === 0) continue
+
+        let imageDataUrl: string | null = null
+
+        // ── Try Pexels first ──
         try {
-          const dalleRes = await fetch('/api/story-dalle', {
+          const pexelsRes = await fetch('/api/story-pexels', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: prompts[0], chapterId: ch.id }),
+            body: JSON.stringify({ prompt: prompts[0], title: ch.title, channel, chapterId: ch.id }),
           })
-          const dalleData = await dalleRes.json()
-          if (!dalleRes.ok) throw new Error(dalleData.error)
-          const file = dataUrlToFile(dalleData.imageDataUrl, `dalle_ch${ch.id}.png`)
-          localMedia[ch.id] = [file]
-          setDalleImages(prev => ({ ...prev, [ch.id]: dalleData.imageDataUrl }))
-          setChapterMedia(prev => ({ ...prev, [ch.id]: [file] }))
+          if (pexelsRes.ok) {
+            const pexelsData = await pexelsRes.json()
+            imageDataUrl = pexelsData.imageDataUrl
+            pexelsCount++
+            console.log(`[auto-build] ch${ch.id}: Pexels OK — "${pexelsData.query}"`)
+          } else {
+            console.log(`[auto-build] ch${ch.id}: Pexels ${pexelsRes.status} — trying DALL-E`)
+          }
         } catch (e) {
-          console.warn(`DALL-E failed for chapter ${ch.id}:`, e)
+          console.warn(`[auto-build] ch${ch.id}: Pexels error:`, e)
+        }
+
+        // ── Fall back to DALL-E if Pexels failed ──
+        if (!imageDataUrl) {
+          setBuildMessage(`Image ${i + 1}: using DALL·E fallback…`)
+          try {
+            const dalleRes = await fetch('/api/story-dalle', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ prompt: prompts[0], chapterId: ch.id }),
+            })
+            if (dalleRes.ok) {
+              const dalleData = await dalleRes.json()
+              imageDataUrl = dalleData.imageDataUrl
+              dalleCount++
+            }
+          } catch (e) {
+            console.warn(`[auto-build] ch${ch.id}: DALL-E fallback failed:`, e)
+          }
+        }
+
+        if (imageDataUrl) {
+          const ext = imageDataUrl.startsWith('data:image/png') ? 'png' : 'jpg'
+          const file = dataUrlToFile(imageDataUrl, `img_ch${ch.id}.${ext}`)
+          localMedia[ch.id] = [file]
+          setDalleImages(prev => ({ ...prev, [ch.id]: imageDataUrl! }))
+          setChapterMedia(prev => ({ ...prev, [ch.id]: [file] }))
         }
       }
+
       setBuildSubProgress({ done: generatedScript.chapters.length, total: generatedScript.chapters.length })
-      setBuildMessage(`${Object.keys(localMedia).length} images generated`)
+      const imageSummary = [
+        pexelsCount > 0 && `${pexelsCount} from Pexels`,
+        dalleCount > 0  && `${dalleCount} from DALL·E`,
+      ].filter(Boolean).join(', ')
+      setBuildMessage(`${Object.keys(localMedia).length} images sourced${imageSummary ? ` (${imageSummary})` : ''}`)
 
       // ── Step 4: Voiceover ──
       setBuildPhase('voiceover')

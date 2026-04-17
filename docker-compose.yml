@@ -33,6 +33,12 @@ services:
       # Image search (Serper)
       SERPER_API_KEY: ${SERPER_API_KEY}
 
+      # Pexels stock photos (for long-form video builder)
+      PEXELS_API_KEY: ${PEXELS_API_KEY}
+
+      # OpenAI (DALL-E fallback for long-form video builder)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+
       # Music for video export (path inside the container)
       MUSIC_FOLDER: ${MUSIC_FOLDER:-/data/music}
 
