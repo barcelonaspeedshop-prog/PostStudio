@@ -4,6 +4,7 @@ import Sidebar from '@/components/Sidebar'
 
 type Chapter = { id: number; title: string; type: string; narration: string; visual: string }
 type Script = { title: string; summary: string; chapters: Chapter[] }
+type BuildPhase = 'idle' | 'script' | 'prompts' | 'images' | 'voiceover' | 'assembly' | 'complete' | 'error'
 
 const CHANNELS = ['Gentlemen of Fuel', 'Omnira F1', 'Road & Trax', 'Omnira Football', 'Omnira Cricket', 'Omnira Golf', 'Omnira NFL', 'Omnira Food', 'Omnira Travel']
 const CALM_CHANNELS = ['Omnira Food', 'Omnira Travel']
@@ -16,6 +17,14 @@ const VOICES = [
   { id: 'gnPxliFHTp6OK6tcoA6i', label: 'Sam — Sports USA' },
 ]
 
+const BUILD_STEPS: { id: BuildPhase; label: string }[] = [
+  { id: 'script',    label: 'Script' },
+  { id: 'prompts',   label: 'Prompts' },
+  { id: 'images',    label: 'Images' },
+  { id: 'voiceover', label: 'Voiceover' },
+  { id: 'assembly',  label: 'Assembly' },
+]
+
 const Spinner = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
   <svg className={`${className} animate-spin`} viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
@@ -23,7 +32,21 @@ const Spinner = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
   </svg>
 )
 
+const DRAFT_KEY = 'draft_longvideo'
+
 export default function LongFormPage() {
+  // ─── Mode ───
+  const [advancedMode, setAdvancedMode] = useState(false)
+
+  // ─── Build pipeline ───
+  const [buildPhase, setBuildPhase] = useState<BuildPhase>('idle')
+  const [buildMessage, setBuildMessage] = useState('')
+  const [buildSubProgress, setBuildSubProgress] = useState<{ done: number; total: number } | null>(null)
+  const [buildError, setBuildError] = useState<string | null>(null)
+  const [showScript, setShowScript] = useState(false)
+  const [showPromptsAccordion, setShowPromptsAccordion] = useState(false)
+
+  // ─── Core state ───
   const [topic, setTopic] = useState('')
   const [channel, setChannel] = useState(CHANNELS[0])
   const [script, setScript] = useState<Script | null>(null)
@@ -33,7 +56,7 @@ export default function LongFormPage() {
   const [assemblyProgress, setAssemblyProgress] = useState('')
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; type?: 'error' | 'success' } | null>(null)
-  const [chapterAudio, setChapterAudio] = useState<Record<number, string>>({}) // chapterId -> base64 data URL
+  const [chapterAudio, setChapterAudio] = useState<Record<number, string>>({})
   const [voiceoverStatus, setVoiceoverStatus] = useState<Record<number, 'generating' | 'ready'>>({})
   const [generatingAllVoiceovers, setGeneratingAllVoiceovers] = useState(false)
   const [testMode, setTestMode] = useState(false)
@@ -47,23 +70,20 @@ export default function LongFormPage() {
   const [isRestored, setIsRestored] = useState(false)
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // AI image prompts — keyed by chapterId, value is array of scene prompts
+  // ─── Image prompts ───
   const [imagePrompts, setImagePrompts] = useState<Record<number, string[]>>({})
   const [promptTitles, setPromptTitles] = useState<Record<number, string>>({})
   const [generatingPrompts, setGeneratingPrompts] = useState(false)
-  const [copiedPromptKey, setCopiedPromptKey] = useState<string | null>(null) // "{chapterId}-{index}"
+  const [copiedPromptKey, setCopiedPromptKey] = useState<string | null>(null)
   const [showPromptsPanel, setShowPromptsPanel] = useState(false)
 
-  // DALL-E generated images — chapterId → data URL (also injected into chapterMedia)
+  // ─── DALL-E ───
   const [dalleImages, setDalleImages] = useState<Record<number, string>>({})
   const [generatingDalleFor, setGeneratingDalleFor] = useState<Record<number, boolean>>({})
   const [dalleProgress, setDalleProgress] = useState<{ done: number; total: number } | null>(null)
   const [dallePromptIndex, setDallePromptIndex] = useState<Record<number, number>>({})
 
-
-  const DRAFT_KEY = 'draft_longvideo'
-
-  // Restore draft on mount
+  // ─── Restore draft ───
   useEffect(() => {
     try {
       const raw = localStorage.getItem(DRAFT_KEY)
@@ -79,11 +99,13 @@ export default function LongFormPage() {
         if (typeof d.testMode === 'boolean') setTestMode(d.testMode)
         if (d.testDuration) setTestDuration(d.testDuration)
       }
+      const savedMode = localStorage.getItem('longform_advancedMode')
+      if (savedMode) setAdvancedMode(savedMode === 'true')
     } catch {}
     setIsRestored(true)
   }, [])
 
-  // Save draft when state changes (only after restore)
+  // ─── Save draft ───
   useEffect(() => {
     if (!isRestored) return
     if (!topic && !script) return
@@ -99,13 +121,18 @@ export default function LongFormPage() {
     }
   }, [isRestored, topic, channel, script, musicMood, selectedVoice, chapterAudio, voiceoverStatus, testMode, testDuration])
 
+  const toggleAdvancedMode = (val: boolean) => {
+    setAdvancedMode(val)
+    localStorage.setItem('longform_advancedMode', String(val))
+  }
+
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 4000)
   }
 
+  // ─── Test audio ───
   const generateTestAudio = (durationSeconds: number): string => {
-    // Use low sample rate to keep file small and avoid base64 encoding issues
     const sampleRate = 8000
     const numSamples = sampleRate * durationSeconds
     const numChannels = 1
@@ -122,8 +149,8 @@ export default function LongFormPage() {
     view.setUint32(4, 36 + dataSize, true)
     writeStr(8, 'WAVE')
     writeStr(12, 'fmt ')
-    view.setUint32(16, 16, true)       // PCM format chunk size
-    view.setUint16(20, 1, true)        // AudioFormat: PCM
+    view.setUint32(16, 16, true)
+    view.setUint16(20, 1, true)
     view.setUint16(22, numChannels, true)
     view.setUint32(24, sampleRate, true)
     view.setUint32(28, byteRate, true)
@@ -131,8 +158,6 @@ export default function LongFormPage() {
     view.setUint16(34, bitsPerSample, true)
     writeStr(36, 'data')
     view.setUint32(40, dataSize, true)
-    // Data bytes are all zero = silence
-    // Convert to base64 via Blob + FileReader workaround for large buffers
     const bytes = new Uint8Array(buffer)
     let binary = ''
     for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
@@ -146,7 +171,7 @@ export default function LongFormPage() {
     showToast(`Chapter ${chapterId} test audio ready (${testDuration}s)`)
   }
 
-  // ─── Script generation ───
+  // ─── Script generation (advanced mode) ───
   const generateScript = async () => {
     if (!topic.trim()) return
     setGenerating(true)
@@ -188,7 +213,7 @@ export default function LongFormPage() {
     }))
   }
 
-  // ─── Video assembly ───
+  // ─── Video assembly (advanced mode) ───
   const assembleVideo = async () => {
     if (!script) return
     setAssembling(true)
@@ -198,15 +223,12 @@ export default function LongFormPage() {
     try {
       const formData = new FormData()
       formData.append('chapters', JSON.stringify(script.chapters.map(ch => ({ id: ch.id, narration: ch.narration, title: ch.title }))))
-
       for (const [chIdStr, files] of Object.entries(chapterMedia)) {
         for (const file of files) {
           formData.append('media', file, `ch${chIdStr}_${file.name}`)
           formData.append('mediaChapterIds', chIdStr)
         }
       }
-
-      // Send chapter audio files so the backend can sync image timing to voiceover duration
       for (const [chIdStr, dataUrl] of Object.entries(chapterAudio)) {
         const base64 = dataUrl.split(',')[1]
         const mime = dataUrl.split(';')[0].split(':')[1] || 'audio/mpeg'
@@ -218,18 +240,12 @@ export default function LongFormPage() {
         formData.append('audio', blob, `ch${chIdStr}_voiceover.${ext}`)
         formData.append('audioChapterIds', chIdStr)
       }
-
-      // Send music mood — server picks a random track from Drive
       formData.append('musicMood', musicMood)
       formData.append('musicVolume', '0.15')
-
       const startRes = await fetch('/api/story-video/start', { method: 'POST', body: formData })
       const startData = await startRes.json()
       if (!startRes.ok) throw new Error(startData.error)
-
       setAssemblyProgress('Rendering video...')
-
-      // Poll for completion
       const result = await new Promise<{ downloadUrl: string; duration: number }>((resolve, reject) => {
         const poll = async () => {
           try {
@@ -243,7 +259,6 @@ export default function LongFormPage() {
         }
         poll()
       })
-
       setCurrentJobId(startData.jobId)
       setVideoUrl(result.downloadUrl)
       setClips([])
@@ -270,19 +285,14 @@ export default function LongFormPage() {
     setCurrentJobId(null)
     setClips([])
     setDraftSaved(false)
+    setBuildPhase('idle')
+    setBuildError(null)
+    setDalleImages({})
+    setImagePrompts({})
     showToast('Draft cleared')
   }
 
-  const downloadVideo = () => {
-    if (!videoUrl) return
-    const a = document.createElement('a')
-    a.href = videoUrl
-    a.download = `${channel.replace(/\s+/g, '_')}_story.mp4`
-    a.click()
-  }
-
-  // ─── DALL-E image generation ───
-
+  // ─── DALL-E helpers ───
   const dataUrlToFile = (dataUrl: string, filename: string): File => {
     const [header, b64] = dataUrl.split(',')
     const mime = header.match(/:(.*?);/)?.[1] || 'image/png'
@@ -302,11 +312,8 @@ export default function LongFormPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-
       setDalleImages(prev => ({ ...prev, [chapterId]: data.imageDataUrl }))
       setDallePromptIndex(prev => ({ ...prev, [chapterId]: promptIndex }))
-
-      // Auto-assign to chapter media (replaces any previous dalle_ file, prepends to list)
       const file = dataUrlToFile(data.imageDataUrl, `dalle_ch${chapterId}.png`)
       setChapterMedia(prev => ({
         ...prev,
@@ -333,7 +340,7 @@ export default function LongFormPage() {
     showToast(`${chaptersWithPrompts.length} images generated and added to chapters`)
   }
 
-  // ─── Create chapter clips ───
+  // ─── Chapter clips ───
   const createClips = async () => {
     if (!currentJobId) return
     setClippingVideo(true)
@@ -355,7 +362,7 @@ export default function LongFormPage() {
     }
   }
 
-  // ─── Voiceover generation ───
+  // ─── Voiceover ───
   const generateVoiceover = async (chapterId: number, text: string) => {
     setVoiceoverStatus(prev => ({ ...prev, [chapterId]: 'generating' }))
     try {
@@ -398,7 +405,6 @@ export default function LongFormPage() {
 
   const downloadCombinedAudio = async () => {
     if (!script) return
-    // Collect audio blobs in chapter order
     const chunks: ArrayBuffer[] = []
     for (const chapter of script.chapters) {
       const dataUrl = chapterAudio[chapter.id]
@@ -420,7 +426,7 @@ export default function LongFormPage() {
     showToast('Audio downloaded!')
   }
 
-  // ─── AI image prompts ───
+  // ─── Image prompts (advanced mode) ───
   const generateImagePrompts = async () => {
     if (!script) return
     setGeneratingPrompts(true)
@@ -429,19 +435,14 @@ export default function LongFormPage() {
       const res = await fetch('/api/story-image-prompts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chapters: script.chapters,
-          channel,
-          topic,
-        }),
+        body: JSON.stringify({ chapters: script.chapters, channel, topic }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-
       const promptMap: Record<number, string[]> = {}
       const titleMap: Record<number, string> = {}
       for (const item of data.prompts) {
-        promptMap[item.chapterId] = item.prompts  // array of scene prompts
+        promptMap[item.chapterId] = item.prompts
         titleMap[item.chapterId] = item.title
       }
       setImagePrompts(promptMap)
@@ -477,306 +478,474 @@ export default function LongFormPage() {
       .filter(Boolean)
       .join('\n\n')
     if (!all) return
-    navigator.clipboard.writeText(all).then(() => {
-      showToast('All prompts copied to clipboard!')
-    })
+    navigator.clipboard.writeText(all).then(() => showToast('All prompts copied to clipboard!'))
   }
 
-  const voiceoverCount = Object.keys(chapterAudio).length
-  const allVoiceoversReady = script ? voiceoverCount === script.chapters.length : false
+  // ─── AUTO BUILD PIPELINE ───
+  const runAutoBuild = async () => {
+    setBuildPhase('script')
+    setBuildMessage('Writing your script...')
+    setBuildSubProgress(null)
+    setBuildError(null)
+    setScript(null)
+    setChapterMedia({})
+    setChapterAudio({})
+    setVoiceoverStatus({})
+    setVideoUrl(null)
+    setCurrentJobId(null)
+    setDalleImages({})
+    setImagePrompts({})
+    setPromptTitles({})
+    setClips([])
+
+    try {
+      // ── Step 1: Script ──
+      const scriptRes = await fetch('/api/story-script', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic: topic.trim() || null, channel }),
+      })
+      const scriptData = await scriptRes.json()
+      if (!scriptRes.ok) throw new Error(scriptData.error || 'Script generation failed')
+      const generatedScript: Script = scriptData.script
+      setScript(generatedScript)
+      setBuildMessage(`"${generatedScript.title}"`)
+
+      // ── Step 2: Image prompts ──
+      setBuildPhase('prompts')
+      setBuildMessage('Generating image prompts...')
+      const promptRes = await fetch('/api/story-image-prompts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chapters: generatedScript.chapters, channel, topic: topic.trim() }),
+      })
+      const promptData = await promptRes.json()
+      if (!promptRes.ok) throw new Error(promptData.error || 'Prompt generation failed')
+      const promptMap: Record<number, string[]> = {}
+      const titleMap: Record<number, string> = {}
+      for (const item of promptData.prompts) {
+        promptMap[item.chapterId] = item.prompts
+        titleMap[item.chapterId] = item.title
+      }
+      setImagePrompts(promptMap)
+      setPromptTitles(titleMap)
+      const totalPrompts = Object.values(promptMap).reduce((s, arr) => s + arr.length, 0)
+      setBuildMessage(`${totalPrompts} prompts across ${generatedScript.chapters.length} chapters`)
+
+      // ── Step 3: DALL-E images ──
+      setBuildPhase('images')
+      const localMedia: Record<number, File[]> = {}
+      for (let i = 0; i < generatedScript.chapters.length; i++) {
+        const ch = generatedScript.chapters[i]
+        setBuildSubProgress({ done: i, total: generatedScript.chapters.length })
+        setBuildMessage(`Generating image ${i + 1} of ${generatedScript.chapters.length}`)
+        const prompts = promptMap[ch.id]
+        if (!prompts || prompts.length === 0) continue
+        try {
+          const dalleRes = await fetch('/api/story-dalle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: prompts[0], chapterId: ch.id }),
+          })
+          const dalleData = await dalleRes.json()
+          if (!dalleRes.ok) throw new Error(dalleData.error)
+          const file = dataUrlToFile(dalleData.imageDataUrl, `dalle_ch${ch.id}.png`)
+          localMedia[ch.id] = [file]
+          setDalleImages(prev => ({ ...prev, [ch.id]: dalleData.imageDataUrl }))
+          setChapterMedia(prev => ({ ...prev, [ch.id]: [file] }))
+        } catch (e) {
+          console.warn(`DALL-E failed for chapter ${ch.id}:`, e)
+        }
+      }
+      setBuildSubProgress({ done: generatedScript.chapters.length, total: generatedScript.chapters.length })
+      setBuildMessage(`${Object.keys(localMedia).length} images generated`)
+
+      // ── Step 4: Voiceover ──
+      setBuildPhase('voiceover')
+      const localAudio: Record<number, string> = {}
+      for (let i = 0; i < generatedScript.chapters.length; i++) {
+        const ch = generatedScript.chapters[i]
+        setBuildSubProgress({ done: i, total: generatedScript.chapters.length })
+        setBuildMessage(`Recording voiceover ${i + 1} of ${generatedScript.chapters.length}`)
+        setVoiceoverStatus(prev => ({ ...prev, [ch.id]: 'generating' }))
+        try {
+          const voiceRes = await fetch('/api/story-voiceover', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: ch.narration, voiceId: selectedVoice }),
+          })
+          const voiceData = await voiceRes.json()
+          if (!voiceRes.ok) throw new Error(voiceData.error)
+          localAudio[ch.id] = voiceData.audio
+          setChapterAudio(prev => ({ ...prev, [ch.id]: voiceData.audio }))
+          setVoiceoverStatus(prev => ({ ...prev, [ch.id]: 'ready' }))
+        } catch (e) {
+          console.warn(`Voiceover failed for chapter ${ch.id}:`, e)
+          setVoiceoverStatus(prev => { const n = { ...prev }; delete n[ch.id]; return n })
+        }
+      }
+      setBuildSubProgress({ done: generatedScript.chapters.length, total: generatedScript.chapters.length })
+
+      // ── Step 5: Assembly ──
+      setBuildPhase('assembly')
+      setBuildMessage('Assembling video...')
+      setBuildSubProgress(null)
+
+      const formData = new FormData()
+      formData.append('chapters', JSON.stringify(generatedScript.chapters.map(ch => ({
+        id: ch.id, narration: ch.narration, title: ch.title,
+      }))))
+
+      for (const [chIdStr, files] of Object.entries(localMedia)) {
+        for (const file of files) {
+          formData.append('media', file, `ch${chIdStr}_${file.name}`)
+          formData.append('mediaChapterIds', chIdStr)
+        }
+      }
+
+      for (const [chIdStr, dataUrl] of Object.entries(localAudio)) {
+        const base64 = dataUrl.split(',')[1]
+        const mime = dataUrl.split(';')[0].split(':')[1] || 'audio/mpeg'
+        const binary = atob(base64)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+        const ext = mime.includes('wav') ? 'wav' : 'mp3'
+        const blob = new Blob([bytes], { type: mime })
+        formData.append('audio', blob, `ch${chIdStr}_voiceover.${ext}`)
+        formData.append('audioChapterIds', chIdStr)
+      }
+
+      formData.append('musicMood', musicMood)
+      formData.append('musicVolume', '0.15')
+
+      const startRes = await fetch('/api/story-video/start', { method: 'POST', body: formData })
+      const startData = await startRes.json()
+      if (!startRes.ok) throw new Error(startData.error || 'Assembly start failed')
+
+      setCurrentJobId(startData.jobId)
+
+      const result = await new Promise<{ downloadUrl: string; duration: number }>((resolve, reject) => {
+        const poll = async () => {
+          try {
+            const statusRes = await fetch(`/api/story-video/status/${startData.jobId}`)
+            const statusData = await statusRes.json()
+            if (statusData.status === 'complete') { resolve(statusData); return }
+            if (statusData.status === 'error') { reject(new Error(statusData.error || 'Assembly failed')); return }
+            if (statusData.progress) setBuildMessage(statusData.progress)
+            setTimeout(poll, 3000)
+          } catch (e) { reject(e) }
+        }
+        poll()
+      })
+
+      setVideoUrl(result.downloadUrl)
+      setBuildPhase('complete')
+      setBuildMessage(`${Math.round(result.duration)}s · ready to download`)
+
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Build failed'
+      setBuildError(msg)
+      setBuildPhase('error')
+    }
+  }
 
   // ─── Computed ───
+  const voiceoverCount = Object.keys(chapterAudio).length
+  const allVoiceoversReady = script ? voiceoverCount === script.chapters.length : false
   const hasAnyMedia = Object.values(chapterMedia).some(f => f.length > 0)
   const totalMedia = Object.values(chapterMedia).reduce((s, f) => s + f.length, 0)
   const chapterLabel = (type: string) => type === 'intro' ? 'INTRO' : type === 'outro' ? 'OUTRO' : 'CHAPTER'
   const chapterColor = (type: string) => type === 'intro' ? 'bg-blue-100 text-blue-700' : type === 'outro' ? 'bg-amber-100 text-amber-700' : 'bg-stone-100 text-stone-600'
+  const isBuilding = ['script', 'prompts', 'images', 'voiceover', 'assembly'].includes(buildPhase)
+  const stepIndex = BUILD_STEPS.findIndex(s => s.id === buildPhase)
 
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Topbar */}
+
+        {/* ─── Topbar ─── */}
         <div className="h-12 bg-white border-b border-stone-100 flex items-center justify-between px-5 pl-14 md:pl-5 shrink-0">
           <div className="flex items-center gap-3">
             <span className="text-[14px] font-medium text-stone-900">Long form story</span>
-            <button
-              onClick={() => setTestMode(prev => !prev)}
-              className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
-                testMode
-                  ? 'bg-amber-100 border-amber-300 text-amber-800'
-                  : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'
-              }`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${testMode ? 'bg-amber-500' : 'bg-stone-300'}`} />
-              Test mode
-            </button>
-            {testMode && (
+            {advancedMode && (
               <>
-                <select
-                  value={testDuration}
-                  onChange={(e) => setTestDuration(Number(e.target.value) as 10 | 30)}
-                  className="hidden md:block text-[11px] border border-amber-300 rounded-lg px-2 py-1 bg-amber-50 text-amber-800 focus:outline-none"
+                <button
+                  onClick={() => setTestMode(prev => !prev)}
+                  className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg border transition-colors ${
+                    testMode ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'
+                  }`}
                 >
-                  <option value={10}>10s</option>
-                  <option value={30}>30s</option>
-                </select>
-                <span className="hidden md:inline text-[11px] text-amber-600 font-medium">Test mode — no ElevenLabs charges</span>
+                  <span className={`w-1.5 h-1.5 rounded-full ${testMode ? 'bg-amber-500' : 'bg-stone-300'}`} />
+                  Test mode
+                </button>
+                {testMode && (
+                  <>
+                    <select value={testDuration} onChange={(e) => setTestDuration(Number(e.target.value) as 10 | 30)} className="hidden md:block text-[11px] border border-amber-300 rounded-lg px-2 py-1 bg-amber-50 text-amber-800 focus:outline-none">
+                      <option value={10}>10s</option>
+                      <option value={30}>30s</option>
+                    </select>
+                    <span className="hidden md:inline text-[11px] text-amber-600 font-medium">Test mode — no ElevenLabs charges</span>
+                  </>
+                )}
               </>
             )}
-            {draftSaved && (
-              <span className="hidden md:inline text-[11px] text-stone-400">Draft saved</span>
-            )}
+            {draftSaved && <span className="hidden md:inline text-[11px] text-stone-400">Draft saved</span>}
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             {(topic || script) && (
-              <button
-                onClick={clearDraft}
-                className="px-3 py-2 min-h-[44px] text-[13px] font-medium border border-stone-200 text-stone-500 rounded-lg hover:bg-stone-50 transition-colors"
-              >
-                Clear draft
+              <button onClick={clearDraft} className="px-3 py-2 min-h-[44px] text-[13px] font-medium border border-stone-200 text-stone-500 rounded-lg hover:bg-stone-50 transition-colors">
+                Clear
               </button>
             )}
-            {videoUrl && (
-              <a
-                href={`${videoUrl}?format=youtube`}
-                download="story_youtube_16x9.mp4"
-                className="px-3 py-2 min-h-[44px] text-[13px] font-medium border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors flex items-center"
-              >
-                ↓ Download Video
-              </a>
-            )}
+            <button
+              onClick={() => toggleAdvancedMode(!advancedMode)}
+              className={`flex items-center gap-1.5 px-3 py-2 min-h-[44px] text-[12px] font-medium rounded-lg border transition-colors ${
+                advancedMode
+                  ? 'bg-stone-900 text-white border-stone-900'
+                  : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-50'
+              }`}
+            >
+              {advancedMode ? '← Simple mode' : 'Advanced mode'}
+            </button>
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-          {/* Left panel */}
-          <div className="w-full md:w-72 border-r border-stone-100 overflow-y-auto p-4 md:p-5 flex flex-col gap-4 shrink-0">
-            <div>
-              <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-2">Story topic</p>
-              <textarea value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. The untold story of the 1966 Le Mans rivalry" className="w-full border border-stone-200 rounded-lg px-3 py-2.5 text-[16px] md:text-[13px] resize-none focus:outline-none focus:ring-1 focus:ring-stone-400" rows={3} />
-            </div>
+        {/* ═══════════════════════════════════════════════
+            SIMPLE MODE
+        ═══════════════════════════════════════════════ */}
+        {!advancedMode && (
+          <div className="flex-1 overflow-y-auto">
 
-            <div>
-              <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-2">Channel</p>
-              <select value={channel} onChange={(e) => { setChannel(e.target.value); setMusicMood(CALM_CHANNELS.includes(e.target.value) ? 'calm' : 'energy') }} className="w-full text-[16px] md:text-[13px] border border-stone-200 rounded-lg px-3 py-2.5 min-h-[44px] bg-white focus:outline-none focus:ring-1 focus:ring-stone-400">
-                {CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-
-            <button onClick={generateScript} disabled={generating} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-stone-900 text-white text-[13px] font-medium rounded-xl hover:bg-stone-800 transition-colors disabled:opacity-50">
-              {generating ? <><Spinner /> Writing script...</> : <><span className="text-[11px]">&#x270E;</span> Generate story</>}
-            </button>
-
-            {/* Voiceover */}
-            {script && (
-              <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 flex flex-col gap-3">
-                <p className="text-[10px] font-medium text-violet-700 uppercase tracking-widest">Voiceover</p>
-                {!testMode && (
-                  <div>
-                    <p className="text-[10px] text-violet-500 mb-1">Voice</p>
-                    <select
-                      value={selectedVoice}
-                      onChange={(e) => {
-                        setSelectedVoice(e.target.value)
-                        setChapterAudio({})
-                        setVoiceoverStatus({})
-                      }}
-                      className="w-full text-[12px] border border-violet-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-violet-400"
-                    >
-                      {VOICES.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
-                    </select>
+            {/* ── IDLE: Input form ── */}
+            {buildPhase === 'idle' && (
+              <div className="flex items-center justify-center min-h-full p-6">
+                <div className="w-full max-w-md">
+                  <div className="text-center mb-8">
+                    <div className="inline-flex items-center justify-center w-12 h-12 bg-stone-900 rounded-2xl mb-4">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.867V15.133a1 1 0 01-1.447.902L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+                      </svg>
+                    </div>
+                    <h1 className="text-[22px] font-bold text-stone-900 mb-1">Build a story video</h1>
+                    <p className="text-[13px] text-stone-500">Script · Images · Voiceover · Video — fully automatic</p>
                   </div>
-                )}
-                <button
-                  onClick={generateAllVoiceovers}
-                  disabled={generatingAllVoiceovers || allVoiceoversReady}
-                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-white text-[13px] font-medium rounded-xl transition-colors disabled:opacity-50 ${testMode ? 'bg-amber-500 hover:bg-amber-600' : 'bg-violet-600 hover:bg-violet-700'}`}
-                >
-                  {generatingAllVoiceovers ? <><Spinner /> Generating...</> : allVoiceoversReady ? 'All voiceovers ready' : testMode ? 'Use test audio (all)' : <><span className="text-[11px]">&#9835;</span> Generate all voiceovers</>}
-                </button>
-                <p className="text-[10px] text-violet-500">{voiceoverCount}/{script.chapters.length} chapters voiced</p>
-                {allVoiceoversReady && (
-                  <button
-                    onClick={downloadCombinedAudio}
-                    className="w-full px-3 py-2 text-[12px] font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
-                  >
-                    &#8595; Download combined audio
-                  </button>
-                )}
+
+                  <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4">
+                    {/* Channel */}
+                    <div>
+                      <label className="text-[11px] font-medium text-stone-500 uppercase tracking-widest block mb-1.5">Channel</label>
+                      <select
+                        value={channel}
+                        onChange={(e) => { setChannel(e.target.value); setMusicMood(CALM_CHANNELS.includes(e.target.value) ? 'calm' : 'energy') }}
+                        className="w-full text-[14px] border border-stone-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-1 focus:ring-stone-400"
+                      >
+                        {CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+
+                    {/* Topic */}
+                    <div>
+                      <label className="text-[11px] font-medium text-stone-500 uppercase tracking-widest block mb-1.5">
+                        Topic <span className="normal-case font-normal text-stone-400">(optional — leave blank for AI suggestion)</span>
+                      </label>
+                      <textarea
+                        value={topic}
+                        onChange={(e) => setTopic(e.target.value)}
+                        placeholder={`e.g. The untold story of Senna at Monaco 1984`}
+                        className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-[14px] resize-none focus:outline-none focus:ring-1 focus:ring-stone-400"
+                        rows={3}
+                      />
+                    </div>
+
+                    {/* Voice */}
+                    <div>
+                      <label className="text-[11px] font-medium text-stone-500 uppercase tracking-widest block mb-1.5">Voice</label>
+                      <select
+                        value={selectedVoice}
+                        onChange={(e) => setSelectedVoice(e.target.value)}
+                        className="w-full text-[14px] border border-stone-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-1 focus:ring-stone-400"
+                      >
+                        {VOICES.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+                      </select>
+                    </div>
+
+                    {/* Music mood */}
+                    <div>
+                      <label className="text-[11px] font-medium text-stone-500 uppercase tracking-widest block mb-1.5">Music</label>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setMusicMood('calm')}
+                          className={`flex-1 py-2.5 text-[13px] font-medium rounded-xl border transition-colors ${
+                            musicMood === 'calm' ? 'bg-sky-100 text-sky-700 border-sky-300' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'
+                          }`}
+                        >
+                          🎵 Calm
+                        </button>
+                        <button
+                          onClick={() => setMusicMood('energy')}
+                          className={`flex-1 py-2.5 text-[13px] font-medium rounded-xl border transition-colors ${
+                            musicMood === 'energy' ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'
+                          }`}
+                        >
+                          ⚡ Energy
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Build button */}
+                    <button
+                      onClick={runAutoBuild}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-stone-900 text-white text-[14px] font-semibold rounded-xl hover:bg-stone-800 active:bg-stone-950 transition-colors mt-2"
+                    >
+                      <span>Generate &amp; Build</span>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                      </svg>
+                    </button>
+
+                    <p className="text-center text-[11px] text-stone-400">
+                      Builds a complete ~4 min video · typically 8–12 minutes
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* Background music */}
-            {script && (
-              <div className="bg-stone-50 border border-stone-100 rounded-xl p-4 flex flex-col gap-3">
-                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Background music</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setMusicMood('calm')}
-                    className={`flex-1 py-2 text-[12px] font-medium rounded-lg border transition-colors ${
-                      musicMood === 'calm'
-                        ? 'bg-sky-100 text-sky-700 border-sky-300'
-                        : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'
-                    }`}
-                  >
-                    Calm
-                  </button>
-                  <button
-                    onClick={() => setMusicMood('energy')}
-                    className={`flex-1 py-2 text-[12px] font-medium rounded-lg border transition-colors ${
-                      musicMood === 'energy'
-                        ? 'bg-amber-100 text-amber-700 border-amber-300'
-                        : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'
-                    }`}
-                  >
-                    Energy
-                  </button>
-                </div>
-                <p className="text-[10px] text-stone-400">Track auto-selected from library</p>
-              </div>
-            )}
+            {/* ── BUILDING: Step progress ── */}
+            {isBuilding && (
+              <div className="flex items-center justify-center min-h-full p-6">
+                <div className="w-full max-w-lg">
 
-            {/* AI Image Prompts */}
-            {script && (
-              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-medium text-indigo-700 uppercase tracking-widest">AI Image Prompts</p>
-                  {Object.keys(imagePrompts).length > 0 && (
-                    <button
-                      onClick={() => setShowPromptsPanel(p => !p)}
-                      className="text-[10px] text-indigo-500 hover:text-indigo-700 transition-colors"
-                    >
-                      {showPromptsPanel ? 'Hide' : 'Show'}
-                    </button>
-                  )}
-                </div>
-                <p className="text-[10px] text-indigo-500 leading-relaxed">
-                  Generate one detailed image prompt per chapter — ready to paste into Midjourney or ChatGPT.
-                </p>
-                <button
-                  onClick={generateImagePrompts}
-                  disabled={generatingPrompts}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-[13px] font-medium rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                >
-                  {generatingPrompts ? (
-                    <><Spinner /> Generating prompts...</>
-                  ) : (
-                    <><span className="text-[11px]">✦</span> {Object.keys(imagePrompts).length > 0 ? 'Regenerate prompts' : 'Generate image prompts'}</>
-                  )}
-                </button>
-                {Object.keys(imagePrompts).length > 0 && (
-                  <button
-                    onClick={copyAllPrompts}
-                    className="w-full px-3 py-2 text-[12px] font-medium bg-white border border-indigo-200 text-indigo-700 rounded-lg hover:bg-indigo-50 transition-colors"
-                  >
-                    ⎘ Copy all prompts
-                  </button>
-                )}
-                {Object.keys(imagePrompts).length > 0 && (() => {
-                  const total = Object.values(imagePrompts).reduce((s, arr) => s + arr.length, 0)
-                  return <p className="text-[10px] text-indigo-500">{total} prompts across {Object.keys(imagePrompts).length} chapters</p>
-                })()}
+                  {/* Step tracker */}
+                  <div className="flex items-start justify-between mb-10">
+                    {BUILD_STEPS.map((step, i) => {
+                      const isComplete = stepIndex > i
+                      const isCurrent = stepIndex === i
+                      return (
+                        <div key={step.id} className="flex flex-col items-center gap-2 flex-1">
+                          <div className="relative flex items-center w-full">
+                            {i > 0 && (
+                              <div className={`absolute right-[calc(50%+14px)] left-0 top-3.5 h-0.5 transition-colors duration-500 ${isComplete ? 'bg-emerald-400' : 'bg-stone-200'}`} />
+                            )}
+                            <div className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center mx-auto transition-all duration-300 ${
+                              isComplete ? 'bg-emerald-500 text-white' :
+                              isCurrent ? 'bg-stone-900 text-white ring-4 ring-stone-100' :
+                              'bg-stone-100 text-stone-400'
+                            }`}>
+                              {isComplete ? (
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                              ) : isCurrent ? (
+                                <Spinner className="w-3.5 h-3.5" />
+                              ) : (
+                                <span className="text-[10px] font-bold">{i + 1}</span>
+                              )}
+                            </div>
+                            {i < BUILD_STEPS.length - 1 && (
+                              <div className={`absolute left-[calc(50%+14px)] right-0 top-3.5 h-0.5 transition-colors duration-500 ${isComplete ? 'bg-emerald-400' : 'bg-stone-200'}`} />
+                            )}
+                          </div>
+                          <span className={`text-[11px] font-medium transition-colors text-center ${isCurrent ? 'text-stone-900' : isComplete ? 'text-emerald-600' : 'text-stone-400'}`}>
+                            {step.label}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
 
-                {/* DALL-E auto-generate */}
-                {Object.keys(imagePrompts).length > 0 && (
-                  <div className="pt-2 border-t border-indigo-200 flex flex-col gap-2">
-                    <button
-                      onClick={generateAllDalle}
-                      disabled={!!dalleProgress || generatingPrompts || Object.values(generatingDalleFor).some(Boolean)}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-violet-600 text-white text-[13px] font-medium rounded-xl hover:bg-violet-700 transition-colors disabled:opacity-50"
-                    >
-                      {dalleProgress ? (
-                        <><Spinner /> {dalleProgress.done}/{dalleProgress.total} generating…</>
-                      ) : (
-                        <>🎨 Auto-generate with DALL·E</>
-                      )}
-                    </button>
-                    {dalleProgress && (
-                      <div className="w-full bg-violet-100 rounded-full h-1.5">
-                        <div
-                          className="bg-violet-500 h-1.5 rounded-full transition-all duration-500"
-                          style={{ width: `${Math.round((dalleProgress.done / dalleProgress.total) * 100)}%` }}
-                        />
+                  {/* Status message */}
+                  <div className="text-center space-y-4">
+                    <p className="text-[15px] font-medium text-stone-800 min-h-[24px]">{buildMessage}</p>
+                    {buildSubProgress && (
+                      <div className="space-y-1.5 max-w-xs mx-auto">
+                        <div className="w-full bg-stone-100 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="bg-stone-700 h-1.5 rounded-full transition-all duration-500"
+                            style={{ width: `${Math.round((buildSubProgress.done / buildSubProgress.total) * 100)}%` }}
+                          />
+                        </div>
+                        <p className="text-[11px] text-stone-400">{buildSubProgress.done} of {buildSubProgress.total} complete</p>
                       </div>
                     )}
-                    {Object.keys(dalleImages).length > 0 && !dalleProgress && (
-                      <p className="text-[10px] text-violet-600">{Object.keys(dalleImages).length} image{Object.keys(dalleImages).length !== 1 ? 's' : ''} generated · added to chapters</p>
-                    )}
+                    <p className="text-[12px] text-stone-400 mt-6">This typically takes 8–12 minutes · keep this tab open</p>
                   </div>
-                )}
+                </div>
               </div>
             )}
 
-            {/* Assembly */}
-            {script && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex flex-col gap-3">
-                <p className="text-[10px] font-medium text-emerald-700 uppercase tracking-widest">Video assembly</p>
-                <button onClick={assembleVideo} disabled={assembling || !hasAnyMedia} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-[13px] font-medium rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50">
-                  {assembling ? <><Spinner /> Assembling...</> : !hasAnyMedia ? 'Upload images first' : <><span className="text-[11px]">&#9654;</span> Assemble video</>}
-                </button>
-                {(assembling || clippingVideo) && assemblyProgress && <p className="text-[10px] text-emerald-600">{assemblyProgress}</p>}
-                {!hasAnyMedia && <p className="text-[10px] text-emerald-500">Add images to chapters to enable</p>}
-                {videoUrl && (
-                  <div className="space-y-1.5">
-                    <p className="text-[10px] font-medium text-emerald-700 uppercase tracking-widest">Download format</p>
-                    <a
-                      href={`${videoUrl}?format=youtube`}
-                      download="story_youtube_16x9.mp4"
-                      className="flex items-center justify-between w-full px-3 py-2 text-[12px] font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-                    >
-                      <span>YouTube</span><span className="opacity-75 text-[10px]">16:9 ↓</span>
-                    </a>
-                    <a
-                      href={`${videoUrl}?format=square`}
-                      download="story_instagram_square.mp4"
-                      className="flex items-center justify-between w-full px-3 py-2 text-[12px] font-medium border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors"
-                    >
-                      <span>Instagram Square</span><span className="opacity-75 text-[10px]">1:1 ↓</span>
-                    </a>
-                    <a
-                      href={`${videoUrl}?format=reels`}
-                      download="story_instagram_reels.mp4"
-                      className="flex items-center justify-between w-full px-3 py-2 text-[12px] font-medium border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors"
-                    >
-                      <span>Reels (full video)</span><span className="opacity-75 text-[10px]">9:16 ↓</span>
-                    </a>
-                  </div>
-                )}
+            {/* ── COMPLETE: Results ── */}
+            {buildPhase === 'complete' && videoUrl && (
+              <div className="max-w-2xl mx-auto py-8 px-6 space-y-5">
 
-                {/* Chapter clips section */}
+                {/* Header */}
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
+                    <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-[17px] font-bold text-stone-900 leading-tight">{script?.title || 'Video ready'}</h2>
+                    <p className="text-[12px] text-stone-500">{buildMessage}</p>
+                  </div>
+                </div>
+
+                {/* Video player */}
+                <div className="bg-black rounded-2xl overflow-hidden aspect-video shadow-md">
+                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                  <video
+                    src={`${videoUrl}?format=youtube`}
+                    controls
+                    className="w-full h-full"
+                    preload="metadata"
+                  />
+                </div>
+
+                {/* Download */}
+                <div className="bg-white border border-stone-200 rounded-2xl p-4 space-y-2">
+                  <p className="text-[11px] font-medium text-stone-400 uppercase tracking-widest mb-3">Download</p>
+                  <a href={`${videoUrl}?format=youtube`} download="story_youtube_16x9.mp4"
+                    className="flex items-center justify-between w-full px-4 py-3 text-[13px] font-medium bg-stone-900 text-white rounded-xl hover:bg-stone-800 transition-colors">
+                    <span>YouTube</span><span className="opacity-60 text-[11px]">16:9 ↓</span>
+                  </a>
+                  <a href={`${videoUrl}?format=square`} download="story_instagram_square.mp4"
+                    className="flex items-center justify-between w-full px-4 py-3 text-[13px] font-medium border border-stone-200 text-stone-700 rounded-xl hover:bg-stone-50 transition-colors">
+                    <span>Instagram Square</span><span className="opacity-60 text-[11px]">1:1 ↓</span>
+                  </a>
+                  <a href={`${videoUrl}?format=reels`} download="story_instagram_reels.mp4"
+                    className="flex items-center justify-between w-full px-4 py-3 text-[13px] font-medium border border-stone-200 text-stone-700 rounded-xl hover:bg-stone-50 transition-colors">
+                    <span>Reels</span><span className="opacity-60 text-[11px]">9:16 ↓</span>
+                  </a>
+                </div>
+
+                {/* Chapter clips */}
                 {currentJobId && (
-                  <div className="pt-1 border-t border-emerald-200">
+                  <div className="bg-white border border-stone-200 rounded-2xl p-4">
+                    <p className="text-[11px] font-medium text-stone-400 uppercase tracking-widest mb-3">Chapter Clips (9:16)</p>
                     <button
                       onClick={createClips}
                       disabled={clippingVideo}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[12px] font-medium border border-emerald-400 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 text-[13px] font-medium border border-stone-300 text-stone-700 rounded-xl hover:bg-stone-50 transition-colors disabled:opacity-50"
                     >
-                      {clippingVideo ? <><Spinner className="w-3 h-3" /> Creating chapter clips...</> : '✂ Create chapter clips (9:16)'}
+                      {clippingVideo
+                        ? <><Spinner className="w-3.5 h-3.5" /> Creating clips...</>
+                        : clips.length > 0 ? `✂ Regenerate chapter clips` : '✂ Create chapter clips'}
                     </button>
                     {clips.length > 0 && (
-                      <div className="mt-2 space-y-2">
-                        <p className="text-[10px] font-medium text-emerald-700">{clips.length} chapter clip{clips.length !== 1 ? 's' : ''} ready</p>
+                      <div className="mt-3 grid grid-cols-3 gap-2">
                         {clips.map((clip) => (
-                          <div key={clip.chapterId} className="bg-white rounded-lg border border-stone-100 overflow-hidden">
+                          <div key={clip.chapterId} className="bg-stone-50 rounded-xl overflow-hidden border border-stone-100">
                             {clip.thumbFile && (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={`/api/clips/${clip.thumbFile}`}
-                                alt={clip.title}
-                                className="w-full aspect-square object-cover"
-                              />
+                              <img src={`/api/clips/${clip.thumbFile}`} alt={clip.title} className="w-full aspect-square object-cover" />
                             )}
-                            <div className="flex items-center justify-between px-2 py-1.5">
-                              <span className="text-[11px] text-stone-600 truncate max-w-[130px]">{clip.title}</span>
-                              <div className="flex items-center gap-2 shrink-0">
+                            <div className="p-2">
+                              <p className="text-[10px] text-stone-700 truncate font-medium leading-tight">{clip.title}</p>
+                              <div className="flex items-center justify-between mt-1">
                                 <span className="text-[10px] text-stone-400">{clip.duration}s</span>
-                                <a
-                                  href={`/api/clips/${clip.clipFile}`}
-                                  download={clip.clipFile}
-                                  className="text-emerald-600 hover:text-emerald-700 font-bold text-[13px]"
-                                >
-                                  ↓
-                                </a>
+                                <a href={`/api/clips/${clip.clipFile}`} download={clip.clipFile} className="text-[12px] font-bold text-stone-600 hover:text-stone-900">↓</a>
                               </div>
                             </div>
                           </div>
@@ -785,203 +954,491 @@ export default function LongFormPage() {
                     )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {/* Info */}
-            {script && (
-              <div className="text-[11px] text-stone-400 space-y-0.5">
-                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-1">Info</p>
-                <p>{script.chapters.length} chapters</p>
-                <p>{totalMedia} media files uploaded</p>
-                <p>{voiceoverCount} voiceovers generated</p>
-              </div>
-            )}
-          </div>
+                {/* Script accordion */}
+                {script && (
+                  <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
+                    <button
+                      onClick={() => setShowScript(s => !s)}
+                      className="w-full flex items-center justify-between px-4 py-3.5 text-[13px] font-medium text-stone-700 hover:bg-stone-50 transition-colors"
+                    >
+                      <span>📄 Script ({script.chapters.length} chapters)</span>
+                      <svg className={`w-4 h-4 text-stone-400 transition-transform duration-200 ${showScript ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {showScript && (
+                      <div className="border-t border-stone-100 divide-y divide-stone-50">
+                        {script.chapters.map(ch => (
+                          <div key={ch.id} className="px-4 py-3 space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${chapterColor(ch.type)}`}>{chapterLabel(ch.type)}</span>
+                              <p className="text-[13px] font-semibold text-stone-900">{ch.title}</p>
+                            </div>
+                            <p className="text-[12px] text-stone-600 leading-relaxed">{ch.narration}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
-          {/* Right panel — chapters */}
-          <div className="flex-1 overflow-y-auto p-6">
-            {!script ? (
-              <div className="flex flex-col items-center justify-center h-full text-stone-400">
-                <svg className="w-10 h-10 mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-                <p className="text-[13px] font-medium">No script yet</p>
-                <p className="text-[12px]">Enter a topic and click Generate story</p>
-              </div>
-            ) : (
-              <div className="max-w-3xl mx-auto space-y-6">
-                <div className="text-center mb-8">
-                  <h1 className="text-2xl font-bold text-stone-900 mb-2">{script.title}</h1>
-                  <p className="text-[13px] text-stone-500">{script.summary}</p>
-                </div>
-
-                {script.chapters.map((chapter) => (
-                  <div key={chapter.id} className="bg-white border border-stone-100 rounded-xl p-5 space-y-4">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${chapterColor(chapter.type)}`}>{chapterLabel(chapter.type)}</span>
-                      <h2 className="text-[15px] font-semibold text-stone-900">{chapter.title}</h2>
-                    </div>
-
-                    <p className="text-[13px] text-stone-700 leading-relaxed">{chapter.narration}</p>
-
-                    {/* Voiceover */}
-                    <div className="flex items-center gap-2">
-                      {voiceoverStatus[chapter.id] === 'generating' ? (
-                        <div className="flex items-center gap-2 text-[12px] text-violet-600">
-                          <Spinner className="w-3 h-3" />
-                          <span>Generating voiceover...</span>
-                        </div>
-                      ) : chapterAudio[chapter.id] ? (
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <audio src={chapterAudio[chapter.id]} controls className="h-8 flex-1 min-w-0" />
-                          <button
-                            onClick={() => generateVoiceover(chapter.id, chapter.narration)}
-                            className="shrink-0 px-2 py-1 text-[10px] border border-stone-200 rounded-md hover:bg-stone-50 text-stone-500 transition-colors"
-                          >
-                            Redo
-                          </button>
-                        </div>
-                      ) : (
+                {/* Prompts accordion */}
+                {Object.keys(imagePrompts).length > 0 && (
+                  <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
+                    <button
+                      onClick={() => setShowPromptsAccordion(s => !s)}
+                      className="w-full flex items-center justify-between px-4 py-3.5 text-[13px] font-medium text-stone-700 hover:bg-stone-50 transition-colors"
+                    >
+                      <span>✦ AI Image Prompts</span>
+                      <div className="flex items-center gap-2">
                         <button
-                          onClick={() => testMode ? generateTestVoiceover(chapter.id) : generateVoiceover(chapter.id, chapter.narration)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors ${testMode ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-violet-100 text-violet-700 hover:bg-violet-200'}`}
+                          onClick={(e) => { e.stopPropagation(); copyAllPrompts() }}
+                          className="text-[11px] text-stone-400 hover:text-stone-600 px-2 py-0.5 rounded border border-stone-200 hover:bg-stone-50 transition-colors"
                         >
-                          <span className="text-[10px]">&#9835;</span> {testMode ? 'Use test audio' : 'Generate voiceover'}
+                          Copy all
                         </button>
-                      )}
-                    </div>
-
-                    <div className="bg-stone-50 rounded-lg px-3 py-2">
-                      <p className="text-[10px] font-medium text-stone-400 uppercase tracking-widest mb-0.5">Visual</p>
-                      <p className="text-[12px] text-stone-500">{chapter.visual}</p>
-                    </div>
-
-                    {/* AI Image Prompts — grouped by chapter, numbered per scene */}
-                    {showPromptsPanel && imagePrompts[chapter.id] && imagePrompts[chapter.id].length > 0 && (
-                      <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2.5">
-                        <p className="text-[10px] font-medium text-indigo-600 uppercase tracking-widest mb-2">
-                          {imagePrompts[chapter.id].length} image prompt{imagePrompts[chapter.id].length !== 1 ? 's' : ''}
-                        </p>
-                        <div className="space-y-3">
-                          {imagePrompts[chapter.id].map((prompt, i) => (
-                            <div key={i} className={i > 0 ? 'border-t border-indigo-100 pt-3' : ''}>
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-[10px] font-semibold text-indigo-500">Image {i + 1}</span>
-                                <div className="flex items-center gap-1">
+                        <svg className={`w-4 h-4 text-stone-400 transition-transform duration-200 ${showPromptsAccordion ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </button>
+                    {showPromptsAccordion && script && (
+                      <div className="border-t border-stone-100 divide-y divide-stone-50">
+                        {script.chapters.map(ch => {
+                          const prompts = imagePrompts[ch.id]
+                          if (!prompts || prompts.length === 0) return null
+                          return (
+                            <div key={ch.id} className="px-4 py-3 space-y-2">
+                              <p className="text-[11px] font-semibold text-stone-700">{ch.title}</p>
+                              {prompts.map((p, i) => (
+                                <div key={i} className="flex items-start gap-2 group">
+                                  <span className="text-[10px] font-bold text-stone-300 mt-0.5 shrink-0 w-4">#{i + 1}</span>
+                                  <p className="text-[11px] text-stone-500 leading-relaxed flex-1">{p}</p>
                                   <button
-                                    onClick={() => generateDalleForChapter(chapter.id, prompt, i)}
-                                    disabled={generatingDalleFor[chapter.id]}
-                                    title="Generate this image with DALL·E"
-                                    className="flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-medium rounded transition-colors bg-violet-100 text-violet-700 hover:bg-violet-200 disabled:opacity-40"
-                                  >
-                                    {generatingDalleFor[chapter.id] && dallePromptIndex[chapter.id] === i ? <Spinner className="w-2.5 h-2.5" /> : '🎨'}
-                                  </button>
-                                  <button
-                                    onClick={() => copyPrompt(chapter.id, i)}
-                                    className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${
-                                      copiedPromptKey === `${chapter.id}-${i}`
+                                    onClick={() => copyPrompt(ch.id, i)}
+                                    className={`shrink-0 px-1.5 py-0.5 text-[10px] rounded transition-colors ${
+                                      copiedPromptKey === `${ch.id}-${i}`
                                         ? 'bg-green-100 text-green-700'
-                                        : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                                        : 'bg-stone-100 text-stone-400 hover:bg-stone-200 opacity-0 group-hover:opacity-100'
                                     }`}
                                   >
-                                    {copiedPromptKey === `${chapter.id}-${i}` ? '✓' : '⎘'}
+                                    {copiedPromptKey === `${ch.id}-${i}` ? '✓' : '⎘'}
                                   </button>
                                 </div>
-                              </div>
-                              <p className="text-[12px] text-indigo-800 leading-relaxed">{prompt}</p>
+                              ))}
                             </div>
-                          ))}
-                        </div>
+                          )
+                        })}
                       </div>
                     )}
-                    {showPromptsPanel && generatingPrompts && (!imagePrompts[chapter.id] || imagePrompts[chapter.id].length === 0) && (
-                      <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2.5 flex items-center gap-2">
-                        <Spinner className="w-3 h-3 text-indigo-400" />
-                        <p className="text-[11px] text-indigo-400">Generating image prompts…</p>
-                      </div>
-                    )}
+                  </div>
+                )}
 
-                    {/* DALL-E generated image */}
-                    {(dalleImages[chapter.id] || generatingDalleFor[chapter.id]) && (
-                      <div className="rounded-xl overflow-hidden border border-violet-200 bg-violet-50">
-                        {generatingDalleFor[chapter.id] ? (
-                          <div className="flex items-center justify-center gap-2 py-10">
-                            <Spinner className="w-4 h-4 text-violet-500" />
-                            <p className="text-[12px] text-violet-600">Generating with DALL·E 3…</p>
-                          </div>
-                        ) : (
-                          <>
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={dalleImages[chapter.id]} alt={chapter.title} className="w-full block" />
-                            <div className="px-3 py-2 flex items-center justify-between">
-                              <p className="text-[10px] text-violet-600 font-medium">DALL·E 3 · Added to media</p>
-                              <button
-                                onClick={() => {
-                                  const idx = dallePromptIndex[chapter.id] ?? 0
-                                  const prompt = imagePrompts[chapter.id]?.[idx] || imagePrompts[chapter.id]?.[0]
-                                  if (prompt) generateDalleForChapter(chapter.id, prompt, idx)
-                                }}
-                                className="text-[10px] text-violet-600 hover:text-violet-800 font-medium transition-colors"
-                              >
-                                ↺ Regenerate
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
+                {/* Action buttons */}
+                <div className="flex gap-3 pb-4">
+                  <button
+                    onClick={() => { setBuildPhase('idle'); setBuildError(null) }}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-[13px] font-semibold bg-stone-900 text-white rounded-xl hover:bg-stone-800 transition-colors"
+                  >
+                    + Build another video
+                  </button>
+                  <button
+                    onClick={() => toggleAdvancedMode(true)}
+                    className="px-4 py-3 text-[13px] font-medium border border-stone-200 text-stone-600 rounded-xl hover:bg-stone-50 transition-colors"
+                  >
+                    Advanced
+                  </button>
+                </div>
+              </div>
+            )}
 
-                    {/* Media upload */}
-                    <div
-                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
-                      onDrop={(e) => { e.preventDefault(); e.stopPropagation(); addMedia(chapter.id, e.dataTransfer.files) }}
+            {/* ── ERROR ── */}
+            {buildPhase === 'error' && (
+              <div className="flex items-center justify-center min-h-full p-6">
+                <div className="w-full max-w-sm text-center space-y-5">
+                  <div className="w-12 h-12 bg-red-100 rounded-2xl flex items-center justify-center mx-auto">
+                    <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-[16px] font-semibold text-stone-900 mb-1">Build failed</p>
+                    <p className="text-[13px] text-stone-500">{buildError}</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={runAutoBuild}
+                      className="flex-1 px-4 py-2.5 bg-stone-900 text-white text-[13px] font-medium rounded-xl hover:bg-stone-800 transition-colors"
                     >
-                      <p className="text-[10px] font-medium text-stone-400 uppercase tracking-widest mb-2">Media</p>
+                      Retry
+                    </button>
+                    <button
+                      onClick={() => setBuildPhase('idle')}
+                      className="flex-1 px-4 py-2.5 border border-stone-200 text-stone-600 text-[13px] font-medium rounded-xl hover:bg-stone-50 transition-colors"
+                    >
+                      Start over
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
-                      {(chapterMedia[chapter.id] || []).length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {(chapterMedia[chapter.id] || []).map((file, j) => (
-                            <div key={j} className="relative group">
-                              {file.type.startsWith('video/') ? (
-                                <video src={URL.createObjectURL(file)} className="w-16 h-16 rounded-lg object-cover" muted playsInline />
-                              ) : (
-                                <img src={URL.createObjectURL(file)} alt="" className="w-16 h-16 rounded-lg object-cover" />
+        {/* ═══════════════════════════════════════════════
+            ADVANCED MODE
+        ═══════════════════════════════════════════════ */}
+        {advancedMode && (
+          <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+
+            {/* Left panel */}
+            <div className="w-full md:w-72 border-r border-stone-100 overflow-y-auto p-4 md:p-5 flex flex-col gap-4 shrink-0">
+              <div>
+                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-2">Story topic</p>
+                <textarea value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. The untold story of the 1966 Le Mans rivalry" className="w-full border border-stone-200 rounded-lg px-3 py-2.5 text-[16px] md:text-[13px] resize-none focus:outline-none focus:ring-1 focus:ring-stone-400" rows={3} />
+              </div>
+
+              <div>
+                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-2">Channel</p>
+                <select value={channel} onChange={(e) => { setChannel(e.target.value); setMusicMood(CALM_CHANNELS.includes(e.target.value) ? 'calm' : 'energy') }} className="w-full text-[16px] md:text-[13px] border border-stone-200 rounded-lg px-3 py-2.5 min-h-[44px] bg-white focus:outline-none focus:ring-1 focus:ring-stone-400">
+                  {CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+
+              <button onClick={generateScript} disabled={generating} className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-stone-900 text-white text-[13px] font-medium rounded-xl hover:bg-stone-800 transition-colors disabled:opacity-50">
+                {generating ? <><Spinner /> Writing script...</> : <><span className="text-[11px]">&#x270E;</span> Generate story</>}
+              </button>
+
+              {/* Voiceover */}
+              {script && (
+                <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 flex flex-col gap-3">
+                  <p className="text-[10px] font-medium text-violet-700 uppercase tracking-widest">Voiceover</p>
+                  {!testMode && (
+                    <div>
+                      <p className="text-[10px] text-violet-500 mb-1">Voice</p>
+                      <select
+                        value={selectedVoice}
+                        onChange={(e) => { setSelectedVoice(e.target.value); setChapterAudio({}); setVoiceoverStatus({}) }}
+                        className="w-full text-[12px] border border-violet-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-violet-400"
+                      >
+                        {VOICES.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  <button
+                    onClick={generateAllVoiceovers}
+                    disabled={generatingAllVoiceovers || allVoiceoversReady}
+                    className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-white text-[13px] font-medium rounded-xl transition-colors disabled:opacity-50 ${testMode ? 'bg-amber-500 hover:bg-amber-600' : 'bg-violet-600 hover:bg-violet-700'}`}
+                  >
+                    {generatingAllVoiceovers ? <><Spinner /> Generating...</> : allVoiceoversReady ? 'All voiceovers ready' : testMode ? 'Use test audio (all)' : <><span className="text-[11px]">&#9835;</span> Generate all voiceovers</>}
+                  </button>
+                  <p className="text-[10px] text-violet-500">{voiceoverCount}/{script.chapters.length} chapters voiced</p>
+                  {allVoiceoversReady && (
+                    <button onClick={downloadCombinedAudio} className="w-full px-3 py-2 text-[12px] font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors">
+                      &#8595; Download combined audio
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Background music */}
+              {script && (
+                <div className="bg-stone-50 border border-stone-100 rounded-xl p-4 flex flex-col gap-3">
+                  <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Background music</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => setMusicMood('calm')} className={`flex-1 py-2 text-[12px] font-medium rounded-lg border transition-colors ${musicMood === 'calm' ? 'bg-sky-100 text-sky-700 border-sky-300' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'}`}>Calm</button>
+                    <button onClick={() => setMusicMood('energy')} className={`flex-1 py-2 text-[12px] font-medium rounded-lg border transition-colors ${musicMood === 'energy' ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'}`}>Energy</button>
+                  </div>
+                  <p className="text-[10px] text-stone-400">Track auto-selected from library</p>
+                </div>
+              )}
+
+              {/* AI Image Prompts */}
+              {script && (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-medium text-indigo-700 uppercase tracking-widest">AI Image Prompts</p>
+                    {Object.keys(imagePrompts).length > 0 && (
+                      <button onClick={() => setShowPromptsPanel(p => !p)} className="text-[10px] text-indigo-500 hover:text-indigo-700 transition-colors">
+                        {showPromptsPanel ? 'Hide' : 'Show'}
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-indigo-500 leading-relaxed">Generate one detailed image prompt per chapter — ready to paste into Midjourney or ChatGPT.</p>
+                  <button onClick={generateImagePrompts} disabled={generatingPrompts} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 text-white text-[13px] font-medium rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                    {generatingPrompts ? <><Spinner /> Generating prompts...</> : <><span className="text-[11px]">✦</span> {Object.keys(imagePrompts).length > 0 ? 'Regenerate prompts' : 'Generate image prompts'}</>}
+                  </button>
+                  {Object.keys(imagePrompts).length > 0 && (
+                    <button onClick={copyAllPrompts} className="w-full px-3 py-2 text-[12px] font-medium bg-white border border-indigo-200 text-indigo-700 rounded-lg hover:bg-indigo-50 transition-colors">
+                      ⎘ Copy all prompts
+                    </button>
+                  )}
+                  {Object.keys(imagePrompts).length > 0 && (() => {
+                    const total = Object.values(imagePrompts).reduce((s, arr) => s + arr.length, 0)
+                    return <p className="text-[10px] text-indigo-500">{total} prompts across {Object.keys(imagePrompts).length} chapters</p>
+                  })()}
+                  {Object.keys(imagePrompts).length > 0 && (
+                    <div className="pt-2 border-t border-indigo-200 flex flex-col gap-2">
+                      <button
+                        onClick={generateAllDalle}
+                        disabled={!!dalleProgress || generatingPrompts || Object.values(generatingDalleFor).some(Boolean)}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-violet-600 text-white text-[13px] font-medium rounded-xl hover:bg-violet-700 transition-colors disabled:opacity-50"
+                      >
+                        {dalleProgress ? <><Spinner /> {dalleProgress.done}/{dalleProgress.total} generating…</> : <>🎨 Auto-generate with DALL·E</>}
+                      </button>
+                      {dalleProgress && (
+                        <div className="w-full bg-violet-100 rounded-full h-1.5">
+                          <div className="bg-violet-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.round((dalleProgress.done / dalleProgress.total) * 100)}%` }} />
+                        </div>
+                      )}
+                      {Object.keys(dalleImages).length > 0 && !dalleProgress && (
+                        <p className="text-[10px] text-violet-600">{Object.keys(dalleImages).length} image{Object.keys(dalleImages).length !== 1 ? 's' : ''} generated · added to chapters</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Assembly */}
+              {script && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex flex-col gap-3">
+                  <p className="text-[10px] font-medium text-emerald-700 uppercase tracking-widest">Video assembly</p>
+                  <button onClick={assembleVideo} disabled={assembling || !hasAnyMedia} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white text-[13px] font-medium rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50">
+                    {assembling ? <><Spinner /> Assembling...</> : !hasAnyMedia ? 'Upload images first' : <><span className="text-[11px]">&#9654;</span> Assemble video</>}
+                  </button>
+                  {(assembling || clippingVideo) && assemblyProgress && <p className="text-[10px] text-emerald-600">{assemblyProgress}</p>}
+                  {!hasAnyMedia && <p className="text-[10px] text-emerald-500">Add images to chapters to enable</p>}
+                  {videoUrl && (
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] font-medium text-emerald-700 uppercase tracking-widest">Download format</p>
+                      <a href={`${videoUrl}?format=youtube`} download="story_youtube_16x9.mp4" className="flex items-center justify-between w-full px-3 py-2 text-[12px] font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
+                        <span>YouTube</span><span className="opacity-75 text-[10px]">16:9 ↓</span>
+                      </a>
+                      <a href={`${videoUrl}?format=square`} download="story_instagram_square.mp4" className="flex items-center justify-between w-full px-3 py-2 text-[12px] font-medium border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors">
+                        <span>Instagram Square</span><span className="opacity-75 text-[10px]">1:1 ↓</span>
+                      </a>
+                      <a href={`${videoUrl}?format=reels`} download="story_instagram_reels.mp4" className="flex items-center justify-between w-full px-3 py-2 text-[12px] font-medium border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors">
+                        <span>Reels (full video)</span><span className="opacity-75 text-[10px]">9:16 ↓</span>
+                      </a>
+                    </div>
+                  )}
+                  {currentJobId && (
+                    <div className="pt-1 border-t border-emerald-200">
+                      <button onClick={createClips} disabled={clippingVideo} className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[12px] font-medium border border-emerald-400 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors disabled:opacity-50">
+                        {clippingVideo ? <><Spinner className="w-3 h-3" /> Creating chapter clips...</> : '✂ Create chapter clips (9:16)'}
+                      </button>
+                      {clips.length > 0 && (
+                        <div className="mt-2 space-y-2">
+                          <p className="text-[10px] font-medium text-emerald-700">{clips.length} chapter clip{clips.length !== 1 ? 's' : ''} ready</p>
+                          {clips.map((clip) => (
+                            <div key={clip.chapterId} className="bg-white rounded-lg border border-stone-100 overflow-hidden">
+                              {clip.thumbFile && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={`/api/clips/${clip.thumbFile}`} alt={clip.title} className="w-full aspect-square object-cover" />
                               )}
-                              <button onClick={() => removeMedia(chapter.id, j)} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">x</button>
+                              <div className="flex items-center justify-between px-2 py-1.5">
+                                <span className="text-[11px] text-stone-600 truncate max-w-[130px]">{clip.title}</span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-[10px] text-stone-400">{clip.duration}s</span>
+                                  <a href={`/api/clips/${clip.clipFile}`} download={clip.clipFile} className="text-emerald-600 hover:text-emerald-700 font-bold text-[13px]">↓</a>
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>
                       )}
-
-                      <label
-                        className="flex flex-col items-center justify-center min-h-[100px] border-2 border-dashed border-stone-300 rounded-lg py-6 px-4 text-center cursor-pointer hover:bg-stone-50 transition-colors"
-                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.add('bg-emerald-50', 'border-emerald-400') }}
-                        onDragLeave={(e) => e.currentTarget.classList.remove('bg-emerald-50', 'border-emerald-400')}
-                        onDrop={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.remove('bg-emerald-50', 'border-emerald-400'); addMedia(chapter.id, e.dataTransfer.files) }}
-                      >
-                        <input type="file" accept="video/mp4,.mp4,video/quicktime,.mov,image/jpeg,.jpg,.jpeg,image/png,.png,image/webp,.webp" multiple className="hidden" onChange={(e) => addMedia(chapter.id, e.target.files)} />
-                        <svg className="w-7 h-7 mb-2 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                        <p className="text-[12px] text-stone-500">Drop images or video here</p>
-                        <p className="text-[10px] text-stone-400 mt-0.5">MP4, MOV, JPG, PNG, WEBP</p>
-                      </label>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+                  )}
+                </div>
+              )}
 
-      {/* Toast */}
-      {toast && (
-        <div className={`fixed bottom-5 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-lg text-[12px] font-medium shadow-sm z-50 ${toast.type === 'error' ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}`}>
-          {toast.msg}
-        </div>
-      )}
+              {/* Info */}
+              {script && (
+                <div className="text-[11px] text-stone-400 space-y-0.5">
+                  <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-1">Info</p>
+                  <p>{script.chapters.length} chapters</p>
+                  <p>{totalMedia} media files uploaded</p>
+                  <p>{voiceoverCount} voiceovers generated</p>
+                </div>
+              )}
+            </div>
+
+            {/* Right panel — chapters */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {!script ? (
+                <div className="flex flex-col items-center justify-center h-full text-stone-400">
+                  <svg className="w-10 h-10 mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                  <p className="text-[13px] font-medium">No script yet</p>
+                  <p className="text-[12px]">Enter a topic and click Generate story</p>
+                </div>
+              ) : (
+                <div className="max-w-3xl mx-auto space-y-6">
+                  <div className="text-center mb-8">
+                    <h1 className="text-2xl font-bold text-stone-900 mb-2">{script.title}</h1>
+                    <p className="text-[13px] text-stone-500">{script.summary}</p>
+                  </div>
+
+                  {script.chapters.map((chapter) => (
+                    <div key={chapter.id} className="bg-white border border-stone-100 rounded-xl p-5 space-y-4">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${chapterColor(chapter.type)}`}>{chapterLabel(chapter.type)}</span>
+                        <h2 className="text-[15px] font-semibold text-stone-900">{chapter.title}</h2>
+                      </div>
+
+                      <p className="text-[13px] text-stone-700 leading-relaxed">{chapter.narration}</p>
+
+                      {/* Voiceover */}
+                      <div className="flex items-center gap-2">
+                        {voiceoverStatus[chapter.id] === 'generating' ? (
+                          <div className="flex items-center gap-2 text-[12px] text-violet-600">
+                            <Spinner className="w-3 h-3" />
+                            <span>Generating voiceover...</span>
+                          </div>
+                        ) : chapterAudio[chapter.id] ? (
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                            <audio src={chapterAudio[chapter.id]} controls className="h-8 flex-1 min-w-0" />
+                            <button onClick={() => generateVoiceover(chapter.id, chapter.narration)} className="shrink-0 px-2 py-1 text-[10px] border border-stone-200 rounded-md hover:bg-stone-50 text-stone-500 transition-colors">Redo</button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => testMode ? generateTestVoiceover(chapter.id) : generateVoiceover(chapter.id, chapter.narration)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium rounded-lg transition-colors ${testMode ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-violet-100 text-violet-700 hover:bg-violet-200'}`}
+                          >
+                            <span className="text-[10px]">&#9835;</span> {testMode ? 'Use test audio' : 'Generate voiceover'}
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="bg-stone-50 rounded-lg px-3 py-2">
+                        <p className="text-[10px] font-medium text-stone-400 uppercase tracking-widest mb-0.5">Visual</p>
+                        <p className="text-[12px] text-stone-500">{chapter.visual}</p>
+                      </div>
+
+                      {/* AI Image Prompts */}
+                      {showPromptsPanel && imagePrompts[chapter.id] && imagePrompts[chapter.id].length > 0 && (
+                        <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2.5">
+                          <p className="text-[10px] font-medium text-indigo-600 uppercase tracking-widest mb-2">
+                            {imagePrompts[chapter.id].length} image prompt{imagePrompts[chapter.id].length !== 1 ? 's' : ''}
+                          </p>
+                          <div className="space-y-3">
+                            {imagePrompts[chapter.id].map((prompt, i) => (
+                              <div key={i} className={i > 0 ? 'border-t border-indigo-100 pt-3' : ''}>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-[10px] font-semibold text-indigo-500">Image {i + 1}</span>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => generateDalleForChapter(chapter.id, prompt, i)}
+                                      disabled={generatingDalleFor[chapter.id]}
+                                      title="Generate this image with DALL·E"
+                                      className="flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-medium rounded transition-colors bg-violet-100 text-violet-700 hover:bg-violet-200 disabled:opacity-40"
+                                    >
+                                      {generatingDalleFor[chapter.id] && dallePromptIndex[chapter.id] === i ? <Spinner className="w-2.5 h-2.5" /> : '🎨'}
+                                    </button>
+                                    <button
+                                      onClick={() => copyPrompt(chapter.id, i)}
+                                      className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${copiedPromptKey === `${chapter.id}-${i}` ? 'bg-green-100 text-green-700' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'}`}
+                                    >
+                                      {copiedPromptKey === `${chapter.id}-${i}` ? '✓' : '⎘'}
+                                    </button>
+                                  </div>
+                                </div>
+                                <p className="text-[12px] text-indigo-800 leading-relaxed">{prompt}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {showPromptsPanel && generatingPrompts && (!imagePrompts[chapter.id] || imagePrompts[chapter.id].length === 0) && (
+                        <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2.5 flex items-center gap-2">
+                          <Spinner className="w-3 h-3 text-indigo-400" />
+                          <p className="text-[11px] text-indigo-400">Generating image prompts…</p>
+                        </div>
+                      )}
+
+                      {/* DALL-E image */}
+                      {(dalleImages[chapter.id] || generatingDalleFor[chapter.id]) && (
+                        <div className="rounded-xl overflow-hidden border border-violet-200 bg-violet-50">
+                          {generatingDalleFor[chapter.id] ? (
+                            <div className="flex items-center justify-center gap-2 py-10">
+                              <Spinner className="w-4 h-4 text-violet-500" />
+                              <p className="text-[12px] text-violet-600">Generating with DALL·E 3…</p>
+                            </div>
+                          ) : (
+                            <>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={dalleImages[chapter.id]} alt={chapter.title} className="w-full block" />
+                              <div className="px-3 py-2 flex items-center justify-between">
+                                <p className="text-[10px] text-violet-600 font-medium">DALL·E 3 · Added to media</p>
+                                <button
+                                  onClick={() => {
+                                    const idx = dallePromptIndex[chapter.id] ?? 0
+                                    const prompt = imagePrompts[chapter.id]?.[idx] || imagePrompts[chapter.id]?.[0]
+                                    if (prompt) generateDalleForChapter(chapter.id, prompt, idx)
+                                  }}
+                                  className="text-[10px] text-violet-600 hover:text-violet-800 font-medium transition-colors"
+                                >
+                                  ↺ Regenerate
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Media upload */}
+                      <div
+                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+                        onDrop={(e) => { e.preventDefault(); e.stopPropagation(); addMedia(chapter.id, e.dataTransfer.files) }}
+                      >
+                        <p className="text-[10px] font-medium text-stone-400 uppercase tracking-widest mb-2">Media</p>
+                        {(chapterMedia[chapter.id] || []).length > 0 && (
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {(chapterMedia[chapter.id] || []).map((file, j) => (
+                              <div key={j} className="relative group">
+                                {file.type.startsWith('video/') ? (
+                                  <video src={URL.createObjectURL(file)} className="w-16 h-16 rounded-lg object-cover" muted playsInline />
+                                ) : (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={URL.createObjectURL(file)} alt="" className="w-16 h-16 rounded-lg object-cover" />
+                                )}
+                                <button onClick={() => removeMedia(chapter.id, j)} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">x</button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <label
+                          className="flex flex-col items-center justify-center min-h-[100px] border-2 border-dashed border-stone-300 rounded-lg py-6 px-4 text-center cursor-pointer hover:bg-stone-50 transition-colors"
+                          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.add('bg-emerald-50', 'border-emerald-400') }}
+                          onDragLeave={(e) => e.currentTarget.classList.remove('bg-emerald-50', 'border-emerald-400')}
+                          onDrop={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.remove('bg-emerald-50', 'border-emerald-400'); addMedia(chapter.id, e.dataTransfer.files) }}
+                        >
+                          <input type="file" accept="video/mp4,.mp4,video/quicktime,.mov,image/jpeg,.jpg,.jpeg,image/png,.png,image/webp,.webp" multiple className="hidden" onChange={(e) => addMedia(chapter.id, e.target.files)} />
+                          <svg className="w-7 h-7 mb-2 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                          </svg>
+                          <p className="text-[12px] text-stone-500">Drop images or video here</p>
+                          <p className="text-[10px] text-stone-400 mt-0.5">MP4, MOV, JPG, PNG, WEBP</p>
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Toast */}
+        {toast && (
+          <div className={`fixed bottom-5 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-lg text-[12px] font-medium shadow-sm z-50 ${toast.type === 'error' ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}`}>
+            {toast.msg}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
