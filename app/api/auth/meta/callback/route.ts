@@ -89,23 +89,88 @@ export async function GET(req: NextRequest) {
     console.log(`[meta-callback] Long-lived user token obtained (expires_in: ${llData.expires_in ?? 'unknown'})`)
 
     // ── Step 3: fetch all managed pages + Instagram IDs ────────────────────
-    const pagesUrl =
-      `https://graph.facebook.com/v25.0/me/accounts` +
-      `?fields=id,name,access_token,instagram_business_account%7Bid%2Cusername%7D` +
-      `&access_token=${encodeURIComponent(longLivedToken)}`
+    // We need to look in TWO places because pages can be either:
+    //   (a) Owned directly by the user (returned by /me/accounts), or
+    //   (b) Owned by a Business Portfolio (returned by /{business-id}/owned_pages
+    //       and /{business-id}/client_pages — these DO NOT appear in /me/accounts).
+    // Facebook Login for Business connections almost always use (b), so we must
+    // enumerate the user's businesses and collect all their pages.
+    const pageMap = new Map<string, PageFromGraph>()
+    const fields = 'id,name,access_token,instagram_business_account%7Bid%2Cusername%7D'
 
-    const pagesRes  = await fetch(pagesUrl)
-    const pagesData = await pagesRes.json() as {
-      data?: PageFromGraph[]
+    async function collectPages(url: string, label: string) {
+      try {
+        const r  = await fetch(url)
+        const j  = await r.json() as { data?: PageFromGraph[]; error?: { message: string } }
+        if (j.error) {
+          console.warn(`[meta-callback] ${label} returned error: ${j.error.message}`)
+          return
+        }
+        const list = j.data || []
+        for (const p of list) if (p?.id && !pageMap.has(p.id)) pageMap.set(p.id, p)
+        console.log(`[meta-callback] ${label} returned ${list.length} pages`)
+      } catch (err) {
+        console.warn(`[meta-callback] ${label} fetch failed:`, err instanceof Error ? err.message : err)
+      }
+    }
+
+    // (a) Personal pages
+    await collectPages(
+      `https://graph.facebook.com/v25.0/me/accounts?fields=${fields}&limit=200&access_token=${encodeURIComponent(longLivedToken)}`,
+      '/me/accounts'
+    )
+
+    // (b) Business-owned pages — enumerate businesses first
+    const bizUrl =
+      `https://graph.facebook.com/v25.0/me/businesses` +
+      `?fields=id,name&limit=200` +
+      `&access_token=${encodeURIComponent(longLivedToken)}`
+    const bizRes  = await fetch(bizUrl)
+    const bizData = await bizRes.json() as {
+      data?: Array<{ id: string; name: string }>
       error?: { message: string }
     }
+    if (bizData.error) {
+      console.warn(`[meta-callback] /me/businesses returned error: ${bizData.error.message}`)
+    }
+    const businesses = bizData.data || []
+    console.log(`[meta-callback] Found ${businesses.length} businesses: ${businesses.map(b => `${b.name}(${b.id})`).join(', ')}`)
 
-    if (pagesData.error || !pagesData.data) {
-      throw new Error(`/me/accounts failed: ${pagesData.error?.message || 'no data'}`)
+    for (const biz of businesses) {
+      await collectPages(
+        `https://graph.facebook.com/v25.0/${biz.id}/owned_pages?fields=${fields}&limit=200&access_token=${encodeURIComponent(longLivedToken)}`,
+        `/${biz.id}/owned_pages`
+      )
+      await collectPages(
+        `https://graph.facebook.com/v25.0/${biz.id}/client_pages?fields=${fields}&limit=200&access_token=${encodeURIComponent(longLivedToken)}`,
+        `/${biz.id}/client_pages`
+      )
     }
 
-    const pages = pagesData.data
-    console.log(`[meta-callback] Found ${pages.length} pages: ${pages.map(p => `${p.name}(${p.id})`).join(', ')}`)
+    const pages = Array.from(pageMap.values())
+
+    // Some business-owned pages don't include an access_token in the list response.
+    // Fetch it individually for any page that's missing one.
+    for (const p of pages) {
+      if (p.access_token) continue
+      try {
+        const tUrl =
+          `https://graph.facebook.com/v25.0/${p.id}` +
+          `?fields=access_token&access_token=${encodeURIComponent(longLivedToken)}`
+        const tRes  = await fetch(tUrl)
+        const tData = await tRes.json() as { access_token?: string; error?: { message: string } }
+        if (tData.access_token) p.access_token = tData.access_token
+        else console.warn(`[meta-callback] Could not fetch page token for ${p.name}(${p.id}): ${tData.error?.message || 'no token'}`)
+      } catch (err) {
+        console.warn(`[meta-callback] Token fetch failed for ${p.name}(${p.id}):`, err instanceof Error ? err.message : err)
+      }
+    }
+
+    console.log(`[meta-callback] Found ${pages.length} total pages: ${pages.map(p => `${p.name}(${p.id})`).join(', ')}`)
+
+    if (pages.length === 0) {
+      throw new Error('No pages returned from /me/accounts, /me/businesses/owned_pages, or /me/businesses/client_pages. Make sure the Business Portfolio has pages and the app has pages_show_list and business_management scopes.')
+    }
 
     // ── Step 4: match pages to channels and save permanent tokens ──────────
     const store    = await loadMetaTokens()
