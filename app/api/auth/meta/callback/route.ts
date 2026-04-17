@@ -20,12 +20,10 @@ type PageFromGraph = {
 //   4. Match pages to channels by stored facebookPageId and save
 //   5. Redirect to /accounts with a summary
 export async function GET(req: NextRequest) {
-  const baseUrl      = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
-  const appId        = process.env.META_APP_ID
-  const appSecret    = process.env.META_APP_SECRET
-  // redirectUri must exactly match what was sent in the initiation request
-  const redirectBase = process.env.META_REDIRECT_BASE || baseUrl
-  const redirectUri  = `${redirectBase}/api/auth/meta/callback`
+  const baseUrl     = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
+  const appId       = process.env.META_APP_ID
+  const appSecret   = process.env.META_APP_SECRET
+  const redirectUri = `${baseUrl}/api/auth/meta/callback`
 
   const { searchParams } = new URL(req.url)
   const code  = searchParams.get('code')
