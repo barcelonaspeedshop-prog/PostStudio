@@ -1,12 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { spawn } from 'child_process'
 import { writeFile, mkdir, rename } from 'fs/promises'
-import { createWriteStream, existsSync, statSync } from 'fs'
+import { createWriteStream, existsSync, statSync, readdirSync } from 'fs'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import path from 'path'
 import { createJob, updateJob, cleanOldJobs } from '../jobs'
 import { getRandomDriveMusicTrack, downloadDriveFileToPath } from '@/lib/drive-images'
+
+// Local fallback music directories (mounted from /docker/poststudio/music)
+const LOCAL_MUSIC: Record<'calm' | 'energy', string> = {
+  calm:   '/music/Ambient',
+  energy: '/music/Energetic',
+}
+
+function pickLocalMusicTrack(mood: 'calm' | 'energy'): string | null {
+  try {
+    const dir = LOCAL_MUSIC[mood]
+    const files = readdirSync(dir).filter(f => /\.(mp3|m4a|wav|aac)$/i.test(f))
+    if (files.length === 0) return null
+    const picked = files[Math.floor(Math.random() * files.length)]
+    return path.join(dir, picked)
+  } catch {
+    return null
+  }
+}
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -441,7 +459,7 @@ export async function POST(req: NextRequest) {
       musicPath = path.join(tmpDir, `bg_music.${ext}`)
       await streamToDisk(musicFile, musicPath)
     } else if (musicMood === 'calm' || musicMood === 'energy') {
-      // New: pick a random track from Drive music/<mood>/
+      // Pick a random track: try Google Drive first, fall back to local /music/ mount
       try {
         const track = await getRandomDriveMusicTrack(musicMood)
         if (track) {
@@ -450,11 +468,23 @@ export async function POST(req: NextRequest) {
           await downloadDriveFileToPath(track.id, musicPath)
           console.log(`[story-video] Drive music track (${musicMood}): ${track.name}`)
         } else {
-          console.warn(`[story-video] No tracks found in Drive music/${musicMood}/ — continuing without music`)
+          // Drive folder is empty — try local fallback
+          const local = pickLocalMusicTrack(musicMood)
+          if (local) {
+            musicPath = local
+            console.log(`[story-video] Local music fallback (${musicMood}): ${path.basename(local)}`)
+          } else {
+            console.warn(`[story-video] No tracks found in Drive or local /music/${musicMood === 'calm' ? 'Ambient' : 'Energetic'}/ — continuing without music`)
+          }
         }
       } catch (e) {
-        console.warn(`[story-video] Failed to fetch Drive music for mood "${musicMood}":`, e instanceof Error ? e.message : e)
-        musicPath = null // Don't leave a partial file path; assembly continues without music
+        console.warn(`[story-video] Drive music fetch failed for mood "${musicMood}":`, e instanceof Error ? e.message : e)
+        // Try local fallback on Drive error
+        const local = pickLocalMusicTrack(musicMood)
+        if (local) {
+          musicPath = local
+          console.log(`[story-video] Local music fallback (after Drive error, ${musicMood}): ${path.basename(local)}`)
+        }
       }
     }
     if (musicVolumeRaw) {
