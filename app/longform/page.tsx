@@ -54,6 +54,12 @@ export default function LongFormPage() {
   const [copiedPromptKey, setCopiedPromptKey] = useState<string | null>(null) // "{chapterId}-{index}"
   const [showPromptsPanel, setShowPromptsPanel] = useState(false)
 
+  // DALL-E generated images — chapterId → data URL (also injected into chapterMedia)
+  const [dalleImages, setDalleImages] = useState<Record<number, string>>({})
+  const [generatingDalleFor, setGeneratingDalleFor] = useState<Record<number, boolean>>({})
+  const [dalleProgress, setDalleProgress] = useState<{ done: number; total: number } | null>(null)
+  const [dallePromptIndex, setDallePromptIndex] = useState<Record<number, number>>({})
+
 
   const DRAFT_KEY = 'draft_longvideo'
 
@@ -273,6 +279,58 @@ export default function LongFormPage() {
     a.href = videoUrl
     a.download = `${channel.replace(/\s+/g, '_')}_story.mp4`
     a.click()
+  }
+
+  // ─── DALL-E image generation ───
+
+  const dataUrlToFile = (dataUrl: string, filename: string): File => {
+    const [header, b64] = dataUrl.split(',')
+    const mime = header.match(/:(.*?);/)?.[1] || 'image/png'
+    const bytes = atob(b64)
+    const array = new Uint8Array(bytes.length)
+    for (let i = 0; i < bytes.length; i++) array[i] = bytes.charCodeAt(i)
+    return new File([array], filename, { type: mime })
+  }
+
+  const generateDalleForChapter = async (chapterId: number, prompt: string, promptIndex: number) => {
+    setGeneratingDalleFor(prev => ({ ...prev, [chapterId]: true }))
+    try {
+      const res = await fetch('/api/story-dalle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, chapterId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+
+      setDalleImages(prev => ({ ...prev, [chapterId]: data.imageDataUrl }))
+      setDallePromptIndex(prev => ({ ...prev, [chapterId]: promptIndex }))
+
+      // Auto-assign to chapter media (replaces any previous dalle_ file, prepends to list)
+      const file = dataUrlToFile(data.imageDataUrl, `dalle_ch${chapterId}.png`)
+      setChapterMedia(prev => ({
+        ...prev,
+        [chapterId]: [file, ...(prev[chapterId] || []).filter(f => !f.name.startsWith('dalle_ch'))],
+      }))
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : `Image generation failed for chapter ${chapterId}`, 'error')
+    } finally {
+      setGeneratingDalleFor(prev => ({ ...prev, [chapterId]: false }))
+    }
+  }
+
+  const generateAllDalle = async () => {
+    if (!script) return
+    const chaptersWithPrompts = script.chapters.filter(ch => (imagePrompts[ch.id]?.length ?? 0) > 0)
+    if (chaptersWithPrompts.length === 0) { showToast('Generate image prompts first', 'error'); return }
+    setDalleProgress({ done: 0, total: chaptersWithPrompts.length })
+    for (let i = 0; i < chaptersWithPrompts.length; i++) {
+      const ch = chaptersWithPrompts[i]
+      await generateDalleForChapter(ch.id, imagePrompts[ch.id][0], 0)
+      setDalleProgress({ done: i + 1, total: chaptersWithPrompts.length })
+    }
+    setDalleProgress(null)
+    showToast(`${chaptersWithPrompts.length} images generated and added to chapters`)
   }
 
   // ─── Create chapter clips ───
@@ -618,6 +676,34 @@ export default function LongFormPage() {
                   const total = Object.values(imagePrompts).reduce((s, arr) => s + arr.length, 0)
                   return <p className="text-[10px] text-indigo-500">{total} prompts across {Object.keys(imagePrompts).length} chapters</p>
                 })()}
+
+                {/* DALL-E auto-generate */}
+                {Object.keys(imagePrompts).length > 0 && (
+                  <div className="pt-2 border-t border-indigo-200 flex flex-col gap-2">
+                    <button
+                      onClick={generateAllDalle}
+                      disabled={!!dalleProgress || generatingPrompts || Object.values(generatingDalleFor).some(Boolean)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-violet-600 text-white text-[13px] font-medium rounded-xl hover:bg-violet-700 transition-colors disabled:opacity-50"
+                    >
+                      {dalleProgress ? (
+                        <><Spinner /> {dalleProgress.done}/{dalleProgress.total} generating…</>
+                      ) : (
+                        <>🎨 Auto-generate with DALL·E</>
+                      )}
+                    </button>
+                    {dalleProgress && (
+                      <div className="w-full bg-violet-100 rounded-full h-1.5">
+                        <div
+                          className="bg-violet-500 h-1.5 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.round((dalleProgress.done / dalleProgress.total) * 100)}%` }}
+                        />
+                      </div>
+                    )}
+                    {Object.keys(dalleImages).length > 0 && !dalleProgress && (
+                      <p className="text-[10px] text-violet-600">{Object.keys(dalleImages).length} image{Object.keys(dalleImages).length !== 1 ? 's' : ''} generated · added to chapters</p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -782,16 +868,26 @@ export default function LongFormPage() {
                             <div key={i} className={i > 0 ? 'border-t border-indigo-100 pt-3' : ''}>
                               <div className="flex items-center justify-between mb-1">
                                 <span className="text-[10px] font-semibold text-indigo-500">Image {i + 1}</span>
-                                <button
-                                  onClick={() => copyPrompt(chapter.id, i)}
-                                  className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${
-                                    copiedPromptKey === `${chapter.id}-${i}`
-                                      ? 'bg-green-100 text-green-700'
-                                      : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
-                                  }`}
-                                >
-                                  {copiedPromptKey === `${chapter.id}-${i}` ? '✓ Copied' : '⎘ Copy'}
-                                </button>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => generateDalleForChapter(chapter.id, prompt, i)}
+                                    disabled={generatingDalleFor[chapter.id]}
+                                    title="Generate this image with DALL·E"
+                                    className="flex items-center gap-0.5 px-2 py-0.5 text-[10px] font-medium rounded transition-colors bg-violet-100 text-violet-700 hover:bg-violet-200 disabled:opacity-40"
+                                  >
+                                    {generatingDalleFor[chapter.id] && dallePromptIndex[chapter.id] === i ? <Spinner className="w-2.5 h-2.5" /> : '🎨'}
+                                  </button>
+                                  <button
+                                    onClick={() => copyPrompt(chapter.id, i)}
+                                    className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${
+                                      copiedPromptKey === `${chapter.id}-${i}`
+                                        ? 'bg-green-100 text-green-700'
+                                        : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                                    }`}
+                                  >
+                                    {copiedPromptKey === `${chapter.id}-${i}` ? '✓' : '⎘'}
+                                  </button>
+                                </div>
                               </div>
                               <p className="text-[12px] text-indigo-800 leading-relaxed">{prompt}</p>
                             </div>
@@ -803,6 +899,36 @@ export default function LongFormPage() {
                       <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2.5 flex items-center gap-2">
                         <Spinner className="w-3 h-3 text-indigo-400" />
                         <p className="text-[11px] text-indigo-400">Generating image prompts…</p>
+                      </div>
+                    )}
+
+                    {/* DALL-E generated image */}
+                    {(dalleImages[chapter.id] || generatingDalleFor[chapter.id]) && (
+                      <div className="rounded-xl overflow-hidden border border-violet-200 bg-violet-50">
+                        {generatingDalleFor[chapter.id] ? (
+                          <div className="flex items-center justify-center gap-2 py-10">
+                            <Spinner className="w-4 h-4 text-violet-500" />
+                            <p className="text-[12px] text-violet-600">Generating with DALL·E 3…</p>
+                          </div>
+                        ) : (
+                          <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={dalleImages[chapter.id]} alt={chapter.title} className="w-full block" />
+                            <div className="px-3 py-2 flex items-center justify-between">
+                              <p className="text-[10px] text-violet-600 font-medium">DALL·E 3 · Added to media</p>
+                              <button
+                                onClick={() => {
+                                  const idx = dallePromptIndex[chapter.id] ?? 0
+                                  const prompt = imagePrompts[chapter.id]?.[idx] || imagePrompts[chapter.id]?.[0]
+                                  if (prompt) generateDalleForChapter(chapter.id, prompt, idx)
+                                }}
+                                className="text-[10px] text-violet-600 hover:text-violet-800 font-medium transition-colors"
+                              >
+                                ↺ Regenerate
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
 
