@@ -5,7 +5,7 @@ import Sidebar from '@/components/Sidebar'
 type Chapter = { id: number; title: string; type: string; narration: string; visual: string }
 type Script = { title: string; summary: string; chapters: Chapter[] }
 
-const CHANNELS = ['Gentlemen of Fuel', 'Omnira F1', 'Road & Trax', 'Omnira Football']
+const CHANNELS = ['Gentlemen of Fuel', 'Omnira F1', 'Road & Trax', 'Omnira Football', 'Omnira Cricket', 'Omnira Golf', 'Omnira NFL', 'Omnira Food', 'Omnira Travel']
 const CALM_CHANNELS = ['Omnira Food', 'Omnira Travel']
 
 const VOICES = [
