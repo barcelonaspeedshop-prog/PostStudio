@@ -127,10 +127,6 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Item not found' }, { status: 404 })
     }
 
-    if (action === 'approve' && !item.videoBase64) {
-      return NextResponse.json({ error: 'Cannot approve without a video. Generate the video first.' }, { status: 400 })
-    }
-
     item.status = action === 'approve' ? 'approved' : 'rejected'
     item.reviewedAt = new Date().toISOString()
     await saveApprovals(items)
@@ -139,13 +135,16 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ id: item.id, status: 'rejected' })
     }
 
-    // Approved — publish to all platforms in parallel
+    // Approved — publish to Instagram and Facebook only
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
     const caption = item.slides.map(s => `${s.headline} — ${s.body}`).join('\n\n')
 
     type PlatformResult = { platform: string; success: boolean; error?: string; url?: string }
 
-    const publishJobs = item.platforms.map((platform): Promise<PlatformResult> => {
+    // Only publish to instagram and facebook — YouTube and TikTok are handled separately
+    const activePlatforms = item.platforms.filter(p => p === 'instagram' || p === 'facebook')
+
+    const publishJobs = activePlatforms.map((platform): Promise<PlatformResult> => {
       switch (platform) {
         case 'instagram':
           return fetch(`${baseUrl}/api/publish`, {
@@ -175,7 +174,6 @@ export async function PATCH(req: NextRequest) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               content: caption,
-              mediaUrl: item.videoBase64,
               platforms: ['facebook'],
               firstSlideHeadline: item.headline,
               channel: item.channel,
@@ -189,53 +187,6 @@ export async function PATCH(req: NextRequest) {
             })
             .catch(e => ({ platform: 'facebook', success: false, error: e instanceof Error ? e.message : String(e) }))
 
-        case 'tiktok':
-          return fetch(`${baseUrl}/api/publish`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              content: caption,
-              mediaUrl: item.videoBase64,
-              platforms: ['tiktok'],
-              firstSlideHeadline: item.headline,
-              channel: item.channel,
-            }),
-          })
-            .then(async r => {
-              const d = await r.json()
-              const inner = (d.results as PlatformResult[] | undefined)?.find(x => x.platform === 'tiktok')
-              if (inner) return inner
-              return { platform: 'tiktok', success: r.ok, error: d.error }
-            })
-            .catch(e => ({ platform: 'tiktok', success: false, error: e instanceof Error ? e.message : String(e) }))
-
-        case 'youtube':
-          if (!item.videoBase64) {
-            return Promise.resolve({
-              platform: 'youtube',
-              success: false,
-              skipped: true,
-              reason: 'No video attached — generate a video before publishing to YouTube.',
-            })
-          }
-          return fetch(`${baseUrl}/api/publish/youtube`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              videoBase64:  item.videoBase64,
-              title:        item.ytTitle       || item.headline,
-              description:  item.ytDescription || caption,
-              tags:         item.ytTags        || [],
-              channelName:  item.channel,
-            }),
-          })
-            .then(async r => {
-              const d = await r.json()
-              if (!r.ok) return { platform: 'youtube', success: false, error: d.error || `HTTP ${r.status}` }
-              return { platform: 'youtube', success: true, url: d.url, id: d.videoId }
-            })
-            .catch(e => ({ platform: 'youtube', success: false, error: e instanceof Error ? e.message : String(e) }))
-
         default:
           return Promise.resolve({ platform, success: false, error: `No publish handler for platform: ${platform}` })
       }
@@ -245,7 +196,7 @@ export async function PATCH(req: NextRequest) {
     const results: PlatformResult[] = settled.map((s, i) =>
       s.status === 'fulfilled'
         ? s.value
-        : { platform: item.platforms[i], success: false, error: s.reason instanceof Error ? s.reason.message : String(s.reason) }
+        : { platform: activePlatforms[i], success: false, error: s.reason instanceof Error ? s.reason.message : String(s.reason) }
     )
 
     const failures = results.filter(r => !r.success)

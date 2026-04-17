@@ -632,14 +632,12 @@ export default function ApprovalsPage() {
         showToast(`Published to ${platforms.join(', ')}!`)
       }
 
-      // Schedule secondary format jobs after successful approve
+      // Schedule secondary format jobs after successful approve (Instagram only)
       if (action === 'approve') {
         const item = items.find(i => i.id === id)
         if (item) {
           const now = new Date()
           const scheduleJobs: Array<{ format: string; platform: string; delayHours: number }> = []
-          if (item.platforms.includes('tiktok')) scheduleJobs.push({ format: 'tiktok', platform: 'tiktok', delayHours: 2 })
-          if (item.platforms.includes('youtube')) scheduleJobs.push({ format: 'short', platform: 'youtube', delayHours: 4 })
           if (item.platforms.includes('instagram')) scheduleJobs.push({ format: 'reel', platform: 'instagram', delayHours: 6 })
           if (item.platforms.includes('instagram')) scheduleJobs.push({ format: 'instagram_still', platform: 'instagram', delayHours: 8 })
 
@@ -747,7 +745,7 @@ export default function ApprovalsPage() {
                           <p className="text-[13px] font-medium text-stone-900 truncate">{item.headline}</p>
                           <p className="text-[11px] text-stone-500 mt-0.5">{item.channel}</p>
                           <div className="flex gap-1 mt-1.5 flex-wrap">
-                            {item.platforms.map(p => (
+                            {item.platforms.filter(p => p === 'instagram' || p === 'facebook').map(p => (
                               <span key={p} className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded capitalize">{p}</span>
                             ))}
                           </div>
@@ -856,7 +854,7 @@ export default function ApprovalsPage() {
                                 {genStep || 'Generating...'}
                               </>
                             ) : (
-                              <><span className="text-[11px]">▶</span> Generate video first</>
+                              <><span className="text-[11px]">▶</span> Generate video (optional)</>
                             )}
                           </button>
                         )}
@@ -868,15 +866,6 @@ export default function ApprovalsPage() {
                             >
                               <span className="text-[11px]">▶</span> Preview
                             </button>
-                          )}
-                          {hasVideo && (
-                            <a
-                              href={`/api/approvals/${item.id}/video`}
-                              download
-                              className="px-4 py-2.5 min-h-[44px] border border-red-200 text-red-600 text-[13px] font-medium rounded-lg hover:bg-red-50 transition-colors flex items-center gap-1.5"
-                            >
-                              <span className="text-[11px]">↓</span> Download for YouTube
-                            </a>
                           )}
                           <button
                             onClick={() => regenerateItem(item)}
@@ -895,10 +884,8 @@ export default function ApprovalsPage() {
                           </button>
                           <button
                             onClick={() => handleAction(item.id, 'approve')}
-                            disabled={isActing || !hasVideo}
-                            className={`flex-1 px-4 py-2.5 min-h-[44px] text-[13px] font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${
-                              hasVideo ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-stone-200 text-stone-400 cursor-not-allowed'
-                            }`}
+                            disabled={isActing}
+                            className="flex-1 px-4 py-2.5 min-h-[44px] text-[13px] font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2 bg-green-600 text-white hover:bg-green-700"
                           >
                             {isActing ? (
                               <>
@@ -908,7 +895,7 @@ export default function ApprovalsPage() {
                                 </svg>
                                 {actingLabel}
                               </>
-                            ) : hasVideo ? 'Approve & Post' : 'Need video'}
+                            ) : 'Approve & Post'}
                           </button>
                           <button
                             onClick={() => handleAction(item.id, 'reject')}
@@ -946,15 +933,6 @@ export default function ApprovalsPage() {
                     }`}>
                       {item.status}
                     </span>
-                    {item.status === 'approved' && item.videoBase64 && (
-                      <a
-                        href={`/api/approvals/${item.id}/video`}
-                        download
-                        className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-600 hover:bg-red-100 transition-colors whitespace-nowrap"
-                      >
-                        ↓ YouTube
-                      </a>
-                    )}
                   </div>
                 ))}
               </div>
@@ -1346,7 +1324,7 @@ export default function ApprovalsPage() {
                 <p className="text-[14px] font-medium text-stone-900">{previewItem.headline}</p>
                 <p className="text-[12px] text-stone-500 mt-0.5">{previewItem.channel} · {previewItem.slides.length} slides</p>
                 <div className="flex gap-1 mt-1.5 flex-wrap">
-                  {previewItem.platforms.map(p => (
+                  {previewItem.platforms.filter(p => p === 'instagram' || p === 'facebook').map(p => (
                     <span key={p} className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded capitalize">{p}</span>
                   ))}
                 </div>
@@ -1381,13 +1359,6 @@ export default function ApprovalsPage() {
                 >
                   Close
                 </button>
-                <a
-                  href={`/api/approvals/${previewItem.id}/video`}
-                  download
-                  className="px-4 py-2.5 min-h-[44px] border border-red-200 text-red-600 text-[13px] font-medium rounded-lg hover:bg-red-50 transition-colors flex items-center gap-1.5"
-                >
-                  <span className="text-[11px]">↓</span> YouTube
-                </a>
               </div>
             </div>
           </div>
