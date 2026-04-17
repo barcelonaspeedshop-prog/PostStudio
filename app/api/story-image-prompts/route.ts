@@ -40,33 +40,32 @@ export async function POST(req: NextRequest) {
       model: 'claude-sonnet-4-20250514',
       max_tokens: 3000,
       system: `You are an expert AI image prompt writer for Midjourney and DALL-E 3.
-You write highly specific, visual prompts that describe scenes in rich detail.
-Each prompt should be 40-80 words and cover: subject, composition, lighting, mood, style, colour palette.
+Each prompt must describe ONE single scene for ONE chapter only — never blend multiple chapters.
+Rules:
+- Start with the primary subject (e.g. "A silver Ferrari 488", "A packed stadium", "A golden bowl of ramen")
+- 2-3 sentences maximum — short, dense, visual
+- No storytelling, no narrative, no "the chapter discusses..." — pure visual description only
+- Specify: subject, setting, lighting, mood, and one style/render cue at the end
+- Never reference other chapters or the overall video topic
 Always respond with valid JSON only — no markdown, no backticks, no preamble.`,
       messages: [{
         role: 'user',
-        content: `Generate one detailed AI image prompt for each chapter of this video script.
+        content: `Generate one standalone AI image prompt per chapter. Each prompt is independent — treat every chapter in isolation.
 
-Video topic: "${topic || 'Unknown'}"
-Channel: ${channelName}
-Visual style for this channel: ${styleGuide}
+Channel visual style: ${styleGuide}
 
-Script chapters:
+Chapters (process each separately):
 ${chaptersText}
 
 Return a JSON array where each object has:
 - "chapterId": the chapter id number
-- "prompt": the detailed image prompt (40-80 words, ready to paste into Midjourney or DALL-E 3)
-- "title": the chapter title (copy from the input)
+- "title": the chapter title (copy exactly from input)
+- "prompt": 2-3 sentence image prompt starting with the primary subject
 
-The prompt must:
-1. Describe a specific visual scene — not abstract concepts
-2. Specify lighting (e.g. "dramatic side lighting", "golden hour backlight")
-3. Specify mood and atmosphere
-4. Match the ${channelName} brand style: ${styleGuide}
-5. End with rendering style cues like "cinematic, 8K, photorealistic" or "hyper-detailed illustration"
+Prompt format example:
+"A lone racing driver in a red helmet crouches beside a silver F1 car on a rain-soaked pit lane. Neon reflections streak across wet tarmac under harsh floodlights. Cinematic, shallow depth of field, photorealistic, 8K."
 
-Return only the JSON array.`,
+Return only the JSON array — one object per chapter.`,
       }],
     })
 
