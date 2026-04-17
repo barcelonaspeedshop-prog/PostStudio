@@ -770,7 +770,9 @@ export default function LongFormPage() {
                     {showPromptsPanel && imagePrompts[chapter.id] && (
                       <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2.5">
                         <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-[10px] font-medium text-indigo-600 uppercase tracking-widest">AI Image Prompt</p>
+                          <p className="text-[10px] font-medium text-indigo-600 uppercase tracking-widest">
+                            Image Prompt #{chapter.id}
+                          </p>
                           <button
                             onClick={() => copyPrompt(chapter.id)}
                             className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${
@@ -783,6 +785,12 @@ export default function LongFormPage() {
                           </button>
                         </div>
                         <p className="text-[12px] text-indigo-800 leading-relaxed">{imagePrompts[chapter.id]}</p>
+                      </div>
+                    )}
+                    {showPromptsPanel && generatingPrompts && !imagePrompts[chapter.id] && (
+                      <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2.5 flex items-center gap-2">
+                        <Spinner className="w-3 h-3 text-indigo-400" />
+                        <p className="text-[11px] text-indigo-400">Generating prompt #{chapter.id}…</p>
                       </div>
                     )}
 

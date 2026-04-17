@@ -19,68 +19,66 @@ const CHANNEL_STYLE: Record<string, string> = {
   'Omnira Travel':      'travel photography, sweeping landscapes, golden-hour light, cultural moments, vivid local colour, wide-angle destination shots',
 }
 
+type ChapterInput = { id: number; title: string; narration: string; visual?: string }
+
+// Generate one image prompt for a single chapter — called in parallel for each chapter.
+async function promptForChapter(
+  ch: ChapterInput,
+  styleGuide: string,
+): Promise<string> {
+  const message = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 200,
+    system: `You are an expert AI image prompt writer for Midjourney and DALL-E 3.
+Write ONE image prompt for the scene described. Rules:
+- Start with the primary subject (a person, object, or place — be specific)
+- 2-3 sentences only
+- Pure visual description — no narrative, no "this chapter shows…"
+- Include: subject, setting, lighting, mood, and a render style cue at the end
+- Output ONLY the prompt text — no labels, no JSON, no preamble`,
+    messages: [{
+      role: 'user',
+      content: `Chapter: "${ch.title}"
+Narration: ${ch.narration}${ch.visual ? `\nVisual direction: ${ch.visual}` : ''}
+Channel style: ${styleGuide}
+
+Write the image prompt now.`,
+    }],
+  })
+
+  return message.content
+    .filter(b => b.type === 'text')
+    .map(b => (b as { type: 'text'; text: string }).text)
+    .join('')
+    .trim()
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { chapters, channel, topic } = await req.json()
+    const { chapters, channel, topic: _topic } = await req.json()
 
     if (!chapters || !Array.isArray(chapters) || chapters.length === 0) {
       return NextResponse.json({ error: 'chapters array is required' }, { status: 400 })
     }
 
     const styleGuide = CHANNEL_STYLE[channel] || 'cinematic photography, dramatic lighting, high production value'
-    const channelName = channel || 'General'
 
-    const chaptersText = chapters
-      .map((ch: { id: number; title: string; narration: string; visual: string }) =>
-        `Chapter ${ch.id} — "${ch.title}"\nNarration: ${ch.narration}\nVisual direction: ${ch.visual}`
-      )
-      .join('\n\n')
+    // Generate all prompts in parallel — one API call per chapter.
+    // This guarantees exactly one prompt per chapter with no ID confusion.
+    const settled = await Promise.allSettled(
+      (chapters as ChapterInput[]).map(ch => promptForChapter(ch, styleGuide))
+    )
 
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 3000,
-      system: `You are an expert AI image prompt writer for Midjourney and DALL-E 3.
-Each prompt must describe ONE single scene for ONE chapter only — never blend multiple chapters.
-Rules:
-- Start with the primary subject (e.g. "A silver Ferrari 488", "A packed stadium", "A golden bowl of ramen")
-- 2-3 sentences maximum — short, dense, visual
-- No storytelling, no narrative, no "the chapter discusses..." — pure visual description only
-- Specify: subject, setting, lighting, mood, and one style/render cue at the end
-- Never reference other chapters or the overall video topic
-Always respond with valid JSON only — no markdown, no backticks, no preamble.`,
-      messages: [{
-        role: 'user',
-        content: `Generate one standalone AI image prompt per chapter. Each prompt is independent — treat every chapter in isolation.
-
-Channel visual style: ${styleGuide}
-
-Chapters (process each separately):
-${chaptersText}
-
-Return a JSON array where each object has:
-- "chapterId": the chapter id number
-- "title": the chapter title (copy exactly from input)
-- "prompt": 2-3 sentence image prompt starting with the primary subject
-
-Prompt format example:
-"A lone racing driver in a red helmet crouches beside a silver F1 car on a rain-soaked pit lane. Neon reflections streak across wet tarmac under harsh floodlights. Cinematic, shallow depth of field, photorealistic, 8K."
-
-Return only the JSON array — one object per chapter.`,
-      }],
+    const prompts = (chapters as ChapterInput[]).map((ch, i) => {
+      const result = settled[i]
+      return {
+        chapterId: ch.id,
+        title: ch.title,
+        prompt: result.status === 'fulfilled' ? result.value : `[Failed to generate prompt for "${ch.title}"]`,
+      }
     })
 
-    const text = message.content
-      .filter(b => b.type === 'text')
-      .map(b => (b as { type: 'text'; text: string }).text)
-      .join('')
-
-    let prompts
-    try {
-      prompts = JSON.parse(text.replace(/```json|```/g, '').trim())
-    } catch {
-      return NextResponse.json({ error: 'Failed to parse prompts from AI' }, { status: 502 })
-    }
-
+    console.log(`[story-image-prompts] Generated ${prompts.length} prompts for channel "${channel}"`)
     return NextResponse.json({ prompts })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
