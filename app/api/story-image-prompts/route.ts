@@ -35,20 +35,24 @@ async function promptsForChapter(ch: ChapterInput, styleGuide: string): Promise<
     max_tokens: 1500,
     system: `You are an image prompt writer for Midjourney and DALL-E 3.
 
-TASK: Read the chapter narration sentence by sentence. Extract every SPECIFIC moment, named person, named place, specific action, or specific event. Write one image prompt per specific moment.
+TASK: Read the narration sentence by sentence. Group consecutive sentences that describe the SAME moment in time into one scene. Write exactly one image prompt per scene.
 
-STRICT RULES — READ CAREFULLY:
-- You MUST return between 4 and 6 prompts. Never fewer than 4.
-- Output is a JSON array of strings ONLY. No keys, no wrapping object, no markdown fences.
-- Each string is one self-contained image prompt (2-3 sentences).
-- SPECIFICITY IS MANDATORY: every prompt must reference something explicitly named or described in the narration. Named people, specific ages, specific actions, specific locations, specific time periods.
-- BAD (generic, forbidden): "A golfer practising on a driving range at sunset, warm tones."
-- GOOD (specific, required): "Earl Woods crouching behind a 2-year-old Tiger Woods in a suburban garage, guiding his tiny hands around a cut-down golf club, 1970s fluorescent workshop lighting."
-- Include era/decade where the text mentions it (1970s, 1980s, etc.) — it anchors the visual.
-- Include named individuals with their role and approximate age if stated in the text.
-- Include specific settings named in the text — a named city, stadium, course, or country.
-- Never invent people or events not mentioned. Only illustrate what the text actually says.
-- End every prompt with a render cue: "photorealistic, cinematic lighting" or "editorial illustration, dramatic shadows" etc.`,
+IRON RULES — VIOLATIONS ARE NOT ALLOWED:
+1. ONE MOMENT IN TIME PER IMAGE. NEVER put two different time periods in one image. NEVER put a young and older version of the same person in one image. Each image = one frozen moment.
+2. You MUST produce between 4 and 6 prompts. Never fewer than 4.
+3. Output is a JSON array of strings ONLY. No keys, no object, no markdown fences.
+4. Each prompt is 2-3 sentences describing WHO + WHAT they are doing + WHERE + WHEN (era/age) + visual style.
+5. SPECIFICITY: use names, ages, locations, and time periods exactly as stated in the text.
+6. FORBIDDEN — combining scenes: "Earl Woods teaching young Tiger while [adult Tiger doing something else]" — this mixes two time periods. NEVER do this.
+7. FORBIDDEN — generic imagery not grounded in the text.
+8. End every prompt with a render cue such as "photorealistic, cinematic lighting" or "editorial illustration, dramatic shadows".
+
+HOW TO SPLIT SCENES: when the text shifts to a different year, a different age, a different person, or a different event — that is a new scene and a new prompt.
+
+EXAMPLE OF CORRECT OUTPUT (Tiger Woods chapter):
+["Earl Woods, a middle-aged Black U.S. Army officer, crouching in a modest California garage in 1975, patiently guiding the tiny hands of his 18-month-old son around a cut-down golf club. Fluorescent workshop light. Photorealistic, warm tones.",
+"A 3-year-old Tiger Woods on The Mike Douglas Show in 1978, putting against Bob Hope on a TV stage set, studio lights bright overhead, the tiny child totally focused. Cinematic, 16mm film grain.",
+"A teenage Tiger Woods, around 15, alone on a sun-bleached municipal golf course in Cypress, California, mid-swing, intense concentration, late 1980s summer haze. Photorealistic, golden hour light."]`,
     messages: [
       {
         role: 'user',
@@ -60,8 +64,9 @@ ${visual ? `\nVISUAL DIRECTION:\n${visual}` : ''}
 
 CHANNEL STYLE: ${styleGuide}
 
-Read the narration carefully. List the specific moments, named people, and events mentioned. Then write 4-6 image prompts — each one illustrating a specific moment from the text, not generic imagery.
-Start your response with [ to open the JSON array.`,
+Step 1 — Read the narration and identify 4-6 distinct moments in time (different years, ages, events, or people).
+Step 2 — For each moment write ONE prompt. Never combine two moments into one prompt.
+Step 3 — Output the prompts as a JSON array of strings. Start with [`,
       },
       {
         role: 'assistant',
