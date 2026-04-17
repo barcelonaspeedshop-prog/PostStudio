@@ -86,8 +86,17 @@ type ConnectForm = {
   error: string
 }
 
+type YouTubeStatus = Record<string, {
+  connected: boolean
+  youtube_channel_name?: string
+  youtube_channel_id?: string
+  youtube_handle?: string
+}>
+
 function AccountsPageInner() {
   const [metaStatus, setMetaStatus] = useState<MetaStatus>({})
+  const [ytStatus, setYtStatus]     = useState<YouTubeStatus>({})
+  const [ytDisconnecting, setYtDisconnecting] = useState<string | null>(null)
   const [connectForm, setConnectForm] = useState<ConnectForm | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [disconnecting, setDisconnecting] = useState<string | null>(null)
@@ -112,14 +121,43 @@ function AccountsPageInner() {
     } catch { /* ignore */ }
   }
 
+  const fetchYtStatus = async () => {
+    try {
+      const res = await fetch('/api/auth/youtube?action=status')
+      if (res.ok) {
+        const data = await res.json()
+        setYtStatus(data)
+      }
+    } catch { /* ignore */ }
+  }
+
+  const disconnectYt = async (channel: string) => {
+    setYtDisconnecting(channel)
+    try {
+      const res = await fetch(`/api/auth/youtube?action=disconnect&channel=${encodeURIComponent(channel)}`)
+      if (res.ok) {
+        await fetchYtStatus()
+        showToast(`YouTube disconnected for ${channel}`)
+      } else {
+        showToast(`Failed to disconnect YouTube for ${channel}`, 'error')
+      }
+    } catch { showToast('Disconnect failed', 'error') }
+    finally { setYtDisconnecting(null) }
+  }
+
   useEffect(() => {
     fetchMetaStatus()
-    // Show result of OAuth callback redirect
-    const connected = searchParams.get('meta_connected')
-    const igCount   = searchParams.get('meta_ig')
-    const metaErr   = searchParams.get('meta_error')
+    fetchYtStatus()
+    // Show result of OAuth callback redirects
+    const ytConnected = searchParams.get('connected')
+    const connected   = searchParams.get('meta_connected')
+    const igCount     = searchParams.get('meta_ig')
+    const metaErr     = searchParams.get('meta_error')
+    const authErr     = searchParams.get('error')
+    if (ytConnected) showToast(`YouTube connected for ${ytConnected}`)
     if (connected) showToast(`Meta connected — ${connected} channel${connected === '1' ? '' : 's'} updated, ${igCount ?? 0} Instagram IDs saved`)
     if (metaErr)   showToast(`Meta connection failed: ${metaErr}`, 'error')
+    if (authErr)   showToast(`YouTube auth failed: ${authErr}`, 'error')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -336,6 +374,53 @@ function AccountsPageInner() {
                         </div>
                         )
                       })}
+                    </div>
+
+                    {/* YouTube API connection */}
+                    <div className="mt-4 pt-4 border-t border-stone-100">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-[12px] font-medium text-stone-700">YouTube API</p>
+                          {ytStatus[ch.channel]?.connected ? (
+                            <div className="mt-0.5 space-y-0.5">
+                              <p className="text-[11px] text-stone-400 truncate">
+                                {ytStatus[ch.channel]?.youtube_handle || ytStatus[ch.channel]?.youtube_channel_name || 'Connected'}
+                              </p>
+                              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
+                                CONNECTED
+                              </span>
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-stone-400 mt-0.5">
+                              Connect to publish videos to YouTube
+                            </p>
+                          )}
+                        </div>
+                        {ytStatus[ch.channel]?.connected ? (
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <a
+                              href={`/api/auth/youtube?channel=${encodeURIComponent(ch.channel)}`}
+                              className="px-2 py-1 text-[10px] font-medium bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors"
+                            >
+                              ↻ Reconnect
+                            </a>
+                            <button
+                              onClick={() => disconnectYt(ch.channel)}
+                              disabled={ytDisconnecting === ch.channel}
+                              className="text-[11px] text-stone-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                            >
+                              {ytDisconnecting === ch.channel ? 'Removing...' : 'Remove'}
+                            </button>
+                          </div>
+                        ) : (
+                          <a
+                            href={`/api/auth/youtube?channel=${encodeURIComponent(ch.channel)}`}
+                            className="shrink-0 px-3 py-1.5 text-[12px] font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                          >
+                            Connect
+                          </a>
+                        )}
+                      </div>
                     </div>
 
                     {/* Meta (Instagram + Facebook) direct API connection */}

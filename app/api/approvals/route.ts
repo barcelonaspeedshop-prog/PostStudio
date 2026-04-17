@@ -210,15 +210,31 @@ export async function PATCH(req: NextRequest) {
             .catch(e => ({ platform: 'tiktok', success: false, error: e instanceof Error ? e.message : String(e) }))
 
         case 'youtube':
-          // YouTube publishing temporarily disabled — channel routing fix in progress.
-          // Re-enable once each Brand Account channel has been reconnected individually
-          // via /api/auth/youtube?channel=<name> with its own OAuth token.
-          return Promise.resolve({
-            platform: 'youtube',
-            success: false,
-            skipped: true,
-            reason: 'YouTube publishing temporarily disabled — channel routing fix in progress',
+          if (!item.videoBase64) {
+            return Promise.resolve({
+              platform: 'youtube',
+              success: false,
+              skipped: true,
+              reason: 'No video attached — generate a video before publishing to YouTube.',
+            })
+          }
+          return fetch(`${baseUrl}/api/publish/youtube`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              videoBase64:  item.videoBase64,
+              title:        item.ytTitle       || item.headline,
+              description:  item.ytDescription || caption,
+              tags:         item.ytTags        || [],
+              channelName:  item.channel,
+            }),
           })
+            .then(async r => {
+              const d = await r.json()
+              if (!r.ok) return { platform: 'youtube', success: false, error: d.error || `HTTP ${r.status}` }
+              return { platform: 'youtube', success: true, url: d.url, id: d.videoId }
+            })
+            .catch(e => ({ platform: 'youtube', success: false, error: e instanceof Error ? e.message : String(e) }))
 
         default:
           return Promise.resolve({ platform, success: false, error: `No publish handler for platform: ${platform}` })
