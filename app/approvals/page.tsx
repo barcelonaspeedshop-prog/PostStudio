@@ -669,6 +669,18 @@ export default function ApprovalsPage() {
     }
   }
 
+  const downloadVideo = (item: ApprovalItem) => {
+    if (!item.videoBase64) return
+    const src = item.videoBase64.startsWith('data:')
+      ? item.videoBase64
+      : `data:video/mp4;base64,${item.videoBase64}`
+    const filename = item.headline.replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') + '.mp4'
+    const a = document.createElement('a')
+    a.href = src
+    a.download = filename
+    a.click()
+  }
+
   const pending = items.filter(i => i.status === 'pending')
   const reviewed = items.filter(i => i.status !== 'pending')
   const previewItem = previewId ? items.find(i => i.id === previewId) : null
@@ -865,6 +877,14 @@ export default function ApprovalsPage() {
                               className="px-4 py-2.5 min-h-[44px] border border-stone-200 text-stone-700 text-[13px] font-medium rounded-lg hover:bg-stone-50 transition-colors flex items-center gap-1.5"
                             >
                               <span className="text-[11px]">▶</span> Preview
+                            </button>
+                          )}
+                          {hasVideo && (
+                            <button
+                              onClick={() => downloadVideo(item)}
+                              className="px-4 py-2.5 min-h-[44px] border border-stone-200 text-stone-700 text-[13px] font-medium rounded-lg hover:bg-stone-50 transition-colors flex items-center gap-1.5"
+                            >
+                              <span className="text-[11px]">↓</span> Download
                             </button>
                           )}
                           <button
@@ -1345,6 +1365,12 @@ export default function ApprovalsPage() {
                       Publishing...
                     </>
                   ) : 'Approve & Post'}
+                </button>
+                <button
+                  onClick={() => downloadVideo(previewItem)}
+                  className="px-4 py-2.5 min-h-[44px] border border-stone-200 text-stone-700 text-[13px] font-medium rounded-lg hover:bg-stone-50 transition-colors flex items-center gap-1.5"
+                >
+                  <span className="text-[11px]">↓</span> Download
                 </button>
                 <button
                   onClick={() => handleAction(previewItem.id, 'reject')}
