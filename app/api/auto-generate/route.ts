@@ -162,7 +162,7 @@ const CHANNEL_TAGS: Record<string, string[]> = {
   'Omnira Football': ['Football', 'Soccer', 'Premier League'],
 }
 
-const DEFAULT_PLATFORMS = ['instagram', 'tiktok', 'youtube']
+const DEFAULT_PLATFORMS = ['instagram', 'facebook', 'tiktok', 'youtube']
 
 const CHANNEL_FALLBACK_QUERIES: Record<string, string> = {
   'Gentlemen of Fuel': 'luxury supercar racing',
