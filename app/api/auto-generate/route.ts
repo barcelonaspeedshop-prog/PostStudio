@@ -4,6 +4,7 @@ import { existsSync } from 'fs'
 import path from 'path'
 import Anthropic from '@anthropic-ai/sdk'
 import { saveToDrive } from '@/lib/drive-images'
+import { generateCTA, loadRecentCTAs, saveRecentCTA } from '@/lib/ctas'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -614,6 +615,19 @@ export async function POST(req: NextRequest) {
       const ytTitle = headline
       const ytDescription = slides.map(s => s.headline + '\n' + s.body).join('\n\n')
 
+      // Generate CTA
+      let cta: string | undefined
+      try {
+        const rawCaption = compositedSlides.map(s => `${s.headline} — ${s.body}`).join('\n\n')
+        const caption = rawCaption.length > 2200 ? rawCaption.slice(0, 2197) + '...' : rawCaption
+        const recentCTAs = await loadRecentCTAs(channel)
+        cta = await generateCTA(caption, topic, channel, recentCTAs)
+        await saveRecentCTA(channel, cta)
+        console.log(`[auto-generate] [${channel}] CTA: "${cta}"`)
+      } catch (e) {
+        console.warn(`[auto-generate] [${channel}] CTA generation failed (non-fatal):`, e instanceof Error ? e.message : e)
+      }
+
       console.log(`[auto-generate] [${channel}] Adding to approval queue...`)
       const approvalRes = await fetch(`${baseUrl}/api/approvals`, {
         method: 'POST',
@@ -628,6 +642,7 @@ export async function POST(req: NextRequest) {
           ytTitle,
           ytDescription,
           ytTags,
+          cta,
         }),
       })
       const approvalData = await approvalRes.json()

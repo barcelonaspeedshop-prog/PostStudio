@@ -21,6 +21,8 @@ export type ApprovalItem = {
   ytTitle?: string
   ytDescription?: string
   ytTags?: string[]
+  cta?: string
+  includeCta?: boolean
   createdAt: string
   status: 'pending' | 'approved' | 'rejected'
   reviewedAt?: string
@@ -56,7 +58,7 @@ export async function GET() {
 // POST — add new item to queue
 export async function POST(req: NextRequest) {
   try {
-    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags } = await req.json()
+    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, cta } = await req.json()
 
     if (!channel || !slides || !Array.isArray(slides)) {
       return NextResponse.json({ error: 'channel and slides are required' }, { status: 400 })
@@ -73,6 +75,7 @@ export async function POST(req: NextRequest) {
       ytTitle: ytTitle || '',
       ytDescription: ytDescription || '',
       ytTags: ytTags || [],
+      cta: cta || undefined,
       createdAt: new Date().toISOString(),
       status: 'pending',
     }
@@ -92,7 +95,7 @@ export async function POST(req: NextRequest) {
 // PUT — update an item (e.g. attach video after generation, or regenerate with fresh content)
 export async function PUT(req: NextRequest) {
   try {
-    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags } = await req.json()
+    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, cta, includeCta } = await req.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
     const items = await loadApprovals()
@@ -106,6 +109,8 @@ export async function PUT(req: NextRequest) {
     if (ytTitle) item.ytTitle = ytTitle
     if (ytDescription) item.ytDescription = ytDescription
     if (ytTags && Array.isArray(ytTags)) item.ytTags = ytTags
+    if (cta !== undefined) item.cta = cta
+    if (includeCta !== undefined) item.includeCta = includeCta
     await saveApprovals(items)
 
     return NextResponse.json({ id: item.id, hasVideo: !!item.videoBase64 })
@@ -148,7 +153,8 @@ export async function PATCH(req: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
     const rawCaption = item.slides.map(s => `${s.headline} — ${s.body}`).join('\n\n')
     // Instagram hard limit is 2,200 characters (Meta API error 36004 if exceeded)
-    const caption = rawCaption.length > 2200 ? rawCaption.slice(0, 2197) + '...' : rawCaption
+    const truncated = rawCaption.length > 2200 ? rawCaption.slice(0, 2197) + '...' : rawCaption
+    const caption = (item.includeCta !== false && item.cta) ? `${truncated}\n\n${item.cta}` : truncated
 
     type PlatformResult = { platform: string; success: boolean; error?: string; url?: string }
 

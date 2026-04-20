@@ -33,6 +33,8 @@ type ApprovalItem = {
   slides: Slide[]
   videoBase64?: string
   platforms: string[]
+  cta?: string
+  includeCta?: boolean
   createdAt: string
   status: 'pending' | 'approved' | 'rejected'
   reviewedAt?: string
@@ -56,6 +58,7 @@ export default function ApprovalsPage() {
   const [autoGenerating, setAutoGenerating] = useState(false)
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
   const [regenStep, setRegenStep] = useState('')
+  const [regeneratingCtaId, setRegeneratingCtaId] = useState<string | null>(null)
   const [imagePicker, setImagePicker] = useState<{
     itemId: string
     slideIndex: number
@@ -669,6 +672,38 @@ export default function ApprovalsPage() {
     }
   }
 
+  const regenerateCta = async (item: ApprovalItem) => {
+    setRegeneratingCtaId(item.id)
+    try {
+      const rawCaption = item.slides.map(s => `${s.headline} — ${s.body}`).join('\n\n')
+      const caption = rawCaption.length > 2200 ? rawCaption.slice(0, 2197) + '...' : rawCaption
+      const res = await fetch('/api/generate-cta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, caption, topic: item.topic, channel: item.channel }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, cta: data.cta } : i))
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'CTA generation failed', 'error')
+    } finally {
+      setRegeneratingCtaId(null)
+    }
+  }
+
+  const toggleIncludeCta = async (item: ApprovalItem) => {
+    const next = item.includeCta === false ? true : false
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, includeCta: next } : i))
+    try {
+      await fetch('/api/approvals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, includeCta: next }),
+      })
+    } catch {}
+  }
+
   const downloadVideo = (item: ApprovalItem) => {
     if (!item.videoBase64) return
     const src = item.videoBase64.startsWith('data:')
@@ -848,6 +883,45 @@ export default function ApprovalsPage() {
                           )}
                         </div>
                       )}
+
+                      {/* CTA section */}
+                      <div className="px-4 py-3 border-t border-stone-50 bg-stone-50/50">
+                        <div className="flex items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <span className="text-[10px] font-semibold text-stone-400 uppercase tracking-widest">Engagement CTA</span>
+                              {item.cta && (
+                                <button
+                                  onClick={() => toggleIncludeCta(item)}
+                                  className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${item.includeCta !== false ? 'bg-green-500' : 'bg-stone-200'}`}
+                                  aria-label="Toggle CTA"
+                                >
+                                  <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${item.includeCta !== false ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                                </button>
+                              )}
+                            </div>
+                            {item.cta ? (
+                              <p className={`text-[12px] leading-relaxed ${item.includeCta !== false ? 'text-stone-700' : 'text-stone-400 line-through'}`}>
+                                &ldquo;{item.cta}&rdquo;
+                              </p>
+                            ) : (
+                              <p className="text-[12px] text-stone-400 italic">No CTA — click Regen to add one</p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => regenerateCta(item)}
+                            disabled={regeneratingCtaId === item.id}
+                            className="shrink-0 flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-lg border border-stone-200 text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors disabled:opacity-40"
+                          >
+                            {regeneratingCtaId === item.id ? (
+                              <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                              </svg>
+                            ) : '↺'} Regen CTA
+                          </button>
+                        </div>
+                      </div>
 
                       {/* Actions */}
                       <div className="flex flex-col gap-2 px-4 pb-4 pt-2">
