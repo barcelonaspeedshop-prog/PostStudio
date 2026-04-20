@@ -182,6 +182,7 @@ export async function PATCH(req: NextRequest) {
               platforms: ['facebook'],
               firstSlideHeadline: item.headline,
               channel: item.channel,
+              slides: item.slides,
             }),
           })
             .then(async r => {

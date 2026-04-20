@@ -115,13 +115,39 @@ async function waitForContainer(
 // ── Temp image hosting ───────────────────────────────────────────────────────
 
 /**
- * Write a base64 data URI (or raw base64 JPEG string) to a temp file under
- * /data/temp-images/ and return its public URL.
- * Returns null if the input is already a public HTTPS URL (no-op).
+ * Write an image to a temp file under /data/temp-images/ and return its public URL.
+ * Accepts:
+ *   - base64 data URI  (data:image/...;base64,...)
+ *   - raw base64 JPEG string
+ *   - http(s) URL — fetched and saved locally so Meta's servers can access it
+ * Returns null if a URL fetch fails (caller should skip that slide).
  */
-async function saveBase64ToTempFile(image: string): Promise<{ publicUrl: string; filePath: string } | null> {
-  // Already a public URL — nothing to do
-  if (image.startsWith('http://') || image.startsWith('https://')) return null
+export async function saveBase64ToTempFile(image: string): Promise<{ publicUrl: string; filePath: string } | null> {
+  if (!existsSync(TEMP_IMAGE_DIR)) {
+    await mkdir(TEMP_IMAGE_DIR, { recursive: true })
+  }
+
+  const filename = `${randomUUID()}.jpg`
+  const filePath = path.join(TEMP_IMAGE_DIR, filename)
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com').replace(/\/$/, '')
+  const publicUrl = `${appUrl}/api/temp-image/${filename}`
+
+  if (image.startsWith('http://') || image.startsWith('https://')) {
+    // Fetch the remote image and save locally — Meta cannot access 403/referer-restricted URLs
+    try {
+      const res = await fetch(image, { headers: { 'User-Agent': 'PostStudio/1.0' } })
+      if (!res.ok) {
+        console.warn(`[meta] Cannot fetch image URL (HTTP ${res.status}): ${image.slice(0, 100)}`)
+        return null
+      }
+      const buffer = Buffer.from(await res.arrayBuffer())
+      await writeFile(filePath, buffer)
+      return { publicUrl, filePath }
+    } catch (e) {
+      console.warn(`[meta] Failed to fetch image URL: ${image.slice(0, 100)} —`, e instanceof Error ? e.message : e)
+      return null
+    }
+  }
 
   // Strip data URI header if present
   const b64 = image.startsWith('data:')
@@ -129,21 +155,11 @@ async function saveBase64ToTempFile(image: string): Promise<{ publicUrl: string;
     : image
 
   const buffer = Buffer.from(b64, 'base64')
-  const filename = `${randomUUID()}.jpg`
-  const filePath = path.join(TEMP_IMAGE_DIR, filename)
-
-  if (!existsSync(TEMP_IMAGE_DIR)) {
-    await mkdir(TEMP_IMAGE_DIR, { recursive: true })
-  }
   await writeFile(filePath, buffer)
-
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com').replace(/\/$/, '')
-  const publicUrl = `${appUrl}/api/temp-image/${filename}`
-
   return { publicUrl, filePath }
 }
 
-async function deleteTempFile(filePath: string): Promise<void> {
+export async function deleteTempFile(filePath: string): Promise<void> {
   try { await unlink(filePath) } catch { /* already gone — ignore */ }
 }
 
@@ -179,8 +195,12 @@ export async function publishCarouselToInstagram(
       tempFiles.push(result.filePath)
       publicUrls.push(result.publicUrl)
     } else {
-      publicUrls.push(image) // already a public URL
+      console.warn(`[meta] Skipping inaccessible image for ${channelName}: ${image.slice(0, 80)}`)
     }
+  }
+
+  if (publicUrls.length < 2) {
+    throw new Error(`Instagram carousel requires at least 2 accessible images; only ${publicUrls.length} could be resolved for ${channelName}`)
   }
 
   try {

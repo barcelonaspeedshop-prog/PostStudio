@@ -4,6 +4,8 @@ import {
   publishVideoToInstagram,
   publishToFacebook,
   getChannelConfig,
+  saveBase64ToTempFile,
+  deleteTempFile,
 } from '@/lib/meta'
 
 export const dynamic = 'force-dynamic'
@@ -133,9 +135,24 @@ export async function POST(req: NextRequest) {
               break
             }
 
-            const publicMedia = mediaUrl && isPublicUrl(mediaUrl) ? mediaUrl : undefined
-            const r = await publishToFacebook(channel, caption, publicMedia)
-            results.push({ platform, success: true, id: r.id })
+            // Resolve image: prefer explicit mediaUrl, then first slide image
+            let fbImageUrl: string | undefined = mediaUrl && isPublicUrl(mediaUrl) ? mediaUrl : undefined
+            let fbTempFile: string | undefined
+
+            if (!fbImageUrl && slideImages.length > 0) {
+              const saved = await saveBase64ToTempFile(slideImages[0])
+              if (saved) {
+                fbImageUrl = saved.publicUrl
+                fbTempFile = saved.filePath
+              }
+            }
+
+            try {
+              const r = await publishToFacebook(channel, caption, fbImageUrl)
+              results.push({ platform, success: true, id: r.id })
+            } finally {
+              if (fbTempFile) await deleteTempFile(fbTempFile)
+            }
           } catch (e: unknown) {
             results.push({ platform, success: false, error: e instanceof Error ? e.message : String(e) })
           }
