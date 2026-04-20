@@ -347,11 +347,19 @@ export async function POST(req: NextRequest) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
   let channels: string[]
 
+  let preSelected: Record<string, { topic: string; headline: string; articleUrl: string }> = {}
   try {
     const body = await req.json().catch(() => ({}))
     channels = body.channels && Array.isArray(body.channels) ? body.channels : DEFAULT_CHANNELS
+    preSelected = body.preSelected || {}
+    console.log(`[auto-generate] Received channels: ${JSON.stringify(channels)}`)
+    console.log(`[auto-generate] Received preSelected keys: ${JSON.stringify(Object.keys(preSelected))}`)
+    for (const [ch, ps] of Object.entries(preSelected)) {
+      console.log(`[auto-generate] preSelected["${ch}"]: topic="${(ps as { topic: string }).topic}" headline="${(ps as { headline: string }).headline}"`)
+    }
   } catch {
     channels = DEFAULT_CHANNELS
+    console.error('[auto-generate] Body parse failed — using DEFAULT_CHANNELS, preSelected lost')
   }
 
   // Credit balance check — skip generation if balance is critically low
@@ -394,12 +402,24 @@ export async function POST(req: NextRequest) {
       const channelExclusions = usedTopics[channel] || []
       console.log(`[auto-generate] [${channel}] Excluding ${channelExclusions.length} previous topics`)
 
-      // Step 1: Get today's news (with topic exclusions)
-      console.log(`[auto-generate] [${channel}] Fetching news...`)
+      // Step 1: Get today's news (with topic exclusions, or use pre-selected story from curation)
+      const channelPreSelected = preSelected[channel]
+      if (channelPreSelected) {
+        console.log(`[auto-generate] [${channel}] Using pre-selected story: topic="${channelPreSelected.topic}" headline="${channelPreSelected.headline}"`)
+      } else {
+        console.log(`[auto-generate] [${channel}] No preSelected for this channel — falling back to web search`)
+      }
+      const newsBriefPayload = {
+        channel,
+        timestamp: Date.now(),
+        exclude_topics: channelExclusions,
+        ...(channelPreSelected ? { preSelected: channelPreSelected } : {}),
+      }
+      console.log(`[auto-generate] [${channel}] news-brief payload (preSelected present: ${!!channelPreSelected}):`, JSON.stringify(newsBriefPayload).substring(0, 300))
       const newsRes = await fetch(`${baseUrl}/api/news-brief`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel, timestamp: Date.now(), exclude_topics: channelExclusions }),
+        body: JSON.stringify(newsBriefPayload),
       })
       const newsData = await newsRes.json()
       if (!newsRes.ok) throw new Error(newsData.error || 'News fetch failed')

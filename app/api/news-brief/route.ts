@@ -217,11 +217,13 @@ async function searchForNews(opts: {
 
 export async function POST(req: NextRequest) {
   try {
-    const { channel, exclude_topic, exclude_topics: rawExcludeTopics } = await req.json()
+    const { channel, exclude_topic, exclude_topics: rawExcludeTopics, preSelected } = await req.json()
     // Support both single exclude_topic (legacy) and exclude_topics array
     const exclude_topics: string[] = Array.isArray(rawExcludeTopics)
       ? rawExcludeTopics
       : exclude_topic ? [exclude_topic] : []
+
+    console.log(`[news-brief] [${channel}] Received — preSelected type: ${typeof preSelected}, value: ${JSON.stringify(preSelected)?.substring(0, 200)}`)
 
     if (!channel || !VALID_CHANNELS.includes(channel)) {
       return NextResponse.json(
@@ -230,34 +232,48 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const topicKeywords = CHANNEL_TOPICS[channel]
-    const angles = CHANNEL_SEARCH_ANGLES[channel] || [topicKeywords]
-    const today = new Date().toISOString().split('T')[0]
-    const yesterdayDate = new Date()
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1)
-    const yesterday = yesterdayDate.toISOString().split('T')[0]
+    let trend: { topic: string; headline: string; articleUrl?: string; searchTerms?: string[] } | null = null
 
-    const hasExclusions = exclude_topics.length > 0
-    const exclusionList = exclude_topics.map((t, i) => `${i + 1}. "${t}"`).join('\n')
+    if (preSelected?.topic) {
+      // Use pre-selected story from curation queue — skip web search entirely
+      console.log(`[news-brief] [${channel}] TAKING PRESELECTED PATH: topic="${preSelected.topic}" headline="${preSelected.headline}"`)
+      trend = {
+        topic: preSelected.topic,
+        headline: preSelected.headline || preSelected.topic.split(/\s+/).slice(0, 6).join(' '),
+        articleUrl: preSelected.articleUrl || '',
+        searchTerms: [],
+      }
+    } else {
+      console.log(`[news-brief] [${channel}] TAKING WEB SEARCH PATH — preSelected was: ${JSON.stringify(preSelected)?.substring(0, 100)}`)
+      const topicKeywords = CHANNEL_TOPICS[channel]
+      const angles = CHANNEL_SEARCH_ANGLES[channel] || [topicKeywords]
+      const today = new Date().toISOString().split('T')[0]
+      const yesterdayDate = new Date()
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+      const yesterday = yesterdayDate.toISOString().split('T')[0]
 
-    const searchOpts = { channel, topicKeywords, angles, today, yesterday, hasExclusions, exclusionList, excludeTopics: exclude_topics }
+      const hasExclusions = exclude_topics.length > 0
+      const exclusionList = exclude_topics.map((t, i) => `${i + 1}. "${t}"`).join('\n')
 
-    // Attempt 1: last 48 hours with channel-specific search angles
-    console.log(`[news-brief] [${channel}] Attempt 1 — 48h window, ${angles.length} angles`)
-    let trend = await searchForNews({ ...searchOpts, broadFallback: false })
+      const searchOpts = { channel, topicKeywords, angles, today, yesterday, hasExclusions, exclusionList, excludeTopics: exclude_topics }
 
-    // Attempt 2: widen to 72 hours with broader terms if first attempt found nothing
-    if (!trend) {
-      console.warn(`[news-brief] [${channel}] Attempt 1 returned no news — retrying with 72h window`)
-      trend = await searchForNews({ ...searchOpts, broadFallback: true })
-    }
+      // Attempt 1: last 48 hours with channel-specific search angles
+      console.log(`[news-brief] [${channel}] Attempt 1 — 48h window, ${angles.length} angles`)
+      trend = await searchForNews({ ...searchOpts, broadFallback: false })
 
-    if (!trend) {
-      console.warn(`[news-brief] [${channel}] Both attempts returned no news`)
-      return NextResponse.json(
-        { error: 'No fresh news found for this channel today' },
-        { status: 503, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
-      )
+      // Attempt 2: widen to 72 hours with broader terms if first attempt found nothing
+      if (!trend) {
+        console.warn(`[news-brief] [${channel}] Attempt 1 returned no news — retrying with 72h window`)
+        trend = await searchForNews({ ...searchOpts, broadFallback: true })
+      }
+
+      if (!trend) {
+        console.warn(`[news-brief] [${channel}] Both attempts returned no news`)
+        return NextResponse.json(
+          { error: 'No fresh news found for this channel today' },
+          { status: 503, headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+        )
+      }
     }
 
     // Step 2: Fetch the article's featured image
