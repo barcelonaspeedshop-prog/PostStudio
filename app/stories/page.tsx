@@ -5,7 +5,7 @@ import Sidebar from '@/components/Sidebar'
 import { CHANNELS } from '@/lib/channels'
 
 type StoryCategory = 'Rivalry' | 'Legend' | 'Moment' | 'Controversy' | 'Era' | 'Dynasty'
-type StoryIdea = { title: string; hook: string; category: StoryCategory }
+type StoryIdea = { title: string; hook: string; category: StoryCategory; factCheckRequired?: boolean }
 type ChannelStatus = 'idle' | 'loading' | 'loaded' | 'error'
 type ChannelState =
   | { status: 'idle' }
@@ -263,10 +263,20 @@ export default function StoriesPage() {
                                   ×
                                 </button>
 
-                                {/* Category badge */}
-                                <span className={`self-start text-[10px] font-semibold px-2 py-0.5 rounded-full border ${catStyle.pill}`}>
-                                  {story.category}
-                                </span>
+                                {/* Badges row */}
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${catStyle.pill}`}>
+                                    {story.category}
+                                  </span>
+                                  {story.factCheckRequired && (
+                                    <span
+                                      title="Claude flagged this story for fact-checking — verify specific details before publishing"
+                                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-yellow-50 text-yellow-700 border-yellow-200 cursor-help"
+                                    >
+                                      ⚠ Verify facts
+                                    </span>
+                                  )}
+                                </div>
 
                                 {/* Title */}
                                 <p className="text-[13px] font-semibold text-stone-900 leading-snug pr-5">

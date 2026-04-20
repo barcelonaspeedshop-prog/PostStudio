@@ -15,6 +15,7 @@ export type StoryIdea = {
   title: string
   hook: string
   category: StoryCategory
+  factCheckRequired?: boolean
 }
 
 type UsedStoryEntry = {
@@ -82,10 +83,15 @@ Rules:
 - Stories should have broad appeal within the niche — avoid deep obscurity
 - Vary the era/period — don't cluster stories in the same decade${avoidBlock}
 
+IMPORTANT: All stories must be factually real and verifiable. Do not invent characters, dates, locations, or events. Every story should be one that a knowledgeable fan of the topic could independently research and confirm. If generating in a genre where fictional storytelling is the norm (e.g. mythology or folklore), clearly use "Legend" as the category so the user knows the content may not be historically documented.
+
+For each story, assess your own confidence in the factual accuracy of the specific details (names, dates, outcomes, quotes). If you are less than fully confident that every detail is accurate and verifiable, set "factCheckRequired" to true. Reserve factCheckRequired: false only for stories you are certain are well-documented historical facts.
+
 Return a JSON array of exactly 18 objects. Each:
 - "title": string (specific, punchy, max 10 words — this becomes the video title)
 - "hook": string (1-2 sentences of pure intrigue, makes the reader stop scrolling)
-- "category": exactly one of "Rivalry" | "Legend" | "Moment" | "Controversy" | "Era" | "Dynasty"`,
+- "category": exactly one of "Rivalry" | "Legend" | "Moment" | "Controversy" | "Era" | "Dynasty"
+- "factCheckRequired": boolean (true if any detail may need verification; false only if you are fully confident in the facts)`,
     }],
   })
 
@@ -100,13 +106,19 @@ Return a JSON array of exactly 18 objects. Each:
   if (!match) throw new Error('No JSON array found in response')
 
   const parsed: unknown[] = JSON.parse(match[0])
-  const stories = parsed.filter(
-    (s): s is StoryIdea =>
-      typeof s === 'object' && s !== null &&
-      typeof (s as StoryIdea).title === 'string' &&
-      typeof (s as StoryIdea).hook === 'string' &&
-      ['Rivalry', 'Legend', 'Moment', 'Controversy', 'Era', 'Dynasty'].includes((s as StoryIdea).category)
-  )
+  const stories = parsed
+    .filter(
+      (s): s is StoryIdea =>
+        typeof s === 'object' && s !== null &&
+        typeof (s as StoryIdea).title === 'string' &&
+        typeof (s as StoryIdea).hook === 'string' &&
+        ['Rivalry', 'Legend', 'Moment', 'Controversy', 'Era', 'Dynasty'].includes((s as StoryIdea).category)
+    )
+    .map(s => ({
+      ...s,
+      // Normalise: treat any non-false value as true; default missing field to true (conservative)
+      factCheckRequired: (s as StoryIdea).factCheckRequired !== false,
+    }))
 
   if (stories.length === 0) throw new Error('No valid stories in response')
   return stories
