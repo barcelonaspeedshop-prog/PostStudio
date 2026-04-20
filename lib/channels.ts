@@ -4,18 +4,19 @@ export type ChannelConfig = {
   bg: string
   handle: string
   tagline: string
+  hookStyle: string
 }
 
 export const CHANNELS: Record<string, ChannelConfig> = {
-  'Gentlemen of Fuel': { name: 'Gentlemen of Fuel', primary: '#e8a020', bg: '#1a1208', handle: '@gentlemenoffuel', tagline: 'Cars · Culture · Class' },
-  'Omnira F1': { name: 'Omnira F1', primary: '#378add', bg: '#0a1628', handle: '@omniraf1', tagline: 'Formula 1 · Grand Prix · Racing' },
-  'Road & Trax': { name: 'Road & Trax', primary: '#5dcaa5', bg: '#081410', handle: '@roadandtrax', tagline: 'Motorsport · Rally · Endurance' },
-  'Omnira Football': { name: 'Omnira Football', primary: '#d85a30', bg: '#1a0c08', handle: '@omnirafootball', tagline: 'Football · Transfers · Matchday' },
-  'Omnira Cricket': { name: 'Omnira Cricket', primary: '#16a34a', bg: '#0a1a0e', handle: '@OmniraCricket', tagline: 'Cricket · Test · T20 · IPL' },
-  'Omnira Golf': { name: 'Omnira Golf', primary: '#15803d', bg: '#081408', handle: '@OmniraGolf', tagline: 'Golf · PGA Tour · Majors' },
-  'Omnira NFL': { name: 'Omnira NFL', primary: '#dc2626', bg: '#1a0808', handle: '@OmniraNFL', tagline: 'NFL · American Football · Playoffs' },
-  'Omnira Food': { name: 'Omnira Food', primary: '#ea580c', bg: '#1a0c08', handle: '@OmniraFood', tagline: 'Food · Recipes · Culture' },
-  'Omnira Travel': { name: 'Omnira Travel', primary: '#0891b2', bg: '#08141a', handle: '@OmniraTravel', tagline: 'Travel · Destinations · Adventure' },
+  'Gentlemen of Fuel': { name: 'Gentlemen of Fuel', primary: '#e8a020', bg: '#1a1208', handle: '@gentlemenoffuel', tagline: 'Cars · Culture · Class', hookStyle: 'reverent and vintage — speak with the quiet authority of a connoisseur; evoke heritage, rarity, and craftsmanship without hyperbole' },
+  'Omnira F1': { name: 'Omnira F1', primary: '#378add', bg: '#0a1628', handle: '@omniraf1', tagline: 'Formula 1 · Grand Prix · Racing', hookStyle: 'insider and technical — write like a paddock journalist; use precise F1 vocabulary, imply inside knowledge, reward fans who understand the sport deeply' },
+  'Road & Trax': { name: 'Road & Trax', primary: '#5dcaa5', bg: '#081410', handle: '@roadandtrax', tagline: 'Motorsport · Rally · Endurance', hookStyle: 'gritty and racer — raw, no-nonsense, smell of fuel and rubber; speak to drivers and crew, not spectators' },
+  'Omnira Football': { name: 'Omnira Football', primary: '#d85a30', bg: '#1a0c08', handle: '@omnirafootball', tagline: 'Football · Transfers · Matchday', hookStyle: 'passionate and partisan — tribal energy, matchday adrenaline, transfer-window urgency; fans feel it in their chest' },
+  'Omnira Cricket': { name: 'Omnira Cricket', primary: '#16a34a', bg: '#0a1a0e', handle: '@OmniraCricket', tagline: 'Cricket · Test · T20 · IPL', hookStyle: 'respectful and traditional — honour the game\'s history, celebrate skill and character, measured but not dry; appeals to purists and IPL fans alike' },
+  'Omnira Golf': { name: 'Omnira Golf', primary: '#15803d', bg: '#081408', handle: '@OmniraGolf', tagline: 'Golf · PGA Tour · Majors', hookStyle: 'refined and analytical — measured, intelligent, appreciates the strategic and mental dimensions; the voice of a thoughtful caddie, not a cheerleader' },
+  'Omnira NFL': { name: 'Omnira NFL', primary: '#dc2626', bg: '#1a0808', handle: '@OmniraNFL', tagline: 'NFL · American Football · Playoffs', hookStyle: 'bold and hyperbolic — go big, use superlatives unapologetically, primetime energy, everything is historic or legendary' },
+  'Omnira Food': { name: 'Omnira Food', primary: '#ea580c', bg: '#1a0c08', handle: '@OmniraFood', tagline: 'Food · Recipes · Culture', hookStyle: 'sensory and enticing — make readers taste and smell it; invoke texture, aroma, and pleasure; warm but never cloying' },
+  'Omnira Travel': { name: 'Omnira Travel', primary: '#0891b2', bg: '#08141a', handle: '@OmniraTravel', tagline: 'Travel · Destinations · Adventure', hookStyle: 'aspirational and wonder-filled — ignite wanderlust; paint vivid scenes, hint at transformation, make staying home feel like a mistake' },
 }
 
 export function getChannel(name: string): ChannelConfig {

@@ -5,15 +5,19 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 export async function POST(req: NextRequest) {
   try {
-    const { topic, channel, slideCount = 10 } = await req.json()
+    const { topic, channel, slideCount = 10, hook } = await req.json()
 
     if (!topic) return NextResponse.json({ error: 'topic is required' }, { status: 400 })
 
-    const system = `You are a social media content expert specialising in carousel posts. 
+    const system = `You are a social media content expert specialising in carousel posts.
 Always respond with valid JSON only — no markdown, no backticks, no preamble.`
 
+    const hookInstruction = hook
+      ? `\nOPENING HOOK (REQUIRED): Use this exact text as the headline for slide 1 — do not paraphrase it: "${hook}"`
+      : ''
+
     const prompt = `Create a ${slideCount}-slide carousel post about: "${topic}"
-Channel: ${channel || 'General'}
+Channel: ${channel || 'General'}${hookInstruction}
 
 Return a JSON array of exactly ${slideCount} slide objects. Each object must have:
 - "num": slide number as two-digit string e.g. "01"

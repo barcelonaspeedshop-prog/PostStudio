@@ -101,6 +101,9 @@ export default function CarouselPage() {
   const [draftSaved, setDraftSaved] = useState(false)
   const [isRestored, setIsRestored] = useState(false)
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [hookPickerOpen, setHookPickerOpen] = useState(false)
+  const [hookPickerLoading, setHookPickerLoading] = useState(false)
+  const [availableHooks, setAvailableHooks] = useState<string[]>([])
 
   const generateYtTags = () => {
     const tags: string[] = []
@@ -295,15 +298,39 @@ export default function CarouselPage() {
     setTimeout(() => setToast(null), 2800)
   }
 
+  const fetchHooks = async () => {
+    setHookPickerLoading(true)
+    setAvailableHooks([])
+    try {
+      const res = await fetch('/api/generate-hooks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic, channel, platforms: ['instagram'] }),
+      })
+      const data = await res.json()
+      setAvailableHooks(data.hooks?.instagram || [])
+    } catch {
+      setAvailableHooks([])
+    } finally {
+      setHookPickerLoading(false)
+    }
+  }
+
   const generateSlides = async () => {
     if (!topic.trim()) { showToast('Enter a topic first', 'error'); return }
+    setHookPickerOpen(true)
+    fetchHooks()
+  }
+
+  const runGeneration = async (hook?: string) => {
+    setHookPickerOpen(false)
     const prevImages = slides.map(s => s.image)
     setGenerating(true)
     try {
       const res = await fetch('/api/carousel-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, channel, slideCount }),
+        body: JSON.stringify({ topic, channel, slideCount, ...(hook ? { hook } : {}) }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -1373,6 +1400,66 @@ export default function CarouselPage() {
           )}
         </div>
       </div>
+
+      {/* Hook picker modal */}
+      {hookPickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="px-6 py-5 border-b border-stone-100">
+              <h3 className="text-[16px] font-semibold text-stone-900">Choose an opening hook</h3>
+              <p className="text-[12px] text-stone-400 mt-0.5">Pick the best hook for your first slide, or skip to generate freely</p>
+            </div>
+            <div className="p-4 max-h-[60vh] overflow-y-auto">
+              {hookPickerLoading ? (
+                <div className="flex items-center justify-center py-10 gap-2">
+                  <svg className="w-4 h-4 animate-spin text-stone-400" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span className="text-[13px] text-stone-400">Generating hooks…</span>
+                </div>
+              ) : availableHooks.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-[13px] text-stone-400">No hooks generated — skip to proceed</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {availableHooks.map((hook, i) => (
+                    <div key={i} className="flex items-start gap-3 p-3.5 rounded-xl border border-stone-100 hover:border-stone-200 bg-stone-50 hover:bg-stone-100 transition-all">
+                      <span className="text-[10px] font-bold text-stone-300 mt-1 shrink-0 w-4">{i + 1}</span>
+                      <p className="flex-1 text-[13px] text-stone-800 leading-relaxed">{hook}</p>
+                      <button
+                        onClick={() => runGeneration(hook)}
+                        className="shrink-0 px-3 py-1.5 rounded-lg bg-stone-900 text-white text-[11px] font-semibold hover:bg-stone-700 transition-colors whitespace-nowrap"
+                      >
+                        Use this
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-stone-100 flex items-center justify-between">
+              <button
+                onClick={fetchHooks}
+                disabled={hookPickerLoading}
+                className="flex items-center gap-1.5 text-[12px] text-stone-500 hover:text-stone-800 font-medium disabled:opacity-40 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Regenerate
+              </button>
+              <button
+                onClick={() => runGeneration()}
+                className="text-[12px] text-stone-400 hover:text-stone-700 font-medium transition-colors"
+              >
+                Skip — generate freely →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (
