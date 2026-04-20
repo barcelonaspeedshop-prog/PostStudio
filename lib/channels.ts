@@ -42,4 +42,46 @@ export const CHANNEL_SCORING: Partial<Record<string, ChannelScoringCriteria>> = 
     medium: 'Mid-table match reports, injury updates to squad players, press conference news, domestic cup early rounds, loan deals',
     low: 'Lower-league results with no elite connection, vague transfer speculation, historical stats with no news angle, social media clips without substance',
   },
+  'Gentlemen of Fuel': {
+    context: 'A classic car channel covering auctions, concours, restorations, and motoring heritage.',
+    high: 'Major auction results (Pebble Beach, Monaco, RM Sotheby\'s), record sale prices, significant barn finds, major concours wins (Goodwood, Villa d\'Este), death of legendary figures (designers, racers, collectors), milestone anniversaries of iconic models',
+    medium: 'New classic car restorations, museum exhibitions, regional concours, manufacturer heritage announcements, documentaries/film releases',
+    low: 'Generic listings for sale, minor auctions, rumour pieces, modern car news dressed as classic',
+  },
+  'Road & Trax': {
+    context: 'A road and endurance racing channel focused on the Citroen C1 Endurance Championship and major endurance races.',
+    high: 'Citroen C1 Endurance Championship rounds (results and previews), major endurance races (Le Mans, Spa 24h, Nürburgring 24h), championship-deciding rounds, death of endurance racing figures, grassroots racing milestones',
+    medium: 'Mid-season endurance race results, driver changes, team launches, rule changes affecting endurance racing',
+    low: 'Minor club racing, single-driver personal news, non-racing automotive content',
+  },
+  'Omnira Cricket': {
+    context: 'A cricket channel covering international Tests, ODIs, T20s, the IPL, and major ICC tournaments.',
+    high: 'Test series deciders, World Cup / ICC tournament matches, record-breaking performances, major retirements/debuts, IPL finals and playoffs, Ashes matches',
+    medium: 'Ongoing series results, player form analysis, squad announcements for major tournaments, significant injuries',
+    low: 'Minor domestic matches, transfer speculation, off-field filler',
+  },
+  'Omnira Golf': {
+    context: 'A golf channel covering the PGA Tour, DP World Tour, LIV Golf, and the four Majors.',
+    high: 'Majors (Masters, PGA Championship, US Open, The Open Championship), Ryder Cup, record-breaking rounds, Hall of Fame inductions, major equipment breakthroughs, Tiger Woods news',
+    medium: 'PGA/DP World/LIV tournament wins, leaderboard drama at non-majors, equipment launches from major brands',
+    low: 'Pro-am events, minor tournaments, generic equipment reviews',
+  },
+  'Omnira NFL': {
+    context: 'An NFL channel covering games, trades, injuries, the draft, and playoff football.',
+    high: 'Playoff games, Super Bowl, Thursday/Sunday/Monday night primetime matchups, major trades, star player injuries, coaching firings at top teams, draft first-round news',
+    medium: 'Regular season results, fantasy-relevant injuries, mid-tier trades, conference standings shifts',
+    low: 'Preseason filler, training camp gossip, minor roster moves',
+  },
+  'Omnira Food': {
+    context: 'A food channel covering fine dining, food culture, viral trends, and the restaurant industry.',
+    high: 'Michelin Guide announcements, major chef news (deaths, major moves, new restaurant openings from household names), viral food trends, seasonal produce peaks (truffle season etc.), major food industry disruptions',
+    medium: 'Restaurant openings in major cities, cookbook launches, seasonal recipe highlights, food documentary releases',
+    low: 'Minor restaurant reviews, generic recipe content, grocery chain news',
+  },
+  'Omnira Travel': {
+    context: 'A travel channel covering destinations, airline news, hotel openings, and travel industry trends.',
+    high: 'Major destination news (border changes, visa updates, major events), seasonal peaks (cherry blossom, Diwali, Christmas markets timing), airline industry major news, iconic hotel openings, major travel disruptions (volcanic eruptions, political unrest affecting tourism)',
+    medium: 'New flight routes, hotel openings in secondary cities, destination trend pieces, travel industry analysis',
+    low: 'Generic "10 best beaches" listicles, minor regional news, sponsored content',
+  },
 }
