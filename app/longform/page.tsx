@@ -85,23 +85,49 @@ export default function LongFormPage() {
 
   // ─── Restore draft ───
   useEffect(() => {
+    // Check for URL params first (coming from /stories "Use this story →")
+    let fromStories = false
     try {
-      const raw = localStorage.getItem(DRAFT_KEY)
-      if (raw) {
-        const d = JSON.parse(raw)
-        if (d.topic) setTopic(d.topic)
-        if (d.channel) setChannel(d.channel)
-        if (d.script) setScript(d.script)
-        if (d.musicMood) setMusicMood(d.musicMood)
-        if (d.selectedVoice) setSelectedVoice(d.selectedVoice)
-        if (d.chapterAudio && typeof d.chapterAudio === 'object') setChapterAudio(d.chapterAudio)
-        if (d.voiceoverStatus && typeof d.voiceoverStatus === 'object') setVoiceoverStatus(d.voiceoverStatus)
-        if (typeof d.testMode === 'boolean') setTestMode(d.testMode)
-        if (d.testDuration) setTestDuration(d.testDuration)
+      const params = new URLSearchParams(window.location.search)
+      const urlTopic = params.get('topic')
+      const urlChannel = params.get('channel')
+      if (urlTopic) {
+        fromStories = true
+        setTopic(urlTopic)
+        setScript(null)
+        setChapterAudio({})
+        setVoiceoverStatus({})
       }
+      if (urlChannel && CHANNELS.includes(urlChannel)) {
+        setChannel(urlChannel)
+        setMusicMood(CALM_CHANNELS.includes(urlChannel) ? 'calm' : 'energy')
+      }
+    } catch {}
+
+    // Restore localStorage draft only when not arriving from /stories
+    if (!fromStories) {
+      try {
+        const raw = localStorage.getItem(DRAFT_KEY)
+        if (raw) {
+          const d = JSON.parse(raw)
+          if (d.topic) setTopic(d.topic)
+          if (d.channel) setChannel(d.channel)
+          if (d.script) setScript(d.script)
+          if (d.musicMood) setMusicMood(d.musicMood)
+          if (d.selectedVoice) setSelectedVoice(d.selectedVoice)
+          if (d.chapterAudio && typeof d.chapterAudio === 'object') setChapterAudio(d.chapterAudio)
+          if (d.voiceoverStatus && typeof d.voiceoverStatus === 'object') setVoiceoverStatus(d.voiceoverStatus)
+          if (typeof d.testMode === 'boolean') setTestMode(d.testMode)
+          if (d.testDuration) setTestDuration(d.testDuration)
+        }
+      } catch {}
+    }
+
+    try {
       const savedMode = localStorage.getItem('longform_advancedMode')
       if (savedMode) setAdvancedMode(savedMode === 'true')
     } catch {}
+
     setIsRestored(true)
   }, [])
 
