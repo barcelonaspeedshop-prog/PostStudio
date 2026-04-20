@@ -98,14 +98,16 @@ export async function POST(req: NextRequest) {
 // PUT — update an item (e.g. attach video after generation, or regenerate with fresh content)
 export async function PUT(req: NextRequest) {
   try {
-    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, cta, includeCta, hashtags } = await req.json()
+    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, cta, includeCta, hashtags, musicEnabled } = await req.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
     const items = await loadApprovals()
     const item = items.find(i => i.id === id)
     if (!item) return NextResponse.json({ error: 'Item not found' }, { status: 404 })
 
-    if (videoBase64) item.videoBase64 = videoBase64
+    // videoBase64: null means explicit clear (toggling music requires re-generation)
+    if (videoBase64 === null) item.videoBase64 = undefined
+    else if (videoBase64) item.videoBase64 = videoBase64
     if (slides && Array.isArray(slides)) item.slides = slides
     if (headline) item.headline = headline
     if (topic !== undefined) item.topic = topic
@@ -115,6 +117,7 @@ export async function PUT(req: NextRequest) {
     if (cta !== undefined) item.cta = cta
     if (includeCta !== undefined) item.includeCta = includeCta
     if (hashtags !== undefined) item.hashtags = Array.isArray(hashtags) ? hashtags : item.hashtags
+    if (musicEnabled !== undefined) (item as Record<string, unknown>).musicEnabled = musicEnabled
     await saveApprovals(items)
 
     return NextResponse.json({ id: item.id, hasVideo: !!item.videoBase64 })

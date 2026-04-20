@@ -118,6 +118,7 @@ function AccountsPageInner() {
   const [setupPanel, setSetupPanel] = useState(false)
   const [setupToken, setSetupToken] = useState('')
   const [setupRunning, setSetupRunning] = useState(false)
+  const [includeMusic, setIncludeMusic] = useState(true)
   const searchParams = useSearchParams()
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -160,6 +161,9 @@ function AccountsPageInner() {
   }
 
   useEffect(() => {
+    fetch('/api/settings').then(r => r.json()).then(s => {
+      if (typeof s.includeMusic === 'boolean') setIncludeMusic(s.includeMusic)
+    }).catch(() => {})
     fetchMetaStatus()
     fetchYtStatus()
     // Show result of OAuth callback redirects
@@ -340,6 +344,39 @@ function AccountsPageInner() {
             <p className="text-[11px] text-amber-600 mt-2">
               This only needs to be done once. Once the URI is saved in Meta, the OAuth flow will work automatically.
             </p>
+          </div>
+
+          {/* Global Settings */}
+          <div className="mb-6 bg-white border border-stone-100 rounded-xl p-5">
+            <h2 className="text-[13px] font-semibold text-stone-900 mb-4">Global Settings</h2>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[13px] font-medium text-stone-700">Background music on posts</p>
+                <p className="text-[11px] text-stone-400 mt-0.5">
+                  {includeMusic
+                    ? 'Music bed added to generated videos. Can be overridden per post.'
+                    : 'No background music by default. Toggle per post on the Long Form or Approvals pages.'}
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  const next = !includeMusic
+                  setIncludeMusic(next)
+                  try {
+                    await fetch('/api/settings', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ includeMusic: next }),
+                    })
+                    showToast(`Music ${next ? 'enabled' : 'disabled'} globally`)
+                  } catch { showToast('Failed to save setting', 'error') }
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${includeMusic ? 'bg-stone-800' : 'bg-stone-200'}`}
+                aria-label={includeMusic ? 'Disable music' : 'Enable music'}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${includeMusic ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

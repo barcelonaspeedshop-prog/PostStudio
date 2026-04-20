@@ -14,6 +14,8 @@ export type ChannelConfig = {
   ctaStyle: string
   storyThemes: string
   hashtagSets: HashtagSet
+  /** Override the global music default for this channel. Undefined = use global setting. */
+  defaultMusic?: boolean
 }
 
 export const CHANNELS: Record<string, ChannelConfig> = {

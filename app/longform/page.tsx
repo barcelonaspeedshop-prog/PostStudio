@@ -62,6 +62,7 @@ export default function LongFormPage() {
   const [testMode, setTestMode] = useState(false)
   const [testDuration, setTestDuration] = useState<10 | 30>(10)
   const [musicMood, setMusicMood] = useState<'calm' | 'energy'>('energy')
+  const [musicEnabled, setMusicEnabled] = useState(true)
   const [selectedVoice, setSelectedVoice] = useState(VOICES[0].id)
   const [currentJobId, setCurrentJobId] = useState<string | null>(null)
   const [clippingVideo, setClippingVideo] = useState(false)
@@ -146,6 +147,14 @@ export default function LongFormPage() {
       // Quota exceeded (large audio) — fail silently
     }
   }, [isRestored, topic, channel, script, musicMood, selectedVoice, chapterAudio, voiceoverStatus, testMode, testDuration])
+
+  // ─── Load global music setting ───
+  useEffect(() => {
+    fetch('/api/settings')
+      .then(r => r.json())
+      .then(s => { if (typeof s.includeMusic === 'boolean') setMusicEnabled(s.includeMusic) })
+      .catch(() => {})
+  }, [])
 
   const toggleAdvancedMode = (val: boolean) => {
     setAdvancedMode(val)
@@ -268,6 +277,7 @@ export default function LongFormPage() {
       }
       formData.append('musicMood', musicMood)
       formData.append('musicVolume', '0.15')
+      formData.append('musicEnabled', String(musicEnabled))
       const startRes = await fetch('/api/story-video/start', { method: 'POST', body: formData })
       const startData = await startRes.json()
       if (!startRes.ok) throw new Error(startData.error)
@@ -684,6 +694,7 @@ export default function LongFormPage() {
 
       formData.append('musicMood', musicMood)
       formData.append('musicVolume', '0.15')
+      formData.append('musicEnabled', String(musicEnabled))
 
       const startRes = await fetch('/api/story-video/start', { method: 'POST', body: formData })
       const startData = await startRes.json()
@@ -837,27 +848,42 @@ export default function LongFormPage() {
                       </select>
                     </div>
 
-                    {/* Music mood */}
+                    {/* Music */}
                     <div>
-                      <label className="text-[11px] font-medium text-stone-500 uppercase tracking-widest block mb-1.5">Music</label>
-                      <div className="flex gap-2">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-[11px] font-medium text-stone-500 uppercase tracking-widest">Music</label>
+                        {/* On/Off toggle */}
                         <button
-                          onClick={() => setMusicMood('calm')}
-                          className={`flex-1 py-2.5 text-[13px] font-medium rounded-xl border transition-colors ${
-                            musicMood === 'calm' ? 'bg-sky-100 text-sky-700 border-sky-300' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'
-                          }`}
+                          onClick={() => setMusicEnabled(v => !v)}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${musicEnabled ? 'bg-stone-800' : 'bg-stone-200'}`}
+                          aria-label={musicEnabled ? 'Disable music' : 'Enable music'}
                         >
-                          🎵 Calm
-                        </button>
-                        <button
-                          onClick={() => setMusicMood('energy')}
-                          className={`flex-1 py-2.5 text-[13px] font-medium rounded-xl border transition-colors ${
-                            musicMood === 'energy' ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'
-                          }`}
-                        >
-                          ⚡ Energy
+                          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${musicEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                         </button>
                       </div>
+                      {/* Calm/Energy buttons — only when music is on */}
+                      {musicEnabled ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setMusicMood('calm')}
+                            className={`flex-1 py-2.5 text-[13px] font-medium rounded-xl border transition-colors ${
+                              musicMood === 'calm' ? 'bg-sky-100 text-sky-700 border-sky-300' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'
+                            }`}
+                          >
+                            🎵 Calm
+                          </button>
+                          <button
+                            onClick={() => setMusicMood('energy')}
+                            className={`flex-1 py-2.5 text-[13px] font-medium rounded-xl border transition-colors ${
+                              musicMood === 'energy' ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'
+                            }`}
+                          >
+                            ⚡ Energy
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-stone-400 py-1">No background music — voiceover only</p>
+                      )}
                     </div>
 
                     {/* Build button */}
@@ -1212,12 +1238,27 @@ export default function LongFormPage() {
               {/* Background music */}
               {script && (
                 <div className="bg-stone-50 border border-stone-100 rounded-xl p-4 flex flex-col gap-3">
-                  <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Background music</p>
-                  <div className="flex gap-2">
-                    <button onClick={() => setMusicMood('calm')} className={`flex-1 py-2 text-[12px] font-medium rounded-lg border transition-colors ${musicMood === 'calm' ? 'bg-sky-100 text-sky-700 border-sky-300' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'}`}>Calm</button>
-                    <button onClick={() => setMusicMood('energy')} className={`flex-1 py-2 text-[12px] font-medium rounded-lg border transition-colors ${musicMood === 'energy' ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'}`}>Energy</button>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Background music</p>
+                    <button
+                      onClick={() => setMusicEnabled(v => !v)}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${musicEnabled ? 'bg-stone-800' : 'bg-stone-200'}`}
+                      aria-label={musicEnabled ? 'Disable music' : 'Enable music'}
+                    >
+                      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${musicEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </button>
                   </div>
-                  <p className="text-[10px] text-stone-400">Track auto-selected from library</p>
+                  {musicEnabled ? (
+                    <>
+                      <div className="flex gap-2">
+                        <button onClick={() => setMusicMood('calm')} className={`flex-1 py-2 text-[12px] font-medium rounded-lg border transition-colors ${musicMood === 'calm' ? 'bg-sky-100 text-sky-700 border-sky-300' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'}`}>Calm</button>
+                        <button onClick={() => setMusicMood('energy')} className={`flex-1 py-2 text-[12px] font-medium rounded-lg border transition-colors ${musicMood === 'energy' ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'}`}>Energy</button>
+                      </div>
+                      <p className="text-[10px] text-stone-400">Track auto-selected from library</p>
+                    </>
+                  ) : (
+                    <p className="text-[11px] text-stone-400">Music off — voiceover only</p>
+                  )}
                 </div>
               )}
 

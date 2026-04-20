@@ -457,8 +457,12 @@ export async function POST(req: NextRequest) {
     const musicFile = formData.get('music') as File | null
     const musicMood = formData.get('musicMood') as string | null
     const musicVolumeRaw = formData.get('musicVolume') as string | null
+    // musicEnabled='false' means skip all music mixing (voiceover stays; no bed)
+    const musicEnabled = formData.get('musicEnabled') !== 'false'
 
-    if (musicFile && musicFile.size > 0) {
+    if (!musicEnabled) {
+      console.log('[story-video] Music disabled — skipping music track')
+    } else if (musicFile && musicFile.size > 0) {
       // Legacy: uploaded file
       const ext = musicFile.name.split('.').pop() || 'mp3'
       musicPath = path.join(tmpDir, `bg_music.${ext}`)

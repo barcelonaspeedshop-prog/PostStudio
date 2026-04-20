@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   const tmpDir = `/tmp/carousel_${Date.now()}`
   
   try {
-    const { slides, slideDuration: rawDuration = 5, audioUrl, musicVolume = 20 } = await req.json()
+    const { slides, slideDuration: rawDuration = 5, audioUrl, musicVolume = 20, musicEnabled = true } = await req.json()
     // Enforce minimum 5 seconds per slide
     const slideDuration = Math.max(5, Number(rawDuration) || 5)
     // Per-tile durations — text tiles need longer display time
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     // Build ffmpeg command
     let ffmpegCmd: string
 
-    if (audioUrl) {
+    if (audioUrl && musicEnabled !== false) {
       const audioPath = path.join(tmpDir, 'audio.mp3')
       if (audioUrl.startsWith('data:')) {
         const base64Data = audioUrl.replace(/^data:audio\/\w+;base64,/, '')
