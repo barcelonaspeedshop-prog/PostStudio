@@ -3,8 +3,10 @@ import {
   publishCarouselToInstagram,
   publishVideoToInstagram,
   publishToFacebook,
+  publishAlbumToFacebook,
   getChannelConfig,
   saveBase64ToTempFile,
+  saveVideoToTempFile,
   deleteTempFile,
 } from '@/lib/meta'
 
@@ -27,13 +29,12 @@ export async function POST(req: NextRequest) {
     const {
       content,
       mediaUrl,
-      imageUrls,   // optional array of explicit image URLs (public or base64)
-      slides,      // optional array of slide objects — base64 images extracted from slide.image
+      videoBase64,  // optional base64 MP4 — triggers Facebook video post if present
+      imageUrls,    // optional array of explicit image URLs (public or base64)
+      slides,       // optional array of slide objects — base64 images extracted from slide.image
       platforms,
       channel,
       firstSlideHeadline,
-      // scheduleAt retained in signature for forward-compatibility but not yet
-      // implemented in the direct API path
     } = await req.json()
 
     // Build the image list for carousel publishing.
@@ -122,6 +123,7 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Facebook ─────────────────────────────────────────────────────────
+        // Priority: video → album (≥2 slides) → single image → text-only
         case 'facebook': {
           try {
             const cfg = await getChannelConfig(channel)
@@ -135,23 +137,57 @@ export async function POST(req: NextRequest) {
               break
             }
 
-            // Resolve image: prefer explicit mediaUrl, then first slide image
-            let fbImageUrl: string | undefined = mediaUrl && isPublicUrl(mediaUrl) ? mediaUrl : undefined
-            let fbTempFile: string | undefined
-
-            if (!fbImageUrl && slideImages.length > 0) {
-              const saved = await saveBase64ToTempFile(slideImages[0])
-              if (saved) {
-                fbImageUrl = saved.publicUrl
-                fbTempFile = saved.filePath
-              }
-            }
+            const tempFiles: string[] = []
 
             try {
-              const r = await publishToFacebook(channel, caption, fbImageUrl)
-              results.push({ platform, success: true, id: r.id })
+              let published = false
+
+              // 1. Video — publish as a Facebook video post
+              if (!published && videoBase64 && typeof videoBase64 === 'string' && videoBase64.length > 100) {
+                const saved = await saveVideoToTempFile(videoBase64)
+                if (saved) {
+                  tempFiles.push(saved.filePath)
+                  const r = await publishToFacebook(channel, caption, saved.publicUrl)
+                  console.log(`[publish] Facebook: video for "${channel}" — ${r.id}`)
+                  results.push({ platform, success: true, id: r.id })
+                  published = true
+                } else {
+                  console.warn(`[publish] Facebook: video save failed for "${channel}", falling through to album`)
+                }
+              }
+
+              if (!published) {
+                // Resolve all slide images to accessible public URLs
+                const resolvedUrls: string[] = []
+                for (const img of slideImages) {
+                  const saved = await saveBase64ToTempFile(img)
+                  if (saved) {
+                    tempFiles.push(saved.filePath)
+                    resolvedUrls.push(saved.publicUrl)
+                  } else {
+                    console.warn(`[publish] Facebook: skipping inaccessible image for "${channel}"`)
+                  }
+                }
+
+                if (resolvedUrls.length >= 2) {
+                  // 2. Album — multiple slides → photo album
+                  const r = await publishAlbumToFacebook(channel, resolvedUrls, caption)
+                  console.log(`[publish] Facebook: album (${resolvedUrls.length} photos) for "${channel}" — ${r.id}`)
+                  results.push({ platform, success: true, id: r.id })
+                } else if (resolvedUrls.length === 1) {
+                  // 3. Single image
+                  const r = await publishToFacebook(channel, caption, resolvedUrls[0])
+                  console.log(`[publish] Facebook: single image for "${channel}" — ${r.id}`)
+                  results.push({ platform, success: true, id: r.id })
+                } else {
+                  // 4. Text-only fallback
+                  const r = await publishToFacebook(channel, caption)
+                  console.log(`[publish] Facebook: text-only for "${channel}" (no images resolved) — ${r.id}`)
+                  results.push({ platform, success: true, id: r.id })
+                }
+              }
             } finally {
-              if (fbTempFile) await deleteTempFile(fbTempFile)
+              await Promise.all(tempFiles.map(deleteTempFile))
             }
           } catch (e: unknown) {
             results.push({ platform, success: false, error: e instanceof Error ? e.message : String(e) })

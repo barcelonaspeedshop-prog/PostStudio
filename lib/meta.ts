@@ -163,6 +163,30 @@ export async function deleteTempFile(filePath: string): Promise<void> {
   try { await unlink(filePath) } catch { /* already gone — ignore */ }
 }
 
+/**
+ * Write a base64 video data URI to a temp .mp4 file and return its public URL.
+ * Returns null on failure (caller should fall through to image/text-only).
+ */
+export async function saveVideoToTempFile(videoBase64: string): Promise<{ publicUrl: string; filePath: string } | null> {
+  if (!existsSync(TEMP_IMAGE_DIR)) {
+    await mkdir(TEMP_IMAGE_DIR, { recursive: true })
+  }
+
+  try {
+    const b64 = videoBase64.replace(/^data:video\/\w+;base64,/, '')
+    const buffer = Buffer.from(b64, 'base64')
+    const filename = `${randomUUID()}.mp4`
+    const filePath = path.join(TEMP_IMAGE_DIR, filename)
+    await writeFile(filePath, buffer)
+
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com').replace(/\/$/, '')
+    return { publicUrl: `${appUrl}/api/temp-image/${filename}`, filePath }
+  } catch (e) {
+    console.warn('[meta] Failed to save video to temp file:', e instanceof Error ? e.message : e)
+    return null
+  }
+}
+
 // ── Instagram carousel ───────────────────────────────────────────────────────
 
 /**
@@ -332,5 +356,48 @@ export async function publishToFacebook(
     { message },
     token,
   )
+  return { id: data.id as string }
+}
+
+// ── Facebook photo album ─────────────────────────────────────────────────────
+
+/**
+ * Publish a multi-photo album to a Facebook Page.
+ * Each imageUrl must be a publicly accessible HTTPS URL.
+ * Uses the two-step approach: upload each photo unpublished, then attach to a feed post.
+ */
+export async function publishAlbumToFacebook(
+  channelName: string,
+  imageUrls: string[],
+  message: string,
+): Promise<{ id: string }> {
+  const cfg = await getChannelConfig(channelName)
+  if (!cfg) throw new Error(`No Meta credentials configured for channel: ${channelName}`)
+
+  const { facebookPageId: pageId, pageAccessToken: token } = cfg
+
+  console.log(`[meta] Uploading ${imageUrls.length} photos for Facebook album (${channelName})`)
+
+  // Step 1: Upload each image as an unpublished photo, collect their IDs
+  const photoIds: string[] = []
+  for (let i = 0; i < imageUrls.length; i++) {
+    console.log(`[meta] Uploading album photo ${i + 1}/${imageUrls.length} for ${channelName}`)
+    const data = await graphPost(
+      `/${pageId}/photos`,
+      { url: imageUrls[i], published: 'false' },
+      token,
+    )
+    photoIds.push(data.id as string)
+  }
+
+  // Step 2: Publish a feed post with all photos attached
+  const attachedMedia = JSON.stringify(photoIds.map(id => ({ media_fbid: id })))
+  console.log(`[meta] Publishing Facebook album post for ${channelName} with ${photoIds.length} photos`)
+  const data = await graphPost(
+    `/${pageId}/feed`,
+    { message, attached_media: attachedMedia },
+    token,
+  )
+
   return { id: data.id as string }
 }

@@ -183,6 +183,7 @@ export async function PATCH(req: NextRequest) {
               firstSlideHeadline: item.headline,
               channel: item.channel,
               slides: item.slides,
+              videoBase64: item.videoBase64,
             }),
           })
             .then(async r => {

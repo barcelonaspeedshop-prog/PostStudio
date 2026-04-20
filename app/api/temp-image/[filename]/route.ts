@@ -14,7 +14,7 @@ export async function GET(
   try {
     // Sanitise: strip any path separators to prevent directory traversal
     const filename = path.basename(params.filename)
-    if (!filename || !/^[\w-]+\.jpe?g$/i.test(filename)) {
+    if (!filename || !/^[\w-]+\.(jpe?g|mp4)$/i.test(filename)) {
       return new NextResponse('Not found', { status: 404 })
     }
 
@@ -24,10 +24,11 @@ export async function GET(
     }
 
     const buffer = await readFile(filePath)
+    const isVideo = filename.toLowerCase().endsWith('.mp4')
     return new NextResponse(buffer, {
       status: 200,
       headers: {
-        'Content-Type': 'image/jpeg',
+        'Content-Type': isVideo ? 'video/mp4' : 'image/jpeg',
         'Content-Length': String(buffer.length),
         'Cache-Control': 'public, max-age=3600',
       },
