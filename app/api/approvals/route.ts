@@ -30,6 +30,10 @@ async function loadApprovals(): Promise<ApprovalItem[]> {
   try {
     if (!existsSync(APPROVALS_PATH)) return []
     const raw = await readFile(APPROVALS_PATH, 'utf-8')
+    const fileSizeMB = Buffer.byteLength(raw, 'utf-8') / (1024 * 1024)
+    if (fileSizeMB > 50) {
+      console.warn(`[approvals] WARNING: approvals.json is ${fileSizeMB.toFixed(1)}MB — binary payloads may not be getting stripped on status transitions`)
+    }
     return JSON.parse(raw)
   } catch {
     return []
@@ -129,11 +133,16 @@ export async function PATCH(req: NextRequest) {
 
     item.status = action === 'approve' ? 'approved' : 'rejected'
     item.reviewedAt = new Date().toISOString()
-    await saveApprovals(items)
 
     if (action === 'reject') {
+      // Strip binary payload immediately — rejected items never need media again
+      item.videoBase64 = undefined
+      item.slides = item.slides.map(({ image: _img, imageOptions: _opts, ...rest }) => rest as typeof item.slides[0])
+      await saveApprovals(items)
       return NextResponse.json({ id: item.id, status: 'rejected' })
     }
+
+    await saveApprovals(items)
 
     // Approved — publish to Instagram and Facebook only
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
@@ -226,6 +235,11 @@ export async function PATCH(req: NextRequest) {
     )
 
     const failures = results.filter(r => !r.success)
+
+    // Strip binary payload now that publishing is done — keeps approvals.json lean
+    item.videoBase64 = undefined
+    item.slides = item.slides.map(({ image: _img, imageOptions: _opts, ...rest }) => rest as typeof item.slides[0])
+    await saveApprovals(items)
 
     console.log(`[approvals] Published "${item.headline}":`, JSON.stringify(results))
 
