@@ -70,11 +70,31 @@ export async function POST(req: NextRequest) {
       ? existing
       : { date: today, populated_at: new Date().toISOString(), channels: {} }
 
-    // Process channels in parallel — each fetches stories + fixtures concurrently
-    const [results, settings] = await Promise.all([
-      Promise.allSettled(channelsToProcess.map(channel => fetchCandidateStories(channel, today))),
-      loadSettings(),
-    ])
+    const settings = await loadSettings()
+
+    // Process channels in batches of 3 with a 20s gap to avoid rate-limiting.
+    // Within each batch channels run concurrently; between batches we wait.
+    // Fixture data from the existing queue is reused (cached per day) to skip
+    // the Haiku+web_search fixture call on same-day re-populates.
+    const BATCH_SIZE = 3
+    const BATCH_DELAY_MS = 20_000
+    const results: PromiseSettledResult<CurationChannelQueue>[] = []
+
+    for (let i = 0; i < channelsToProcess.length; i += BATCH_SIZE) {
+      if (i > 0) {
+        console.log(`[curation] Batch ${Math.floor(i / BATCH_SIZE) + 1} — waiting ${BATCH_DELAY_MS / 1000}s…`)
+        await new Promise(r => setTimeout(r, BATCH_DELAY_MS))
+      }
+      const batch = channelsToProcess.slice(i, i + BATCH_SIZE)
+      console.log(`[curation] Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${batch.join(', ')}`)
+      const batchResults = await Promise.allSettled(
+        batch.map(channel => {
+          const cachedFixtures = queue.channels[channel]?.fixtures
+          return fetchCandidateStories(channel, today, cachedFixtures)
+        })
+      )
+      results.push(...batchResults)
+    }
 
     channelsToProcess.forEach((channel, i) => {
       const result = results[i]

@@ -157,7 +157,11 @@ Return ONLY a JSON array with one entry per story in the same order (no markdown
   })
 }
 
-export async function fetchCandidateStories(channel: string, today: string): Promise<CurationChannelQueue> {
+export async function fetchCandidateStories(
+  channel: string,
+  today: string,
+  cachedFixtures?: CurationFixture[],
+): Promise<CurationChannelQueue> {
   const topicKeywords = CHANNEL_TOPICS[channel] || channel
   const highCriteria = HIGH_IMPORTANCE_CRITERIA[channel] || 'major breaking news, significant events'
 
@@ -168,9 +172,14 @@ export async function fetchCandidateStories(channel: string, today: string): Pro
   let rawStories: Omit<CurationStory, 'id'>[] = []
   let fixtures: CurationFixture[] = []
 
+  // Use cached fixture data if available (avoids a Haiku+web_search call per sports channel)
+  const fixturePromise = cachedFixtures !== undefined
+    ? Promise.resolve(cachedFixtures)
+    : SPORTS_CHANNELS.has(channel) ? fetchFixtures(channel, today) : Promise.resolve([])
+
   const [storiesResult, fixturesResult] = await Promise.allSettled([
     fetchStories(channel, topicKeywords, highCriteria, today, yesterday),
-    SPORTS_CHANNELS.has(channel) ? fetchFixtures(channel, today) : Promise.resolve([]),
+    fixturePromise,
   ])
 
   if (storiesResult.status === 'fulfilled') rawStories = storiesResult.value

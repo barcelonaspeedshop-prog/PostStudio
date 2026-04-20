@@ -31,7 +31,7 @@ async function promptsForChapter(ch: ChapterInput, styleGuide: string): Promise<
   // Pre-fill the assistant turn with "[" to force Claude to open a JSON array immediately.
   // This is the most reliable technique for guaranteed JSON array output.
   const message = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 1500,
     system: `You are an image prompt writer for Midjourney and DALL-E 3.
 
