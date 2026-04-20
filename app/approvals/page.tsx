@@ -35,6 +35,7 @@ type ApprovalItem = {
   platforms: string[]
   cta?: string
   includeCta?: boolean
+  hashtags?: string[]
   createdAt: string
   status: 'pending' | 'approved' | 'rejected'
   reviewedAt?: string
@@ -59,6 +60,9 @@ export default function ApprovalsPage() {
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
   const [regenStep, setRegenStep] = useState('')
   const [regeneratingCtaId, setRegeneratingCtaId] = useState<string | null>(null)
+  const [regeneratingHashtagsId, setRegeneratingHashtagsId] = useState<string | null>(null)
+  const [editingHashtagsId, setEditingHashtagsId] = useState<string | null>(null)
+  const [hashtagDraft, setHashtagDraft] = useState('')
   const [imagePicker, setImagePicker] = useState<{
     itemId: string
     slideIndex: number
@@ -692,6 +696,53 @@ export default function ApprovalsPage() {
     }
   }
 
+  const regenerateHashtags = async (item: ApprovalItem) => {
+    setRegeneratingHashtagsId(item.id)
+    try {
+      const res = await fetch('/api/generate-hashtags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, topic: item.topic || item.headline, channel: item.channel }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setItems(prev => prev.map(i => i.id === item.id ? { ...i, hashtags: data.hashtags } : i))
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Hashtag generation failed', 'error')
+    } finally {
+      setRegeneratingHashtagsId(null)
+    }
+  }
+
+  const removeHashtag = async (item: ApprovalItem, tag: string) => {
+    const updated = (item.hashtags || []).filter(t => t !== tag)
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, hashtags: updated } : i))
+    try {
+      await fetch('/api/approvals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, hashtags: updated }),
+      })
+    } catch {}
+  }
+
+  const saveHashtagEdit = async (item: ApprovalItem) => {
+    const parsed = hashtagDraft
+      .split(/[\s,]+/)
+      .map(t => t.trim())
+      .filter(t => t.length > 0)
+      .map(t => t.startsWith('#') ? t : `#${t}`)
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, hashtags: parsed } : i))
+    setEditingHashtagsId(null)
+    try {
+      await fetch('/api/approvals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, hashtags: parsed }),
+      })
+    } catch {}
+  }
+
   const toggleIncludeCta = async (item: ApprovalItem) => {
     const next = item.includeCta === false ? true : false
     setItems(prev => prev.map(i => i.id === item.id ? { ...i, includeCta: next } : i))
@@ -921,6 +972,79 @@ export default function ApprovalsPage() {
                             ) : '↺'} Regen CTA
                           </button>
                         </div>
+                      </div>
+
+                      {/* Hashtags section */}
+                      <div className="px-4 py-3 border-t border-stone-50 bg-stone-50/30">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-semibold text-stone-400 uppercase tracking-widest">
+                            Hashtags {item.hashtags && item.hashtags.length > 0 ? `(${item.hashtags.length})` : ''}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            {item.hashtags && item.hashtags.length > 0 && editingHashtagsId !== item.id && (
+                              <button
+                                onClick={() => { setEditingHashtagsId(item.id); setHashtagDraft(item.hashtags!.join(' ')) }}
+                                className="text-[10px] text-stone-400 hover:text-stone-700 transition-colors"
+                              >
+                                Edit
+                              </button>
+                            )}
+                            <button
+                              onClick={() => regenerateHashtags(item)}
+                              disabled={regeneratingHashtagsId === item.id}
+                              className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-lg border border-stone-200 text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors disabled:opacity-40"
+                            >
+                              {regeneratingHashtagsId === item.id ? (
+                                <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                                </svg>
+                              ) : '↺'} Regen
+                            </button>
+                          </div>
+                        </div>
+
+                        {editingHashtagsId === item.id ? (
+                          <div className="flex flex-col gap-2">
+                            <textarea
+                              value={hashtagDraft}
+                              onChange={e => setHashtagDraft(e.target.value)}
+                              rows={3}
+                              className="w-full px-2.5 py-2 text-[11px] border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-400 resize-none leading-relaxed"
+                              placeholder="Paste or type hashtags separated by spaces…"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => saveHashtagEdit(item)}
+                                className="flex-1 py-1.5 text-[12px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => setEditingHashtagsId(null)}
+                                className="px-3 py-1.5 text-[12px] text-stone-500 border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : item.hashtags && item.hashtags.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {item.hashtags.map(tag => (
+                              <button
+                                key={tag}
+                                onClick={() => removeHashtag(item, tag)}
+                                title="Click to remove"
+                                className="px-2 py-0.5 text-[10px] bg-stone-100 text-stone-600 rounded-full hover:bg-red-50 hover:text-red-500 transition-colors group flex items-center gap-0.5"
+                              >
+                                {tag}
+                                <span className="opacity-0 group-hover:opacity-100 text-[8px] ml-0.5">×</span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[12px] text-stone-400 italic">No hashtags — click Regen to generate</p>
+                        )}
                       </div>
 
                       {/* Actions */}

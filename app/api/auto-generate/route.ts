@@ -5,6 +5,7 @@ import path from 'path'
 import Anthropic from '@anthropic-ai/sdk'
 import { saveToDrive } from '@/lib/drive-images'
 import { generateCTA, loadRecentCTAs, saveRecentCTA } from '@/lib/ctas'
+import { generateHashtags } from '@/lib/hashtags'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -628,6 +629,15 @@ export async function POST(req: NextRequest) {
         console.warn(`[auto-generate] [${channel}] CTA generation failed (non-fatal):`, e instanceof Error ? e.message : e)
       }
 
+      // Generate hashtags (non-fatal — generation continues if this fails)
+      let hashtags: string[] | undefined
+      try {
+        hashtags = await generateHashtags(topic, channel)
+        console.log(`[auto-generate] [${channel}] Hashtags (${hashtags.length}): ${hashtags.slice(0, 5).join(' ')}…`)
+      } catch (e) {
+        console.warn(`[auto-generate] [${channel}] Hashtag generation failed (non-fatal):`, e instanceof Error ? e.message : e)
+      }
+
       console.log(`[auto-generate] [${channel}] Adding to approval queue...`)
       const approvalRes = await fetch(`${baseUrl}/api/approvals`, {
         method: 'POST',
@@ -643,6 +653,7 @@ export async function POST(req: NextRequest) {
           ytDescription,
           ytTags,
           cta,
+          hashtags,
         }),
       })
       const approvalData = await approvalRes.json()

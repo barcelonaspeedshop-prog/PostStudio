@@ -3,6 +3,7 @@ import { readFile, writeFile, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
 import crypto from 'crypto'
+import { trackHashtags } from '@/lib/hashtags'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -23,6 +24,7 @@ export type ApprovalItem = {
   ytTags?: string[]
   cta?: string
   includeCta?: boolean
+  hashtags?: string[]
   createdAt: string
   status: 'pending' | 'approved' | 'rejected'
   reviewedAt?: string
@@ -58,7 +60,7 @@ export async function GET() {
 // POST — add new item to queue
 export async function POST(req: NextRequest) {
   try {
-    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, cta } = await req.json()
+    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, cta, hashtags } = await req.json()
 
     if (!channel || !slides || !Array.isArray(slides)) {
       return NextResponse.json({ error: 'channel and slides are required' }, { status: 400 })
@@ -76,6 +78,7 @@ export async function POST(req: NextRequest) {
       ytDescription: ytDescription || '',
       ytTags: ytTags || [],
       cta: cta || undefined,
+      hashtags: Array.isArray(hashtags) ? hashtags : undefined,
       createdAt: new Date().toISOString(),
       status: 'pending',
     }
@@ -95,7 +98,7 @@ export async function POST(req: NextRequest) {
 // PUT — update an item (e.g. attach video after generation, or regenerate with fresh content)
 export async function PUT(req: NextRequest) {
   try {
-    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, cta, includeCta } = await req.json()
+    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, cta, includeCta, hashtags } = await req.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
     const items = await loadApprovals()
@@ -111,6 +114,7 @@ export async function PUT(req: NextRequest) {
     if (ytTags && Array.isArray(ytTags)) item.ytTags = ytTags
     if (cta !== undefined) item.cta = cta
     if (includeCta !== undefined) item.includeCta = includeCta
+    if (hashtags !== undefined) item.hashtags = Array.isArray(hashtags) ? hashtags : item.hashtags
     await saveApprovals(items)
 
     return NextResponse.json({ id: item.id, hasVideo: !!item.videoBase64 })
@@ -152,9 +156,11 @@ export async function PATCH(req: NextRequest) {
     // Approved — publish to Instagram and Facebook only
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
     const rawCaption = item.slides.map(s => `${s.headline} — ${s.body}`).join('\n\n')
-    // Instagram hard limit is 2,200 characters (Meta API error 36004 if exceeded)
-    const truncated = rawCaption.length > 2200 ? rawCaption.slice(0, 2197) + '...' : rawCaption
-    const caption = (item.includeCta !== false && item.cta) ? `${truncated}\n\n${item.cta}` : truncated
+    // Keep body short enough to leave room for CTA (~150 chars) + hashtags (~400 chars)
+    const truncated = rawCaption.length > 1500 ? rawCaption.slice(0, 1497) + '...' : rawCaption
+    let caption = truncated
+    if (item.includeCta !== false && item.cta) caption = `${caption}\n\n${item.cta}`
+    if (item.hashtags && item.hashtags.length > 0) caption = `${caption}\n\n${item.hashtags.join(' ')}`
 
     type PlatformResult = { platform: string; success: boolean; error?: string; url?: string }
 
@@ -241,6 +247,13 @@ export async function PATCH(req: NextRequest) {
     )
 
     const failures = results.filter(r => !r.success)
+
+    // Track hashtags for rotation — fire-and-forget
+    if (item.hashtags && item.hashtags.length > 0) {
+      trackHashtags(item.channel, item.hashtags).catch(e =>
+        console.warn('[approvals] trackHashtags failed:', e instanceof Error ? e.message : e)
+      )
+    }
 
     // Strip binary payload now that publishing is done — keeps approvals.json lean
     item.videoBase64 = undefined
