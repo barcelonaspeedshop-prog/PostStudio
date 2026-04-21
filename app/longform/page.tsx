@@ -890,6 +890,11 @@ export default function LongFormPage() {
 
   // Open YouTube OAuth popup for one channel; auto-upload after successful login
   const loginAndUploadYouTube = (ch: string) => {
+    // If already connected, skip OAuth and upload directly
+    if (ytConnected[ch]) {
+      uploadToYouTube(ch)
+      return
+    }
     setYtStatus(prev => ({ ...prev, [ch]: 'connecting' }))
     const popup = window.open(
       `/api/auth/youtube?channel=${encodeURIComponent(ch)}`,
@@ -1378,28 +1383,29 @@ export default function LongFormPage() {
                         const anySelected = plat.yt || plat.ig || plat.fb
                         const igOk = !!metaConnected[ch]?.instagram
                         const fbOk = !!metaConnected[ch]?.facebook
+                        const ytAlready = !!ytConnected[ch]
                         const yt = ytStatus[ch] || 'idle'
                         const meta = metaStatus[ch] || 'idle'
                         return (
                           <div key={ch} className="rounded-xl border border-stone-100 overflow-hidden">
                             {/* Channel header + platform toggles */}
                             <div className="flex items-center gap-3 px-3 py-2.5">
-                              <span className="text-[13px] font-medium text-stone-800 flex-1 truncate">{ch}</span>
+                              <span className="text-[13px] font-medium text-stone-800 min-w-0 flex-1">{ch}</span>
                               <div className="flex gap-1.5 shrink-0">
                                 <button
                                   onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], yt: !plat.yt } }))}
-                                  title="YouTube — requires login per channel"
+                                  title={ytAlready ? 'YouTube — already connected, will upload directly' : 'YouTube — login required'}
                                   className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.yt ? 'bg-red-50 text-red-600 border-red-300' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300'}`}
                                 >YT</button>
                                 <button
-                                  onClick={() => igOk && setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], ig: !plat.ig } }))}
-                                  title={igOk ? 'Instagram' : 'No Instagram connected for this channel'}
-                                  className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.ig ? 'bg-pink-50 text-pink-600 border-pink-300' : igOk ? 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300' : 'bg-stone-50 text-stone-300 border-stone-100 cursor-not-allowed'}`}
+                                  onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], ig: !plat.ig } }))}
+                                  title={igOk ? 'Instagram' : 'Instagram — connect via Accounts page first'}
+                                  className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.ig ? 'bg-pink-50 text-pink-600 border-pink-300' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300'}`}
                                 >IG</button>
                                 <button
-                                  onClick={() => fbOk && setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], fb: !plat.fb } }))}
-                                  title={fbOk ? 'Facebook' : 'No Facebook connected for this channel'}
-                                  className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.fb ? 'bg-blue-50 text-blue-600 border-blue-300' : fbOk ? 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300' : 'bg-stone-50 text-stone-300 border-stone-100 cursor-not-allowed'}`}
+                                  onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], fb: !plat.fb } }))}
+                                  title={fbOk ? 'Facebook' : 'Facebook — connect via Accounts page first'}
+                                  className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.fb ? 'bg-blue-50 text-blue-600 border-blue-300' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300'}`}
                                 >FB</button>
                               </div>
                             </div>
@@ -1437,7 +1443,7 @@ export default function LongFormPage() {
                                   />
                                 )}
 
-                                {/* YouTube per-channel login button */}
+                                {/* YouTube per-channel action */}
                                 {plat.yt && (
                                   <div className="pt-0.5">
                                     {yt === 'done' ? (
@@ -1453,7 +1459,7 @@ export default function LongFormPage() {
                                           onClick={() => loginAndUploadYouTube(ch)}
                                           className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[12px] font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
                                         >
-                                          {YT_ICON} Login to YouTube &amp; Upload
+                                          {YT_ICON} {ytAlready ? 'Upload to YouTube' : 'Login to YouTube & Upload'}
                                         </button>
                                       </div>
                                     )}
@@ -1466,7 +1472,7 @@ export default function LongFormPage() {
                                     {meta === 'done' && <p className="text-emerald-600 font-medium">✓ Published to {[plat.ig && 'Instagram', plat.fb && 'Facebook'].filter(Boolean).join(' & ')}</p>}
                                     {meta === 'uploading' && <span className="flex items-center gap-1.5 text-stone-500"><Spinner className="w-3 h-3" /> Publishing to {[plat.ig && 'Instagram', plat.fb && 'Facebook'].filter(Boolean).join(' & ')}...</span>}
                                     {meta === 'error' && <p className="text-red-500">{metaError[ch]}</p>}
-                                    {meta === 'idle' && <p className="text-stone-400">Instagram/Facebook will publish when you click Publish below</p>}
+                                    {meta === 'idle' && <p className="text-stone-400">Will publish when you click Publish below</p>}
                                   </div>
                                 )}
                               </div>
@@ -1832,27 +1838,28 @@ export default function LongFormPage() {
                         const anySelected = plat.yt || plat.ig || plat.fb
                         const igOk = !!metaConnected[ch]?.instagram
                         const fbOk = !!metaConnected[ch]?.facebook
+                        const ytAlready = !!ytConnected[ch]
                         const yt = ytStatus[ch] || 'idle'
                         const meta = metaStatus[ch] || 'idle'
                         return (
                           <div key={ch} className="rounded-xl border border-stone-100 overflow-hidden">
                             <div className="flex items-center gap-3 px-3 py-2.5">
-                              <span className="text-[12px] font-medium text-stone-800 flex-1 truncate">{ch}</span>
+                              <span className="text-[12px] font-medium text-stone-800 min-w-0 flex-1">{ch}</span>
                               <div className="flex gap-1.5 shrink-0">
                                 <button
                                   onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], yt: !plat.yt } }))}
-                                  title="YouTube — requires login per channel"
+                                  title={ytAlready ? 'YouTube — already connected, will upload directly' : 'YouTube — login required'}
                                   className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.yt ? 'bg-red-50 text-red-600 border-red-300' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300'}`}
                                 >YT</button>
                                 <button
-                                  onClick={() => igOk && setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], ig: !plat.ig } }))}
-                                  title={igOk ? 'Instagram' : 'No Instagram connected for this channel'}
-                                  className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.ig ? 'bg-pink-50 text-pink-600 border-pink-300' : igOk ? 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300' : 'bg-stone-50 text-stone-300 border-stone-100 cursor-not-allowed'}`}
+                                  onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], ig: !plat.ig } }))}
+                                  title={igOk ? 'Instagram' : 'Instagram — connect via Accounts page first'}
+                                  className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.ig ? 'bg-pink-50 text-pink-600 border-pink-300' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300'}`}
                                 >IG</button>
                                 <button
-                                  onClick={() => fbOk && setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], fb: !plat.fb } }))}
-                                  title={fbOk ? 'Facebook' : 'No Facebook connected for this channel'}
-                                  className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.fb ? 'bg-blue-50 text-blue-600 border-blue-300' : fbOk ? 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300' : 'bg-stone-50 text-stone-300 border-stone-100 cursor-not-allowed'}`}
+                                  onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], fb: !plat.fb } }))}
+                                  title={fbOk ? 'Facebook' : 'Facebook — connect via Accounts page first'}
+                                  className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.fb ? 'bg-blue-50 text-blue-600 border-blue-300' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300'}`}
                                 >FB</button>
                               </div>
                             </div>
@@ -1902,7 +1909,7 @@ export default function LongFormPage() {
                                           onClick={() => loginAndUploadYouTube(ch)}
                                           className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[12px] font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
                                         >
-                                          {YT_ICON} Login to YouTube &amp; Upload
+                                          {YT_ICON} {ytAlready ? 'Upload to YouTube' : 'Login to YouTube & Upload'}
                                         </button>
                                       </div>
                                     )}
@@ -1913,7 +1920,7 @@ export default function LongFormPage() {
                                     {meta === 'done' && <p className="text-emerald-600 font-medium">✓ Published to {[plat.ig && 'Instagram', plat.fb && 'Facebook'].filter(Boolean).join(' & ')}</p>}
                                     {meta === 'uploading' && <span className="flex items-center gap-1.5 text-stone-500"><Spinner className="w-3 h-3" /> Publishing to {[plat.ig && 'Instagram', plat.fb && 'Facebook'].filter(Boolean).join(' & ')}...</span>}
                                     {meta === 'error' && <p className="text-red-500">{metaError[ch]}</p>}
-                                    {meta === 'idle' && <p className="text-stone-400">Instagram/Facebook will publish when you click Publish below</p>}
+                                    {meta === 'idle' && <p className="text-stone-400">Will publish when you click Publish below</p>}
                                   </div>
                                 )}
                               </div>
