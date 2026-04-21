@@ -135,59 +135,82 @@ async function handleGoogleLogin(page, credentials) {
   }
 }
 
+// YouTube channel names may differ from PostStudio channel names.
+// List all possible names that could appear in Google's channel picker.
+const CHANNEL_PICKER_NAMES = {
+  'Gentlemen of Fuel': ['Gentlemen of Fuel'],
+  'Omnira F1':         ['Omnira F1'],
+  'Road & Trax':       ['Road & Trax'],
+  'Omnira Football':   ['Omnira FC', 'Omnira Football'],
+  'Omnira Cricket':    ['Omnira Cricket'],
+  'Omnira Golf':       ['Omnira Golf'],
+  'Omnira NFL':        ['Omnira NFL'],
+  'Omnira Food':       ['Omnira Food'],
+  'Omnira Travel':     ['Omnira Travel'],
+}
+
 // ── Google account / Brand-Account picker ─────────────────────────────────────
 
+/**
+ * Clicks the correct Brand Account (or YouTube channel) in Google's pickers.
+ *
+ * Google shows two different pickers during YouTube OAuth:
+ *  1. Google Account picker  — asks which GOOGLE ACCOUNT to use
+ *  2. YouTube channel picker — asks which YOUTUBE CHANNEL (personal or Brand Account)
+ *
+ * The function tries both by searching all visible text for any of the known
+ * display names for this channel, then clicking the containing interactive element.
+ */
 async function selectBrandAccount(page, channelName) {
   const url = page.url()
+  if (!url.includes('accounts.google.com') && !url.includes('youtube.com')) return
 
-  // Google shows this after login OR as the very first screen when multiple
-  // accounts are already signed in (prompt=select_account).
-  if (!url.includes('accounts.google.com')) return
+  const namesToTry = CHANNEL_PICKER_NAMES[channelName] || [channelName]
+  console.log(`  [google] Picker detected — searching for: ${namesToTry.join(' / ')}`)
 
-  console.log(`  [google] Account picker detected — looking for "${channelName}"`)
-
-  // Wait for the account list to render
   await sleep(2000)
 
-  // Try to find a list item matching the channel name
-  const found = await page.evaluate(name => {
-    // Account rows in the modern account picker
-    const rows = [
-      ...document.querySelectorAll('[data-authuser], [data-identifier], li[role="presentation"]'),
-      ...document.querySelectorAll('div[jscontroller] div[data-email]'),
-    ]
+  for (const name of namesToTry) {
+    const found = await page.evaluate(name => {
+      const normalize = s => s.toLowerCase().replace(/\s+/g, ' ').trim()
+      const target = normalize(name)
 
-    // Also search all visible text nodes
-    const allEls = [...document.querySelectorAll('*')]
-    const nameNorm = name.toLowerCase().replace(/\s+/g, ' ').trim()
+      // Search all visible elements whose FULL text content matches the channel name
+      const allEls = [...document.querySelectorAll('*')]
+      for (const el of allEls) {
+        if (!el.offsetParent) continue // skip hidden
+        const text = normalize(el.textContent || '')
+        if (text !== target) continue
 
-    for (const el of allEls) {
-      const text = (el.textContent || '').toLowerCase().replace(/\s+/g, ' ').trim()
-      if (text === nameNorm && el.offsetParent !== null) {
-        // Walk up to the clickable ancestor
-        let target = el
-        while (target && !['LI', 'DIV', 'A', 'BUTTON'].includes(target.tagName)) {
-          target = target.parentElement
+        // Walk up to find the nearest interactive/clickable ancestor (max 6 levels)
+        let clickable = el
+        for (let i = 0; i < 6; i++) {
+          const tag = clickable.tagName
+          const role = clickable.getAttribute('role')
+          if (tag === 'BUTTON' || tag === 'A' || tag === 'LI' ||
+              role === 'button' || role === 'option' || role === 'menuitem' ||
+              clickable.hasAttribute('jsaction') || clickable.hasAttribute('data-authuser')) {
+            clickable.click()
+            return true
+          }
+          if (!clickable.parentElement) break
+          clickable = clickable.parentElement
         }
-        if (target) { target.click(); return true }
+        // Fallback: click the element itself
+        el.click()
+        return true
       }
-    }
-    return false
-  }, channelName)
+      return false
+    }, name)
 
-  if (found) {
-    console.log(`  [google] Clicked "${channelName}" account row`)
-    await sleep(2000)
-    return
+    if (found) {
+      console.log(`  [google] Clicked "${name}" in picker`)
+      await sleep(2500)
+      return
+    }
   }
 
-  // Channel not found in account list — may need to use "Switch account" or
-  // the user hasn't added this Brand Account to their session.
-  // As a fallback: click the first non-personal account (Brand Accounts are
-  // listed after the personal account in the order they were added).
-  console.warn(`  [google] "${channelName}" not found in account picker — trying first Brand Account`)
-
-  // "Add another account" or use existing — for now just wait & see where we land
+  console.warn(`  [google] "${channelName}" not found in picker — continuing (may need manual intervention)`)
   await sleep(1000)
 }
 
@@ -311,41 +334,76 @@ async function main() {
     process.exit(1)
   }
 
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--window-size=1280,900',
-    ],
-  })
+  // CRITICAL: each channel MUST use a fresh browser instance with no existing
+  // Google session.  When all channels share one browser session, Google returns
+  // the same refresh_token for every channel (same OAuth grant = same token),
+  // which causes all uploads to go to the first/default channel.
+  //
+  // A fresh browser per channel forces Google to issue a new, channel-specific
+  // refresh_token each time — the only reliable fix without YouTube CMS access.
 
-  // Pre-sign into Google once in a shared page so subsequent channels reuse
-  // the session cookie and skip the login step.
-  console.log('Pre-signing into Google...')
-  const loginPage = await browser.newPage()
-  await loginPage.setViewport({ width: 1280, height: 900 })
-  await loginPage.setUserAgent(
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-    '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-  )
-  await loginPage.goto('https://accounts.google.com/signin', { waitUntil: 'networkidle2', timeout: 30000 })
-  await handleGoogleLogin(loginPage, credentials)
-  await loginPage.close()
-  console.log('Google session established\n')
+  const PUPPETEER_ARGS = [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-gpu',
+    '--window-size=1280,900',
+  ]
+
+  // Step 1: revoke existing shared tokens so Google issues fresh grants
+  console.log('Revoking existing shared tokens (if any)...')
+  try {
+    const health = await fetch(`${APP_URL}/api/auth/youtube?action=health`)
+    if (health.ok) {
+      const { sharedGroups } = await health.json()
+      for (const group of (sharedGroups || [])) {
+        const first = group.channels[0]
+        await fetch(`${APP_URL}/api/auth/youtube?action=revoke&channel=${encodeURIComponent(first)}`)
+        console.log(`  Revoked shared token for group: ${group.channels.join(', ')}`)
+      }
+    }
+  } catch (e) {
+    console.warn('  Could not revoke tokens (non-fatal):', e.message)
+  }
+  console.log()
 
   const results = []
 
   for (const channel of channels) {
-    const result = await connectChannel(browser, channel, credentials)
-    results.push(result)
-    // Brief pause between channels to avoid rate limiting
-    await sleep(2000)
+    // Fresh browser — no Google session = new OAuth grant = unique refresh_token
+    const browser = await puppeteer.launch({ headless: 'new', args: PUPPETEER_ARGS })
+    try {
+      const result = await connectChannel(browser, channel, credentials)
+      results.push(result)
+    } finally {
+      await browser.close()
+    }
+    // Pause between channels to avoid Google rate limiting
+    await sleep(3000)
   }
 
-  await browser.close()
+  // Step 2: verify all tokens have unique refresh_tokens
+  console.log('\nVerifying token uniqueness...')
+  try {
+    const healthRes = await fetch(`${APP_URL}/api/auth/youtube?action=health`)
+    if (healthRes.ok) {
+      const { sharedGroups, channels: healthChannels } = await healthRes.json()
+      if (sharedGroups && sharedGroups.length > 0) {
+        console.warn(`⚠ WARNING: ${sharedGroups.flatMap(g => g.channels).length} channels still share a refresh token:`)
+        sharedGroups.forEach(g => console.warn(`  Shared: ${g.channels.join(', ')}`))
+        console.warn('  These channels will not publish to the correct Brand Account.')
+        console.warn('  Try re-running the script for those channels only.')
+      } else {
+        console.log('✓ All connected channels have unique tokens')
+      }
+      ;(healthChannels || []).forEach(c => {
+        const icon = c.shared ? '⚠' : '✓'
+        console.log(`  ${icon} ${c.channel}: ${c.handle || c.channelId || 'unknown'}`)
+      })
+    }
+  } catch (e) {
+    console.warn('Could not verify tokens:', e.message)
+  }
 
   // Summary
   console.log('\n=== Summary ===')

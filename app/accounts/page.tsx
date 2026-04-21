@@ -107,10 +107,17 @@ type YouTubeStatus = Record<string, {
   youtube_handle?: string
 }>
 
+type YouTubeHealth = {
+  sharedGroups: { channels: string[] }[]
+  channels: { channel: string; shared: boolean }[]
+}
+
 function AccountsPageInner() {
   const [metaStatus, setMetaStatus] = useState<MetaStatus>({})
   const [ytStatus, setYtStatus]     = useState<YouTubeStatus>({})
+  const [ytHealth, setYtHealth]     = useState<YouTubeHealth | null>(null)
   const [ytDisconnecting, setYtDisconnecting] = useState<string | null>(null)
+  const [ytRevoking, setYtRevoking] = useState<string | null>(null)
   const [connectForm, setConnectForm] = useState<ConnectForm | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [disconnecting, setDisconnecting] = useState<string | null>(null)
@@ -139,11 +146,29 @@ function AccountsPageInner() {
   const fetchYtStatus = async () => {
     try {
       const res = await fetch('/api/auth/youtube?action=status')
-      if (res.ok) {
-        const data = await res.json()
-        setYtStatus(data)
-      }
+      if (res.ok) setYtStatus(await res.json())
     } catch { /* ignore */ }
+  }
+
+  const fetchYtHealth = async () => {
+    try {
+      const res = await fetch('/api/auth/youtube?action=health')
+      if (res.ok) setYtHealth(await res.json())
+    } catch { /* ignore */ }
+  }
+
+  // Revoke the shared token for a channel, then redirect to fresh OAuth
+  const revokeAndReconnect = async (channel: string) => {
+    setYtRevoking(channel)
+    try {
+      await fetch(`/api/auth/youtube?action=revoke&channel=${encodeURIComponent(channel)}`)
+      await fetchYtStatus()
+      await fetchYtHealth()
+      window.location.href = `/api/auth/youtube?channel=${encodeURIComponent(channel)}`
+    } catch {
+      showToast('Revoke failed', 'error')
+      setYtRevoking(null)
+    }
   }
 
   const disconnectYt = async (channel: string) => {
@@ -166,6 +191,7 @@ function AccountsPageInner() {
     }).catch(() => {})
     fetchMetaStatus()
     fetchYtStatus()
+    fetchYtHealth()
     // Show result of OAuth callback redirects
     const ytConnected = searchParams.get('connected')
     const connected   = searchParams.get('meta_connected')
@@ -346,6 +372,22 @@ function AccountsPageInner() {
             </p>
           </div>
 
+          {/* Shared YouTube token warning */}
+          {ytHealth && ytHealth.sharedGroups.length > 0 && (
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-xl px-5 py-4">
+              <p className="text-[13px] font-semibold text-red-800 mb-1">YouTube publishing misconfigured — {ytHealth.sharedGroups.flatMap(g => g.channels).length} channels share the same Google token</p>
+              <p className="text-[12px] text-red-700 leading-relaxed mb-2">
+                These channels will all publish to the same YouTube channel (the managing account&apos;s default). Each Brand Account needs its own unique OAuth token. Click <strong>Revoke &amp; Reconnect</strong> on each affected channel, then sign in and select the correct Brand Account.
+              </p>
+              <p className="text-[11px] text-red-600 font-medium">
+                Affected: {ytHealth.sharedGroups.flatMap(g => g.channels).join(', ')}
+              </p>
+              <p className="text-[11px] text-red-500 mt-1">
+                Tip: use a fresh incognito window or run <code className="bg-red-100 px-1 rounded font-mono">node scripts/setup-youtube.js</code> on the server to re-auth all channels at once.
+              </p>
+            </div>
+          )}
+
           {/* Global Settings */}
           <div className="mb-6 bg-white border border-stone-100 rounded-xl p-5">
             <h2 className="text-[13px] font-semibold text-stone-900 mb-4">Global Settings</h2>
@@ -433,6 +475,8 @@ function AccountsPageInner() {
                       const expectedId = EXPECTED_YT_CHANNEL_IDS[ch.channel]
                       const connectedId = yt?.youtube_channel_id
                       const wrongChannel = yt?.connected && expectedId && connectedId && connectedId !== expectedId
+                      const sharedToken = ytHealth?.channels.find(c => c.channel === ch.channel)?.shared ?? false
+                      const hasIssue = wrongChannel || sharedToken
                       return (
                         <div className="mt-4 pt-4 border-t border-stone-100">
                           <div className="flex items-start justify-between gap-2">
@@ -443,13 +487,22 @@ function AccountsPageInner() {
                                   <p className="text-[11px] text-stone-400 truncate">
                                     {yt?.youtube_handle || yt?.youtube_channel_name || 'Connected'}
                                   </p>
-                                  {wrongChannel ? (
+                                  {sharedToken ? (
+                                    <div>
+                                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">
+                                        ⚠ SHARED TOKEN
+                                      </span>
+                                      <p className="text-[10px] text-amber-700 mt-1 leading-tight">
+                                        Shares a Google token with other channels — uploads will go to the wrong place.
+                                      </p>
+                                    </div>
+                                  ) : wrongChannel ? (
                                     <div>
                                       <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-red-50 text-red-700">
                                         ⚠ WRONG CHANNEL
                                       </span>
                                       <p className="text-[10px] text-red-600 mt-1 leading-tight">
-                                        Connected to <code className="font-mono">{connectedId?.slice(0,12)}…</code> — expected <code className="font-mono">{expectedId?.slice(0,12)}…</code>. Reconnect and select the correct Brand Account.
+                                        Connected to <code className="font-mono">{connectedId?.slice(0,12)}…</code> — expected <code className="font-mono">{expectedId?.slice(0,12)}…</code>.
                                       </p>
                                     </div>
                                   ) : (
@@ -466,12 +519,22 @@ function AccountsPageInner() {
                             </div>
                             {yt?.connected ? (
                               <div className="flex items-center gap-1.5 shrink-0">
-                                <a
-                                  href={`/api/auth/youtube?channel=${encodeURIComponent(ch.channel)}`}
-                                  className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${wrongChannel ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
-                                >
-                                  ↻ Reconnect
-                                </a>
+                                {sharedToken ? (
+                                  <button
+                                    onClick={() => revokeAndReconnect(ch.channel)}
+                                    disabled={ytRevoking === ch.channel}
+                                    className="px-2 py-1 text-[10px] font-medium bg-amber-500 text-white rounded hover:bg-amber-600 disabled:opacity-50 transition-colors"
+                                  >
+                                    {ytRevoking === ch.channel ? 'Revoking…' : '↻ Revoke & Reconnect'}
+                                  </button>
+                                ) : (
+                                  <a
+                                    href={`/api/auth/youtube?channel=${encodeURIComponent(ch.channel)}`}
+                                    className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${hasIssue ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
+                                  >
+                                    ↻ Reconnect
+                                  </a>
+                                )}
                                 <button
                                   onClick={() => disconnectYt(ch.channel)}
                                   disabled={ytDisconnecting === ch.channel}
@@ -489,10 +552,17 @@ function AccountsPageInner() {
                               </a>
                             )}
                           </div>
-                          {wrongChannel && (
+                          {sharedToken && (
+                            <div className="mt-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                              <p className="text-[10px] text-amber-800 leading-relaxed">
+                                <strong>Action required:</strong> Click <strong>↻ Revoke &amp; Reconnect</strong>. This clears the shared token then opens Google OAuth — when you see the channel picker, select <strong>{ch.channel}</strong> specifically.
+                              </p>
+                            </div>
+                          )}
+                          {!sharedToken && wrongChannel && (
                             <div className="mt-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
                               <p className="text-[10px] text-red-700 leading-relaxed">
-                                <strong>Action required:</strong> Click <strong>↻ Reconnect</strong>. On Google&apos;s screen, click <strong>&quot;Switch account&quot;</strong> or <strong>&quot;Use another account&quot;</strong> and sign in as the <strong>{ch.channel}</strong> Brand Account.
+                                <strong>Action required:</strong> Click <strong>↻ Reconnect</strong>. On Google&apos;s screen, click <strong>&quot;Switch account&quot;</strong> and sign in as the <strong>{ch.channel}</strong> Brand Account.
                               </p>
                             </div>
                           )}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getOAuth2Client, loadTokens, deleteTokenForChannel } from '@/lib/youtube'
+import { getOAuth2Client, loadTokens, saveTokens, deleteTokenForChannel } from '@/lib/youtube'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +20,56 @@ export async function GET(req: NextRequest) {
       }
     }
     return NextResponse.json(status)
+  }
+
+  // Health check — detect channels sharing the same refresh token.
+  // Shared tokens mean multiple channels authenticate as the same Google Account
+  // and all uploads go to that account's default channel.
+  if (action === 'health') {
+    const tokens = await loadTokens()
+    const byRefresh: Record<string, string[]> = {}
+    for (const [ch, tok] of Object.entries(tokens)) {
+      const key = tok.refresh_token || 'none'
+      if (!byRefresh[key]) byRefresh[key] = []
+      byRefresh[key].push(ch)
+    }
+    const sharedGroups = Object.entries(byRefresh)
+      .filter(([, channels]) => channels.length > 1)
+      .map(([, channels]) => ({ channels }))
+    const channelList = Object.entries(tokens).map(([channel, token]) => ({
+      channel,
+      channelId: token.youtube_channel_id,
+      channelName: token.youtube_channel_name,
+      handle: token.youtube_handle,
+      shared: sharedGroups.some(g => g.channels.includes(channel)),
+    }))
+    return NextResponse.json({ sharedGroups, channels: channelList })
+  }
+
+  // Revoke a channel's token at Google and remove all channels sharing it.
+  // This forces a fresh OAuth grant (new refresh token) on next connect.
+  if (action === 'revoke') {
+    const channel = searchParams.get('channel')
+    if (!channel) {
+      return NextResponse.json({ error: 'channel is required' }, { status: 400 })
+    }
+    const tokens = await loadTokens()
+    const token = tokens[channel]
+    if (token?.refresh_token) {
+      try {
+        await fetch(
+          `https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(token.refresh_token)}`,
+          { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        )
+      } catch { /* non-fatal — Google revocation may return errors for already-expired tokens */ }
+      // Remove every channel that shares this refresh token
+      const sharedRefresh = token.refresh_token
+      for (const [ch, tok] of Object.entries(tokens)) {
+        if (tok.refresh_token === sharedRefresh) delete tokens[ch]
+      }
+      await saveTokens(tokens)
+    }
+    return NextResponse.json({ success: true, channel })
   }
 
   // Disconnect a channel
