@@ -84,6 +84,13 @@ export default function LongFormPage() {
   const [dalleProgress, setDalleProgress] = useState<{ done: number; total: number } | null>(null)
   const [dallePromptIndex, setDallePromptIndex] = useState<Record<number, number>>({})
 
+  // ─── Thumbnail ───
+  const [thumbnailAccentWord, setThumbnailAccentWord] = useState('')
+  const [thumbnailHeroFile, setThumbnailHeroFile] = useState<File | null>(null)
+  const [thumbnailGenerating, setThumbnailGenerating] = useState(false)
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null)
+  const thumbnailFileRef = useRef<HTMLInputElement>(null)
+
   // ─── Restore draft ───
   useEffect(() => {
     // Check for URL params first (coming from /stories "Use this story →")
@@ -727,6 +734,42 @@ export default function LongFormPage() {
     }
   }
 
+  // ─── Thumbnail ───
+  const generateThumbnail = async () => {
+    if (!script) return
+    setThumbnailGenerating(true)
+    setThumbnailUrl(null)
+    try {
+      let heroImageBase64: string | undefined
+      if (thumbnailHeroFile) {
+        const reader = new FileReader()
+        heroImageBase64 = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string)
+          reader.onerror = reject
+          reader.readAsDataURL(thumbnailHeroFile)
+        })
+      }
+      const res = await fetch('/api/generate-thumbnail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel,
+          title: script.title,
+          accentWord: thumbnailAccentWord.trim(),
+          heroImageBase64,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setThumbnailUrl(data.thumbnailBase64)
+      showToast('Thumbnail generated and saved to Drive')
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Thumbnail generation failed', 'error')
+    } finally {
+      setThumbnailGenerating(false)
+    }
+  }
+
   // ─── Computed ───
   const voiceoverCount = Object.keys(chapterAudio).length
   const allVoiceoversReady = script ? voiceoverCount === script.chapters.length : false
@@ -1011,6 +1054,63 @@ export default function LongFormPage() {
                     className="flex items-center justify-between w-full px-4 py-3 text-[13px] font-medium border border-stone-200 text-stone-700 rounded-xl hover:bg-stone-50 transition-colors">
                     <span>Reels</span><span className="opacity-60 text-[11px]">9:16 ↓</span>
                   </a>
+                </div>
+
+                {/* Thumbnail generator */}
+                <div className="bg-white border border-stone-200 rounded-2xl p-4 space-y-3">
+                  <p className="text-[11px] font-medium text-stone-400 uppercase tracking-widest">YouTube Thumbnail</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={thumbnailAccentWord}
+                      onChange={(e) => setThumbnailAccentWord(e.target.value)}
+                      placeholder="Accent word (highlighted in colour)"
+                      className="flex-1 px-3 py-2 text-[13px] border border-stone-200 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-400"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="flex-1 flex items-center gap-2 px-3 py-2 border border-dashed border-stone-300 rounded-lg cursor-pointer hover:bg-stone-50 transition-colors">
+                      <input
+                        ref={thumbnailFileRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => setThumbnailHeroFile(e.target.files?.[0] ?? null)}
+                      />
+                      <svg className="w-4 h-4 text-stone-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4-4a3 3 0 014 0l4 4M14 12l2-2a3 3 0 014 0l2 2M8 21h8m-4-4v4" />
+                      </svg>
+                      <span className="text-[12px] text-stone-500 truncate">
+                        {thumbnailHeroFile ? thumbnailHeroFile.name : 'Hero image (optional)'}
+                      </span>
+                    </label>
+                    {thumbnailHeroFile && (
+                      <button onClick={() => setThumbnailHeroFile(null)} className="text-[11px] text-stone-400 hover:text-stone-600 shrink-0">✕</button>
+                    )}
+                  </div>
+                  <button
+                    onClick={generateThumbnail}
+                    disabled={thumbnailGenerating}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 text-[13px] font-medium bg-stone-900 text-white rounded-xl hover:bg-stone-800 transition-colors disabled:opacity-50"
+                  >
+                    {thumbnailGenerating ? <><Spinner className="w-3.5 h-3.5" /> Generating...</> : 'Generate Thumbnail'}
+                  </button>
+                  {thumbnailUrl && (
+                    <div className="rounded-xl overflow-hidden border border-stone-100">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={thumbnailUrl} alt="Generated thumbnail" className="w-full block" />
+                      <div className="px-3 py-2 flex items-center justify-between bg-stone-50">
+                        <p className="text-[11px] text-stone-500">Saved to Drive · AI Generated</p>
+                        <a
+                          href={thumbnailUrl}
+                          download={`thumbnail_${channel.replace(/\s+/g, '_')}.jpg`}
+                          className="text-[12px] font-bold text-stone-600 hover:text-stone-900"
+                        >
+                          ↓ Download
+                        </a>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Chapter clips */}
