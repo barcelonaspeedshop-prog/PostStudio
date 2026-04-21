@@ -986,9 +986,17 @@ export default function LongFormPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Publish failed')
+      // If neither Instagram nor Facebook succeeded, surface the error
+      const igErr = data.errors?.instagram as string | undefined
+      const fbErr = data.errors?.facebook as string | undefined
+      const anyMetaSuccess = !!(data.instagram || data.facebook)
+      if (!anyMetaSuccess) {
+        throw new Error(igErr || fbErr || 'Publish failed — no platforms succeeded')
+      }
       setMetaStatus(prev => ({ ...prev, [ch]: 'done' }))
-      const errs = Object.values(data.errors || {}) as string[]
-      if (errs.length > 0) showToast(`${ch}: ${errs[0]}`, 'error')
+      // Warn about partial failures (e.g. IG ok but FB failed)
+      const partialErr = (plat?.ig && igErr) ? igErr : (plat?.fb && fbErr) ? fbErr : null
+      if (partialErr) showToast(`${ch}: ${partialErr}`, 'error')
     } catch (e: unknown) {
       setMetaStatus(prev => ({ ...prev, [ch]: 'error' }))
       setMetaError(prev => ({ ...prev, [ch]: e instanceof Error ? e.message : 'Publish failed' }))
@@ -1460,10 +1468,10 @@ export default function LongFormPage() {
                                       <div>
                                         {yt === 'error' && <p className="text-[11px] text-red-500 mb-1.5">{ytError[ch]}</p>}
                                         <button
-                                          onClick={() => loginAndUploadYouTube(ch)}
+                                          onClick={() => ytAlready ? uploadToYouTube(ch) : loginAndUploadYouTube(ch)}
                                           className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[12px] font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
                                         >
-                                          {YT_ICON} {ytAlready ? 'Upload to YouTube' : 'Login to YouTube & Upload'}
+                                          {YT_ICON} {ytAlready ? 'Upload to YouTube' : 'Login & Upload'}
                                         </button>
                                       </div>
                                     )}
@@ -1915,10 +1923,10 @@ export default function LongFormPage() {
                                       <div>
                                         {yt === 'error' && <p className="text-[11px] text-red-500 mb-1.5">{ytError[ch]}</p>}
                                         <button
-                                          onClick={() => loginAndUploadYouTube(ch)}
+                                          onClick={() => ytAlready ? uploadToYouTube(ch) : loginAndUploadYouTube(ch)}
                                           className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[12px] font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
                                         >
-                                          {YT_ICON} {ytAlready ? 'Upload to YouTube' : 'Login to YouTube & Upload'}
+                                          {YT_ICON} {ytAlready ? 'Upload to YouTube' : 'Login & Upload'}
                                         </button>
                                       </div>
                                     )}

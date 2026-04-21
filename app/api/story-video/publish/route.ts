@@ -133,6 +133,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'jobId, channelName, and title are required' }, { status: 400 })
     }
 
+    console.log(`[publish] Request — channel: "${channelName}", jobId: ${jobId}, publishInstagram: ${publishInstagram}, publishFacebook: ${publishFacebook}, format: ${format}`)
+
     const results: {
       youtube?: { videoId: string; videoUrl: string }
       instagram?: { id: string }
@@ -195,6 +197,7 @@ export async function POST(req: NextRequest) {
 
     if (publishInstagram) {
       const metaCfg = await getChannelConfig(channelName)
+      console.log(`[publish] Instagram — channel: "${channelName}", igAccountId: ${metaCfg?.instagramAccountId || 'NOT FOUND'}`)
       if (!metaCfg?.instagramAccountId) {
         results.errors.instagram = `No Instagram credentials for "${channelName}"`
       } else {
@@ -219,6 +222,7 @@ export async function POST(req: NextRequest) {
 
     if (publishFacebook) {
       const metaCfg = await getChannelConfig(channelName)
+      console.log(`[publish] Facebook — channel: "${channelName}", pageId: ${metaCfg?.facebookPageId || 'NOT FOUND'}`)
       if (!metaCfg?.facebookPageId) {
         results.errors.facebook = `No Facebook credentials for "${channelName}"`
       } else {
