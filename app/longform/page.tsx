@@ -1384,6 +1384,7 @@ export default function LongFormPage() {
                         const igOk = !!metaConnected[ch]?.instagram
                         const fbOk = !!metaConnected[ch]?.facebook
                         const ytAlready = !!ytConnected[ch]
+                        const ytEnabled = ch === 'Gentlemen of Fuel'
                         const yt = ytStatus[ch] || 'idle'
                         const meta = metaStatus[ch] || 'idle'
                         return (
@@ -1392,11 +1393,15 @@ export default function LongFormPage() {
                             <div className="flex items-center gap-3 px-3 py-2.5">
                               <span className="text-[13px] font-medium text-stone-800 min-w-0 flex-1">{ch}</span>
                               <div className="flex gap-1.5 shrink-0">
-                                <button
-                                  onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], yt: !plat.yt } }))}
-                                  title={ytAlready ? 'YouTube — already connected, will upload directly' : 'YouTube — login required'}
-                                  className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.yt ? 'bg-red-50 text-red-600 border-red-300' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300'}`}
-                                >YT</button>
+                                {ytEnabled ? (
+                                  <button
+                                    onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], yt: !plat.yt } }))}
+                                    title={ytAlready ? 'YouTube — already connected, will upload directly' : 'YouTube — login required'}
+                                    className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.yt ? 'bg-red-50 text-red-600 border-red-300' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300'}`}
+                                  >YT</button>
+                                ) : (
+                                  <span title="YouTube coming soon" className="text-[10px] px-2 py-0.5 rounded-full border font-semibold bg-stone-50 text-stone-300 border-stone-100 cursor-not-allowed select-none">YT</span>
+                                )}
                                 <button
                                   onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], ig: !plat.ig } }))}
                                   title={igOk ? 'Instagram' : 'Instagram — connect via Accounts page first'}
@@ -1426,14 +1431,13 @@ export default function LongFormPage() {
                                   rows={2}
                                   className="w-full px-2.5 py-1.5 text-[12px] border border-stone-200 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-300 resize-none bg-white"
                                 />
-                                {plat.yt && (
-                                  <input
-                                    value={publishMeta[ch]?.ytTags || ''}
-                                    onChange={e => setPublishMeta(p => ({ ...p, [ch]: { ...p[ch], ytTags: e.target.value } }))}
-                                    placeholder="YouTube tags: formula1, f1, grand prix, ..."
-                                    className="w-full px-2.5 py-1.5 text-[12px] border border-red-100 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-red-200 bg-white"
-                                  />
-                                )}
+                                {/* YouTube tags always visible — useful for manual uploads even when YT publish is disabled */}
+                                <input
+                                  value={publishMeta[ch]?.ytTags || ''}
+                                  onChange={e => setPublishMeta(p => ({ ...p, [ch]: { ...p[ch], ytTags: e.target.value } }))}
+                                  placeholder="YouTube tags: formula1, f1, grand prix, ..."
+                                  className="w-full px-2.5 py-1.5 text-[12px] border border-red-100 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-red-200 bg-white"
+                                />
                                 {plat.ig && (
                                   <input
                                     value={publishMeta[ch]?.igTags || ''}
@@ -1443,7 +1447,7 @@ export default function LongFormPage() {
                                   />
                                 )}
 
-                                {/* YouTube per-channel action */}
+                                {/* YouTube per-channel action — GoF only */}
                                 {plat.yt && (
                                   <div className="pt-0.5">
                                     {yt === 'done' ? (
@@ -1839,6 +1843,7 @@ export default function LongFormPage() {
                         const igOk = !!metaConnected[ch]?.instagram
                         const fbOk = !!metaConnected[ch]?.facebook
                         const ytAlready = !!ytConnected[ch]
+                        const ytEnabled = ch === 'Gentlemen of Fuel'
                         const yt = ytStatus[ch] || 'idle'
                         const meta = metaStatus[ch] || 'idle'
                         return (
@@ -1846,11 +1851,15 @@ export default function LongFormPage() {
                             <div className="flex items-center gap-3 px-3 py-2.5">
                               <span className="text-[12px] font-medium text-stone-800 min-w-0 flex-1">{ch}</span>
                               <div className="flex gap-1.5 shrink-0">
-                                <button
-                                  onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], yt: !plat.yt } }))}
-                                  title={ytAlready ? 'YouTube — already connected, will upload directly' : 'YouTube — login required'}
-                                  className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.yt ? 'bg-red-50 text-red-600 border-red-300' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300'}`}
-                                >YT</button>
+                                {ytEnabled ? (
+                                  <button
+                                    onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], yt: !plat.yt } }))}
+                                    title={ytAlready ? 'YouTube — already connected, will upload directly' : 'YouTube — login required'}
+                                    className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.yt ? 'bg-red-50 text-red-600 border-red-300' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300'}`}
+                                  >YT</button>
+                                ) : (
+                                  <span title="YouTube coming soon" className="text-[10px] px-2 py-0.5 rounded-full border font-semibold bg-stone-50 text-stone-300 border-stone-100 cursor-not-allowed select-none">YT</span>
+                                )}
                                 <button
                                   onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], ig: !plat.ig } }))}
                                   title={igOk ? 'Instagram' : 'Instagram — connect via Accounts page first'}
@@ -1878,14 +1887,13 @@ export default function LongFormPage() {
                                   rows={2}
                                   className="w-full px-2.5 py-1.5 text-[12px] border border-stone-200 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-300 resize-none bg-white"
                                 />
-                                {plat.yt && (
-                                  <input
-                                    value={publishMeta[ch]?.ytTags || ''}
-                                    onChange={e => setPublishMeta(p => ({ ...p, [ch]: { ...p[ch], ytTags: e.target.value } }))}
-                                    placeholder="YouTube tags: formula1, f1, grand prix, ..."
-                                    className="w-full px-2.5 py-1.5 text-[12px] border border-red-100 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-red-200 bg-white"
-                                  />
-                                )}
+                                {/* YouTube tags always visible — useful for manual uploads even when YT publish is disabled */}
+                                <input
+                                  value={publishMeta[ch]?.ytTags || ''}
+                                  onChange={e => setPublishMeta(p => ({ ...p, [ch]: { ...p[ch], ytTags: e.target.value } }))}
+                                  placeholder="YouTube tags: formula1, f1, grand prix, ..."
+                                  className="w-full px-2.5 py-1.5 text-[12px] border border-red-100 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-red-200 bg-white"
+                                />
                                 {plat.ig && (
                                   <input
                                     value={publishMeta[ch]?.igTags || ''}
@@ -1894,6 +1902,7 @@ export default function LongFormPage() {
                                     className="w-full px-2.5 py-1.5 text-[12px] border border-pink-100 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-pink-200 bg-white"
                                   />
                                 )}
+                                {/* YouTube upload action — GoF only */}
                                 {plat.yt && (
                                   <div className="pt-0.5">
                                     {yt === 'done' ? (
