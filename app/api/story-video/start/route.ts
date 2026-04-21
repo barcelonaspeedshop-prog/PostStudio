@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { spawn } from 'child_process'
-import { writeFile, mkdir, rename } from 'fs/promises'
+import { writeFile, mkdir, rename, copyFile } from 'fs/promises'
 import { createWriteStream, existsSync, statSync, readdirSync } from 'fs'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import path from 'path'
-import { createJob, updateJob, cleanOldJobs } from '../jobs'
+import { createJob, updateJob, cleanOldJobs, VIDEOS_DIR } from '../jobs'
 import { getRandomDriveMusicTrack, downloadDriveFileToPath } from '@/lib/drive-images'
 import { getChannel } from '@/lib/channels'
 
@@ -449,10 +449,24 @@ async function assembleInBackground(
     }
 
     const totalDuration = Object.values(chapterDurations).reduce((a, b) => a + b, 0)
+
+    // Copy final video to /data/videos/ so it survives Docker restarts
+    let persistedVideoPath = outputVideo
+    try {
+      if (!existsSync(VIDEOS_DIR)) await mkdir(VIDEOS_DIR, { recursive: true })
+      const persistedName = `${jobId}.mp4`
+      const dest = path.join(VIDEOS_DIR, persistedName)
+      await copyFile(outputVideo, dest)
+      persistedVideoPath = dest
+      console.log(`[story-video] Video persisted to ${dest}`)
+    } catch (e) {
+      console.warn('[story-video] Failed to persist video to /data/videos (using tmp path):', e instanceof Error ? e.message : e)
+    }
+
     updateJob(jobId, {
       status: 'complete',
       progress: 'Complete',
-      videoPath: outputVideo,
+      videoPath: persistedVideoPath,
       duration: totalDuration,
       tmpDir,
       chapterOrder: chapters.map(c => c.id),

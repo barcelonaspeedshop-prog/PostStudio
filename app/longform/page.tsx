@@ -1211,6 +1211,20 @@ export default function LongFormPage() {
                     className="flex items-center justify-between w-full px-4 py-3 text-[13px] font-medium border border-stone-200 text-stone-700 rounded-xl hover:bg-stone-50 transition-colors">
                     <span>Reels</span><span className="opacity-60 text-[11px]">9:16 ↓</span>
                   </a>
+                  <button
+                    onClick={publishPanelOpen ? () => setPublishPanelOpen(false) : openPublishPanel}
+                    className="flex items-center justify-between w-full px-4 py-3 text-[13px] font-medium bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors mt-2"
+                  >
+                    <span className="flex items-center gap-2">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                      </svg>
+                      Publish to channels
+                    </span>
+                    <svg className={`w-4 h-4 opacity-80 transition-transform duration-200 ${publishPanelOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
                 </div>
 
                 {/* Thumbnail generator */}
@@ -1270,26 +1284,10 @@ export default function LongFormPage() {
                   )}
                 </div>
 
-                {/* Publish to channels */}
-                {videoUrl && (
+                {/* Publish panel — expands when "Publish to channels" button is clicked */}
+                {publishPanelOpen && (
                   <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
-                    <button
-                      onClick={publishPanelOpen ? () => setPublishPanelOpen(false) : openPublishPanel}
-                      className="w-full flex items-center justify-between px-4 py-3.5 text-[13px] font-medium text-stone-700 hover:bg-stone-50 transition-colors"
-                    >
-                      <span className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                        </svg>
-                        Publish to YouTube
-                      </span>
-                      <svg className={`w-4 h-4 text-stone-400 transition-transform duration-200 ${publishPanelOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-
-                    {publishPanelOpen && (
-                      <div className="border-t border-stone-100 p-4 space-y-4">
+                      <div className="p-4 space-y-4">
                         {/* Channel list */}
                         <div className="space-y-2">
                           {CHANNELS.map(ch => {
@@ -1406,7 +1404,6 @@ export default function LongFormPage() {
                           <p className="text-[11px] text-stone-400 text-center">Generated thumbnail will be applied to all uploads</p>
                         )}
                       </div>
-                    )}
                   </div>
                 )}
 
@@ -1726,26 +1723,27 @@ export default function LongFormPage() {
                       <a href={`${videoUrl}?format=reels`} download="story_instagram_reels.mp4" className="flex items-center justify-between w-full px-3 py-2 text-[12px] font-medium border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors">
                         <span>Reels (full video)</span><span className="opacity-75 text-[10px]">9:16 ↓</span>
                       </a>
-                    </div>
-                  )}
-                  {/* Publish panel — advanced mode */}
-                  {videoUrl && (
-                    <div className="pt-1 border-t border-emerald-200">
+                      {/* Publish button — always visible when video is ready */}
                       <button
                         onClick={publishPanelOpen ? () => setPublishPanelOpen(false) : openPublishPanel}
-                        className="w-full flex items-center justify-between px-2 py-1.5 mb-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                        className="flex items-center justify-between w-full px-3 py-2 text-[12px] font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                       >
                         <span className="flex items-center gap-1.5">
-                          <svg className="w-3 h-3 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
                           </svg>
                           Publish to channels
                         </span>
-                        <svg className={`w-3 h-3 text-emerald-500 transition-transform ${publishPanelOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className={`w-3 h-3 opacity-80 transition-transform ${publishPanelOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                       </button>
-                    {publishPanelOpen && (<div className="space-y-2">
+                    </div>
+                  )}
+                  {/* Publish panel content — advanced mode */}
+                  {publishPanelOpen && videoUrl && (
+                    <div className="rounded-lg border border-stone-200 bg-white overflow-hidden">
+                      <div className="p-2 space-y-2">
                       {CHANNELS.map(ch => {
                         const isSelected = selectedPublishChannels.includes(ch)
                         const status = publishStatus[ch]
@@ -1806,7 +1804,7 @@ export default function LongFormPage() {
                           ? <><Spinner className="w-3 h-3" /> Publishing...</>
                           : `Publish to ${selectedPublishChannels.length} channel${selectedPublishChannels.length !== 1 ? 's' : ''}`}
                       </button>
-                    </div>)}
+                      </div>
                     </div>
                   )}
 
