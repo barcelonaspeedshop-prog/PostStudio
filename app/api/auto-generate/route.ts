@@ -6,6 +6,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { saveToDrive } from '@/lib/drive-images'
 import { generateCTA, loadRecentCTAs, saveRecentCTA } from '@/lib/ctas'
 import { generateHashtags } from '@/lib/hashtags'
+import { getContentTypeForDay, generateContentSlides, type ContentType } from '@/lib/content-mix'
+import { CHANNELS } from '@/lib/channels'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -400,63 +402,83 @@ export async function POST(req: NextRequest) {
   for (const channel of channels) {
     console.log(`[auto-generate] Starting: ${channel}`)
     try {
-      // Get excluded topics for this channel
       const channelExclusions = usedTopics[channel] || []
       console.log(`[auto-generate] [${channel}] Excluding ${channelExclusions.length} previous topics`)
 
-      // Step 1: Get today's news (with topic exclusions, or use pre-selected story from curation)
-      const channelPreSelected = preSelected[channel]
-      if (channelPreSelected) {
-        console.log(`[auto-generate] [${channel}] Using pre-selected story: topic="${channelPreSelected.topic}" headline="${channelPreSelected.headline}"`)
-      } else {
-        console.log(`[auto-generate] [${channel}] No preSelected for this channel — falling back to web search`)
-      }
-      const newsBriefPayload = {
-        channel,
-        timestamp: Date.now(),
-        exclude_topics: channelExclusions,
-        ...(channelPreSelected ? { preSelected: channelPreSelected } : {}),
-      }
-      console.log(`[auto-generate] [${channel}] news-brief payload (preSelected present: ${!!channelPreSelected}):`, JSON.stringify(newsBriefPayload).substring(0, 300))
-      const newsRes = await fetch(`${baseUrl}/api/news-brief`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newsBriefPayload),
-      })
-      const newsData = await newsRes.json()
-      if (!newsRes.ok) throw new Error(newsData.error || 'News fetch failed')
+      const channelPreSelected = preSelected[channel] as (typeof preSelected[string] & { contentType?: ContentType }) | undefined
 
-      let slides: Slide[] = newsData.slides
-      let topic: string = newsData.topic || newsData.story || ''
+      // Determine content type for today; preSelected can carry an override
+      const activeContentType: ContentType = channelPreSelected?.contentType || getContentTypeForDay()
+      console.log(`[auto-generate] [${channel}] Content type: ${activeContentType}`)
 
-      // Word-overlap duplicate check: retry if 3+ significant words match a recent used topic
-      if (topic && !channelPreSelected) {
-        const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'is', 'was', 'are', 'vs', 'with', 'that', 'this', 'has', 'have', 'had'])
-        const significantWords = (s: string) => new Set(s.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stopWords.has(w)))
-        const topicWords = significantWords(topic)
-        const recentTopics = usedTopics[channel] || []
-        const isDuplicate = recentTopics.some(used => {
-          const usedWords = significantWords(used)
-          const overlap = [...topicWords].filter(w => usedWords.has(w))
-          return overlap.length >= 3
+      let slides: Slide[] = []
+      let topic = ''
+
+      if (activeContentType !== 'news') {
+        // ── Content-mix generator (Quiz / Stats / History / Tips) ─────────────
+        const channelCfg = CHANNELS[channel]
+        if (!channelCfg?.contentMix) {
+          console.warn(`[auto-generate] [${channel}] No contentMix config — falling back to news`)
+        } else {
+          console.log(`[auto-generate] [${channel}] Generating ${activeContentType} slides via content-mix`)
+          const generated = await generateContentSlides(
+            activeContentType, channel, channelCfg.contentMix, channelCfg.primary,
+          )
+          slides = generated.slides as Slide[]
+          topic = generated.topic
+          console.log(`[auto-generate] [${channel}] Content-mix topic: "${topic}"`)
+        }
+      }
+
+      if (slides.length === 0) {
+        // ── News via news-brief (default, or content-mix fallback) ────────────
+        if (channelPreSelected) {
+          console.log(`[auto-generate] [${channel}] Using pre-selected story: topic="${channelPreSelected.topic}" headline="${channelPreSelected.headline}"`)
+        } else {
+          console.log(`[auto-generate] [${channel}] No preSelected — falling back to web search`)
+        }
+        const newsBriefPayload = {
+          channel,
+          timestamp: Date.now(),
+          exclude_topics: channelExclusions,
+          ...(channelPreSelected ? { preSelected: channelPreSelected } : {}),
+        }
+        console.log(`[auto-generate] [${channel}] news-brief payload (preSelected present: ${!!channelPreSelected}):`, JSON.stringify(newsBriefPayload).substring(0, 300))
+        const newsRes = await fetch(`${baseUrl}/api/news-brief`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newsBriefPayload),
         })
+        const newsData = await newsRes.json()
+        if (!newsRes.ok) throw new Error(newsData.error || 'News fetch failed')
 
-        if (isDuplicate) {
-          console.warn(`[auto-generate] [${channel}] Topic "${topic.substring(0, 60)}" overlaps with recent used topics — retrying`)
-          const retryRes = await fetch(`${baseUrl}/api/news-brief`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              channel,
-              timestamp: Date.now(),
-              exclude_topics: [...channelExclusions, topic],
-            }),
+        slides = newsData.slides
+        topic = newsData.topic || newsData.story || ''
+
+        // Word-overlap duplicate check: retry if 3+ significant words match a recent used topic
+        if (topic && !channelPreSelected) {
+          const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'is', 'was', 'are', 'vs', 'with', 'that', 'this', 'has', 'have', 'had'])
+          const significantWords = (s: string) => new Set(s.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stopWords.has(w)))
+          const topicWords = significantWords(topic)
+          const recentTopics = usedTopics[channel] || []
+          const isDuplicate = recentTopics.some(used => {
+            const usedWords = significantWords(used)
+            const overlap = [...topicWords].filter(w => usedWords.has(w))
+            return overlap.length >= 3
           })
-          const retryData = await retryRes.json()
-          if (retryRes.ok && retryData.slides) {
-            slides = retryData.slides
-            topic = retryData.topic || retryData.story || topic
-            console.log(`[auto-generate] [${channel}] Duplicate retry returned: "${topic.substring(0, 60)}"`)
+          if (isDuplicate) {
+            console.warn(`[auto-generate] [${channel}] Topic "${topic.substring(0, 60)}" overlaps with recent used topics — retrying`)
+            const retryRes = await fetch(`${baseUrl}/api/news-brief`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ channel, timestamp: Date.now(), exclude_topics: [...channelExclusions, topic] }),
+            })
+            const retryData = await retryRes.json()
+            if (retryRes.ok && retryData.slides) {
+              slides = retryData.slides
+              topic = retryData.topic || retryData.story || topic
+              console.log(`[auto-generate] [${channel}] Duplicate retry returned: "${topic.substring(0, 60)}"`)
+            }
           }
         }
       }
@@ -687,6 +709,7 @@ export async function POST(req: NextRequest) {
           ytTags,
           cta,
           hashtags,
+          contentType: activeContentType,
         }),
       })
       const approvalData = await approvalRes.json()

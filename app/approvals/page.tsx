@@ -25,6 +25,24 @@ type Slide = {
   num: string; tag: string; headline: string; body: string; badge: string; accent: string; image?: string; imageOptions?: string[]
 }
 
+type ContentType = 'news' | 'stats' | 'quiz' | 'history' | 'tips'
+
+const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
+  news:    '📰 News',
+  stats:   '📊 Stats',
+  quiz:    '❓ Quiz',
+  history: '📅 History',
+  tips:    '💡 Tips',
+}
+
+const CONTENT_TYPE_COLORS: Record<ContentType, string> = {
+  news:    'bg-blue-50 text-blue-600 border-blue-200',
+  stats:   'bg-purple-50 text-purple-600 border-purple-200',
+  quiz:    'bg-amber-50 text-amber-600 border-amber-200',
+  history: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+  tips:    'bg-rose-50 text-rose-600 border-rose-200',
+}
+
 type ApprovalItem = {
   id: string
   channel: string
@@ -37,6 +55,7 @@ type ApprovalItem = {
   includeCta?: boolean
   hashtags?: string[]
   musicEnabled?: boolean
+  contentType?: ContentType
   createdAt: string
   status: 'pending' | 'approved' | 'rejected'
   reviewedAt?: string
@@ -185,21 +204,38 @@ export default function ApprovalsPage() {
     }
   }
 
-  const regenerateItem = async (item: ApprovalItem) => {
+  const regenerateItem = async (item: ApprovalItem, overrideContentType?: ContentType) => {
+    const effectiveContentType = overrideContentType || item.contentType || 'news'
     setRegeneratingId(item.id)
     try {
-      // Step 1: Fetch fresh news for this channel
-      setRegenStep('Fetching news...')
-      const newsRes = await fetch('/api/news-brief', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel: item.channel, timestamp: Date.now(), exclude_topics: [item.topic || item.headline].filter(Boolean) }),
-      })
-      const newsData = await newsRes.json()
-      if (!newsRes.ok) throw new Error(newsData.error || 'News fetch failed')
+      // Step 1: Fetch slides — news-brief for news, content-mix-slides for other types
+      setRegenStep('Generating slides...')
+      let newSlides: Slide[]
+      let newTopic: string
 
-      const newSlides: Slide[] = newsData.slides
-      const newTopic: string = newsData.topic || newsData.story || ''
+      if (effectiveContentType !== 'news') {
+        const cmRes = await fetch('/api/content-mix-slides', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channel: item.channel, contentType: effectiveContentType }),
+        })
+        const cmData = await cmRes.json()
+        if (!cmRes.ok) throw new Error(cmData.error || 'Content mix generation failed')
+        newSlides = cmData.slides
+        newTopic = cmData.topic || ''
+      } else {
+        setRegenStep('Fetching news...')
+        const newsRes = await fetch('/api/news-brief', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channel: item.channel, timestamp: Date.now(), exclude_topics: [item.topic || item.headline].filter(Boolean) }),
+        })
+        const newsData = await newsRes.json()
+        if (!newsRes.ok) throw new Error(newsData.error || 'News fetch failed')
+        newSlides = newsData.slides
+        newTopic = newsData.topic || newsData.story || ''
+      }
+
       const newHeadline = newSlides[0]?.headline || newTopic
 
       // Step 2: Fetch images for each slide
@@ -291,6 +327,7 @@ export default function ApprovalsPage() {
           ytTitle,
           ytDescription,
           ytTags,
+          contentType: effectiveContentType,
         }),
       })
       if (!updateRes.ok) throw new Error('Failed to save regenerated content')
@@ -302,6 +339,7 @@ export default function ApprovalsPage() {
         headline: newHeadline,
         topic: newTopic,
         videoBase64: vidData.video,
+        contentType: effectiveContentType,
       } : i))
       showToast(`Regenerated: "${newHeadline}"`)
     } catch (e: unknown) {
@@ -898,7 +936,13 @@ export default function ApprovalsPage() {
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] font-medium text-stone-900 truncate">{item.headline}</p>
-                          <p className="text-[11px] text-stone-500 mt-0.5">{item.channel}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-[11px] text-stone-500">{item.channel}</p>
+                            {/* Content type badge */}
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${CONTENT_TYPE_COLORS[item.contentType || 'news']}`}>
+                              {CONTENT_TYPE_LABELS[item.contentType || 'news']}
+                            </span>
+                          </div>
                           <div className="flex gap-1 mt-1.5 flex-wrap">
                             {item.platforms.filter(p => p === 'instagram' || p === 'facebook').map(p => (
                               <span key={p} className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded capitalize">{p}</span>
@@ -1167,21 +1211,42 @@ export default function ApprovalsPage() {
                           >
                             Thumbnail
                           </button>
-                          <button
-                            onClick={() => regenerateItem(item)}
-                            disabled={isRegenerating || isActing}
-                            className="px-4 py-2.5 min-h-[44px] bg-amber-500 text-white text-[13px] font-medium rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50 flex items-center gap-1.5"
-                          >
-                            {isRegenerating ? (
-                              <>
-                                <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
-                                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-                                </svg>
-                                {regenStep || 'Regenerating...'}
-                              </>
-                            ) : '↺ Regenerate'}
-                          </button>
+                          <div className="flex items-stretch gap-0">
+                            <select
+                              value={item.contentType || 'news'}
+                              onChange={async (e) => {
+                                const ct = e.target.value as ContentType
+                                setItems(prev => prev.map(i => i.id === item.id ? { ...i, contentType: ct } : i))
+                                await fetch('/api/approvals', {
+                                  method: 'PUT',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ id: item.id, contentType: ct }),
+                                })
+                              }}
+                              disabled={isRegenerating || isActing}
+                              className="text-[11px] border border-r-0 border-stone-200 rounded-l-lg px-2 py-1 bg-stone-50 text-stone-600 focus:outline-none disabled:opacity-50 cursor-pointer"
+                              title="Content type for regeneration"
+                            >
+                              {(Object.keys(CONTENT_TYPE_LABELS) as ContentType[]).map(ct => (
+                                <option key={ct} value={ct}>{CONTENT_TYPE_LABELS[ct]}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => regenerateItem(item)}
+                              disabled={isRegenerating || isActing}
+                              className="px-4 py-2.5 min-h-[44px] bg-amber-500 text-white text-[13px] font-medium rounded-r-lg hover:bg-amber-600 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                              {isRegenerating ? (
+                                <>
+                                  <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                    <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                                  </svg>
+                                  {regenStep || 'Regenerating...'}
+                                </>
+                              ) : '↺ Regen'}
+                            </button>
+                          </div>
                           <button
                             onClick={() => handleAction(item.id, 'approve')}
                             disabled={isActing}
