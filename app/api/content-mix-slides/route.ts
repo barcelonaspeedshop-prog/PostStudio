@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateContentSlides, type ContentType } from '@/lib/content-mix'
+import { generateContentSlides, extractPollFromSlides, type ContentType } from '@/lib/content-mix'
 import { CHANNELS } from '@/lib/channels'
 
 export const dynamic = 'force-dynamic'
@@ -20,7 +20,9 @@ export async function POST(req: NextRequest) {
       contentType, channel, channelCfg.contentMix, channelCfg.primary,
     )
 
-    return NextResponse.json({ slides, topic })
+    const { pollQuestion, pollOptions } = extractPollFromSlides(slides)
+
+    return NextResponse.json({ slides, topic, pollQuestion, pollOptions })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[content-mix-slides] Error:', message)

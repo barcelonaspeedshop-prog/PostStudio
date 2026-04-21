@@ -56,6 +56,8 @@ type ApprovalItem = {
   hashtags?: string[]
   musicEnabled?: boolean
   contentType?: ContentType
+  pollQuestion?: string
+  pollOptions?: string[]
   createdAt: string
   status: 'pending' | 'approved' | 'rejected'
   reviewedAt?: string
@@ -83,6 +85,10 @@ export default function ApprovalsPage() {
   const [regeneratingHashtagsId, setRegeneratingHashtagsId] = useState<string | null>(null)
   const [editingHashtagsId, setEditingHashtagsId] = useState<string | null>(null)
   const [hashtagDraft, setHashtagDraft] = useState('')
+  const [editingPollId, setEditingPollId] = useState<string | null>(null)
+  const [pollQuestionDraft, setPollQuestionDraft] = useState('')
+  const [pollOptionsDraft, setPollOptionsDraft] = useState<string[]>([])
+  const [regeneratingPollId, setRegeneratingPollId] = useState<string | null>(null)
   const [imagePicker, setImagePicker] = useState<{
     itemId: string
     slideIndex: number
@@ -213,6 +219,9 @@ export default function ApprovalsPage() {
       let newSlides: Slide[]
       let newTopic: string
 
+      let regenPollQuestion: string | undefined
+      let regenPollOptions: string[] | undefined
+
       if (effectiveContentType !== 'news') {
         const cmRes = await fetch('/api/content-mix-slides', {
           method: 'POST',
@@ -223,6 +232,8 @@ export default function ApprovalsPage() {
         if (!cmRes.ok) throw new Error(cmData.error || 'Content mix generation failed')
         newSlides = cmData.slides
         newTopic = cmData.topic || ''
+        regenPollQuestion = cmData.pollQuestion
+        regenPollOptions = cmData.pollOptions
       } else {
         setRegenStep('Fetching news...')
         const newsRes = await fetch('/api/news-brief', {
@@ -234,6 +245,8 @@ export default function ApprovalsPage() {
         if (!newsRes.ok) throw new Error(newsData.error || 'News fetch failed')
         newSlides = newsData.slides
         newTopic = newsData.topic || newsData.story || ''
+        regenPollQuestion = newsData.pollQuestion
+        regenPollOptions = newsData.pollOptions
       }
 
       const newHeadline = newSlides[0]?.headline || newTopic
@@ -328,6 +341,8 @@ export default function ApprovalsPage() {
           ytDescription,
           ytTags,
           contentType: effectiveContentType,
+          pollQuestion: regenPollQuestion,
+          pollOptions: regenPollOptions,
         }),
       })
       if (!updateRes.ok) throw new Error('Failed to save regenerated content')
@@ -340,6 +355,8 @@ export default function ApprovalsPage() {
         topic: newTopic,
         videoBase64: vidData.video,
         contentType: effectiveContentType,
+        pollQuestion: regenPollQuestion,
+        pollOptions: regenPollOptions,
       } : i))
       showToast(`Regenerated: "${newHeadline}"`)
     } catch (e: unknown) {
@@ -790,6 +807,45 @@ export default function ApprovalsPage() {
     } catch {}
   }
 
+  const savePollEdit = async (item: ApprovalItem) => {
+    const updated = { pollQuestion: pollQuestionDraft, pollOptions: pollOptionsDraft.filter(o => o.trim()) }
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, ...updated } : i))
+    setEditingPollId(null)
+    try {
+      await fetch('/api/approvals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, ...updated }),
+      })
+    } catch {}
+  }
+
+  const regeneratePoll = async (item: ApprovalItem) => {
+    setRegeneratingPollId(item.id)
+    try {
+      const res = await fetch('/api/news-brief', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: item.channel, preSelected: { topic: item.topic, headline: item.headline } }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      if (data.pollQuestion && data.pollOptions) {
+        const updated = { pollQuestion: data.pollQuestion, pollOptions: data.pollOptions }
+        setItems(prev => prev.map(i => i.id === item.id ? { ...i, ...updated } : i))
+        await fetch('/api/approvals', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: item.id, ...updated }),
+        })
+      }
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Poll regeneration failed', 'error')
+    } finally {
+      setRegeneratingPollId(null)
+    }
+  }
+
   const toggleIncludeCta = async (item: ApprovalItem) => {
     const next = item.includeCta === false ? true : false
     setItems(prev => prev.map(i => i.id === item.id ? { ...i, includeCta: next } : i))
@@ -1145,6 +1201,78 @@ export default function ApprovalsPage() {
                           </div>
                         ) : (
                           <p className="text-[12px] text-stone-400 italic">No hashtags — click Regen to generate</p>
+                        )}
+                      </div>
+
+                      {/* Poll section */}
+                      <div className="px-4 py-3 border-t border-stone-50 bg-amber-50/30">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-semibold text-amber-700 uppercase tracking-widest">Poll CTA</span>
+                          <div className="flex items-center gap-2">
+                            {item.pollQuestion && editingPollId !== item.id && (
+                              <button
+                                onClick={() => { setEditingPollId(item.id); setPollQuestionDraft(item.pollQuestion || ''); setPollOptionsDraft(item.pollOptions || ['', '', '']) }}
+                                className="text-[10px] text-stone-400 hover:text-stone-700 transition-colors"
+                              >Edit</button>
+                            )}
+                            <button
+                              onClick={() => regeneratePoll(item)}
+                              disabled={regeneratingPollId === item.id}
+                              className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-40"
+                            >
+                              {regeneratingPollId === item.id ? (
+                                <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                                </svg>
+                              ) : '↺'} Regen
+                            </button>
+                          </div>
+                        </div>
+
+                        {editingPollId === item.id ? (
+                          <div className="flex flex-col gap-2">
+                            <input
+                              value={pollQuestionDraft}
+                              onChange={e => setPollQuestionDraft(e.target.value)}
+                              placeholder="Poll question..."
+                              className="w-full px-2.5 py-1.5 text-[12px] border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white"
+                            />
+                            {pollOptionsDraft.map((opt, i) => (
+                              <input
+                                key={i}
+                                value={opt}
+                                onChange={e => { const next = [...pollOptionsDraft]; next[i] = e.target.value; setPollOptionsDraft(next) }}
+                                placeholder={`Option ${String.fromCharCode(65 + i)}...`}
+                                className="w-full px-2.5 py-1.5 text-[12px] border border-amber-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-200 bg-white"
+                              />
+                            ))}
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => savePollEdit(item)}
+                                className="flex-1 py-1.5 text-[12px] font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+                              >Save</button>
+                              <button
+                                onClick={() => setEditingPollId(null)}
+                                className="px-3 py-1.5 text-[12px] text-stone-500 border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
+                              >Cancel</button>
+                            </div>
+                          </div>
+                        ) : item.pollQuestion ? (
+                          <div className="space-y-1.5">
+                            <p className="text-[12px] font-medium text-stone-800">{item.pollQuestion}</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {(item.pollOptions || []).map((opt, i) => (
+                                <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-800 text-[11px] font-medium rounded-full">
+                                  <span className="w-3.5 h-3.5 flex items-center justify-center bg-amber-500 text-white rounded-full text-[8px] font-bold">{String.fromCharCode(65 + i)}</span>
+                                  {opt}
+                                </span>
+                              ))}
+                            </div>
+                            <p className="text-[10px] text-stone-400 italic">Shown as final slide for Stats & Quiz content types</p>
+                          </div>
+                        ) : (
+                          <p className="text-[12px] text-stone-400 italic">No poll — click Regen to generate one</p>
                         )}
                       </div>
 

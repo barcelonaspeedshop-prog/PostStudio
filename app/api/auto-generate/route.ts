@@ -6,7 +6,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { saveToDrive } from '@/lib/drive-images'
 import { generateCTA, loadRecentCTAs, saveRecentCTA } from '@/lib/ctas'
 import { generateHashtags } from '@/lib/hashtags'
-import { getContentTypeForDay, generateContentSlides, type ContentType } from '@/lib/content-mix'
+import { getContentTypeForDay, generateContentSlides, extractPollFromSlides, type ContentType } from '@/lib/content-mix'
 import { CHANNELS } from '@/lib/channels'
 
 export const dynamic = 'force-dynamic'
@@ -314,6 +314,7 @@ function extractChartData(slide: { body: string; headline: string }): ChartData 
 
 function enforceTilePattern(slides: Slide[]): void {
   slides.forEach((slide, i) => {
+    if (slide.tileType === 'poll') return  // preserve explicit poll tiles
     if (i === 0) {
       slide.tileType = 'hook'
     } else if (i === 1) {
@@ -413,6 +414,8 @@ export async function POST(req: NextRequest) {
 
       let slides: Slide[] = []
       let topic = ''
+      let pollQuestion: string | undefined
+      let pollOptions: string[] | undefined
 
       if (activeContentType !== 'news') {
         // ── Content-mix generator (Quiz / Stats / History / Tips) ─────────────
@@ -427,6 +430,10 @@ export async function POST(req: NextRequest) {
           slides = generated.slides as Slide[]
           topic = generated.topic
           console.log(`[auto-generate] [${channel}] Content-mix topic: "${topic}"`)
+          // Extract poll data from poll slide (Stats & Quiz generators append one)
+          const pollData = extractPollFromSlides(slides)
+          pollQuestion = pollData.pollQuestion
+          pollOptions = pollData.pollOptions
         }
       }
 
@@ -454,6 +461,8 @@ export async function POST(req: NextRequest) {
 
         slides = newsData.slides
         topic = newsData.topic || newsData.story || ''
+        pollQuestion = newsData.pollQuestion
+        pollOptions = newsData.pollOptions
 
         // Word-overlap duplicate check: retry if 3+ significant words match a recent used topic
         if (topic && !channelPreSelected) {
@@ -507,7 +516,7 @@ export async function POST(req: NextRequest) {
       console.log(`[auto-generate] [${channel}] Fetching images for ${slides.length} slides...`)
       await Promise.all(slides.map(async (slide, slideIdx) => {
         // Solid-bg tiles never need images
-        if (slide.tileType === 'brand' || slide.tileType === 'story-text') {
+        if (slide.tileType === 'brand' || slide.tileType === 'story-text' || slide.tileType === 'poll') {
           console.log(`[auto-generate] [${channel}] Skipping image for ${slide.tileType} tile (index ${slideIdx})`)
           return
         }
@@ -710,6 +719,8 @@ export async function POST(req: NextRequest) {
           cta,
           hashtags,
           contentType: activeContentType,
+          pollQuestion,
+          pollOptions,
         }),
       })
       const approvalData = await approvalRes.json()

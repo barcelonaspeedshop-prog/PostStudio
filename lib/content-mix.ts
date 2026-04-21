@@ -49,6 +49,7 @@ export type Slide = {
   badge: string
   accent: string
   tileType?: string
+  pollOptions?: string[]
 }
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -132,7 +133,21 @@ Rules:
   const match = text.replace(/```json|```/g, '').trim().match(/\{[\s\S]*\}/)
   if (!match) throw new Error('No JSON from quiz generator')
   const data = JSON.parse(match[0]) as { topic: string; slides: Slide[] }
-  return { slides: data.slides, topic: data.topic }
+
+  // Append poll slide
+  const poll = await generatePollQuestion(data.topic, channel)
+  const pollSlide: Slide = {
+    num: String(data.slides.length + 1),
+    tag: 'POLL',
+    headline: poll.question,
+    body: poll.options.join(' | '),
+    badge: 'VOTE',
+    accent: primary,
+    tileType: 'poll',
+    pollOptions: poll.options,
+  }
+
+  return { slides: [...data.slides, pollSlide], topic: data.topic }
 }
 
 // ── Stats generator ───────────────────────────────────────────────────────────
@@ -207,7 +222,21 @@ Return ONLY valid JSON, no markdown`
   const match = text.replace(/```json|```/g, '').trim().match(/\{[\s\S]*\}/)
   if (!match) throw new Error('No JSON from stats generator')
   const data = JSON.parse(match[0]) as { topic: string; slides: Slide[] }
-  return { slides: data.slides, topic: data.topic }
+
+  // Append poll slide
+  const poll = await generatePollQuestion(data.topic, channel)
+  const pollSlide: Slide = {
+    num: String(data.slides.length + 1),
+    tag: 'POLL',
+    headline: poll.question,
+    body: poll.options.join(' | '),
+    badge: 'VOTE',
+    accent: primary,
+    tileType: 'poll',
+    pollOptions: poll.options,
+  }
+
+  return { slides: [...data.slides, pollSlide], topic: data.topic }
 }
 
 // ── History generator ─────────────────────────────────────────────────────────
@@ -365,6 +394,55 @@ Rules:
   if (!match) throw new Error('No JSON from tips generator')
   const data = JSON.parse(match[0]) as { topic: string; slides: Slide[] }
   return { slides: data.slides, topic: data.topic }
+}
+
+// ── Poll question generator ───────────────────────────────────────────────────
+
+async function generatePollQuestion(
+  topic: string,
+  channel: string,
+): Promise<{ question: string; options: string[] }> {
+  const prompt = `You are a social media engagement expert for "${channel}".
+Based on this topic: "${topic}"
+
+Generate a short, controversial poll question with exactly 3 answer options.
+The question should spark debate and drive comments.
+
+Return ONLY valid JSON:
+{"question": "Which is better?", "options": ["Option A", "Option B", "Option C"]}
+
+Rules:
+- Question max 12 words
+- Each option max 5 words
+- Make options clearly distinct
+- No "None of the above" options`
+
+  try {
+    const msg = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 200,
+      messages: [{ role: 'user', content: prompt }],
+    })
+    const text = msg.content.filter(b => b.type === 'text').map(b => (b as { type: 'text'; text: string }).text).join('')
+    const match = text.replace(/```json|```/g, '').trim().match(/\{[\s\S]*\}/)
+    if (!match) throw new Error('No JSON')
+    const data = JSON.parse(match[0]) as { question: string; options: string[] }
+    if (!data.question || !Array.isArray(data.options) || data.options.length < 2) throw new Error('Bad poll data')
+    return { question: data.question, options: data.options.slice(0, 3) }
+  } catch {
+    return { question: `What's your take on ${topic.split(' ').slice(0, 4).join(' ')}?`, options: ['Agree', 'Disagree', 'Not sure'] }
+  }
+}
+
+// ── Poll extractor (used by callers to get poll data from slides) ─────────────
+
+export function extractPollFromSlides(slides: Slide[]): { pollQuestion?: string; pollOptions?: string[] } {
+  const pollSlide = slides.find(s => s.tileType === 'poll')
+  if (!pollSlide) return {}
+  return {
+    pollQuestion: pollSlide.headline,
+    pollOptions: pollSlide.pollOptions || pollSlide.body.split(' | ').filter(Boolean),
+  }
 }
 
 // ── Unified dispatcher ────────────────────────────────────────────────────────

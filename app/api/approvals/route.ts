@@ -27,6 +27,8 @@ export type ApprovalItem = {
   includeCta?: boolean
   hashtags?: string[]
   contentType?: ContentType
+  pollQuestion?: string
+  pollOptions?: string[]
   createdAt: string
   status: 'pending' | 'approved' | 'rejected'
   reviewedAt?: string
@@ -62,7 +64,7 @@ export async function GET() {
 // POST — add new item to queue
 export async function POST(req: NextRequest) {
   try {
-    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, cta, hashtags, contentType } = await req.json()
+    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, cta, hashtags, contentType, pollQuestion, pollOptions } = await req.json()
 
     if (!channel || !slides || !Array.isArray(slides)) {
       return NextResponse.json({ error: 'channel and slides are required' }, { status: 400 })
@@ -82,6 +84,8 @@ export async function POST(req: NextRequest) {
       cta: cta || undefined,
       hashtags: Array.isArray(hashtags) ? hashtags : undefined,
       contentType: contentType || 'news',
+      pollQuestion: pollQuestion || undefined,
+      pollOptions: Array.isArray(pollOptions) ? pollOptions : undefined,
       createdAt: new Date().toISOString(),
       status: 'pending',
     }
@@ -101,7 +105,7 @@ export async function POST(req: NextRequest) {
 // PUT — update an item (e.g. attach video after generation, or regenerate with fresh content)
 export async function PUT(req: NextRequest) {
   try {
-    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, cta, includeCta, hashtags, musicEnabled, contentType } = await req.json()
+    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, cta, includeCta, hashtags, musicEnabled, contentType, pollQuestion, pollOptions } = await req.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
     const items = await loadApprovals()
@@ -122,6 +126,8 @@ export async function PUT(req: NextRequest) {
     if (hashtags !== undefined) item.hashtags = Array.isArray(hashtags) ? hashtags : item.hashtags
     if (musicEnabled !== undefined) (item as Record<string, unknown>).musicEnabled = musicEnabled
     if (contentType) item.contentType = contentType as ContentType
+    if (pollQuestion !== undefined) item.pollQuestion = pollQuestion || undefined
+    if (pollOptions !== undefined) item.pollOptions = Array.isArray(pollOptions) ? pollOptions : undefined
     await saveApprovals(items)
 
     return NextResponse.json({ id: item.id, hasVideo: !!item.videoBase64 })

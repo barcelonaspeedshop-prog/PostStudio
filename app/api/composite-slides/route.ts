@@ -23,9 +23,10 @@ type SlideInput = {
   badge: string
   accent: string
   image?: string
-  tileType?: 'hook' | 'brand' | 'story' | 'story-text' | 'cta'
+  tileType?: 'hook' | 'brand' | 'story' | 'story-text' | 'cta' | 'poll'
   channel?: string
   chartData?: ChartData
+  pollOptions?: string[]
 }
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -469,11 +470,101 @@ function buildCtaSvg(
   return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`
 }
 
+// ── Tile 6: POLL ─────────────────────────────────────────────────────────────
+// Solid channel bg. Accent bar at top. Channel name centred.
+// Large question text centred. 2-3 option boxes with letter badges in accent colour.
+// "Comment your pick below ↓" footer. Handle at very bottom.
+function buildPollSvg(
+  slide: SlideInput,
+  primary: string,
+  bg: string,
+  channelName: string,
+  handle: string,
+): string {
+  const [pr, pg, pb] = hexToRgb(primary)
+  const [bgr, bgg, bgb] = hexToRgb(bg)
+  const cx = W / 2
+  const pad = 72
+
+  const options = (slide.pollOptions && slide.pollOptions.length >= 2)
+    ? slide.pollOptions.slice(0, 3)
+    : slide.body.split(' | ').filter(Boolean).slice(0, 3)
+
+  const qFontSize = dynamicFontSize(slide.headline, 936, 64)
+  const qLines = wrapText(slide.headline, Math.floor(936 / (qFontSize * 0.55)))
+  const qLineH = Math.round(qFontSize * 1.12)
+  const totalQH = qLines.length * qLineH
+
+  const optionH = 92
+  const optionGap = 18
+  const optionW = W - pad * 2
+  const letters = ['A', 'B', 'C']
+
+  let svg = ''
+
+  // Background
+  svg += `<rect width="${W}" height="${H}" fill="rgb(${bgr},${bgg},${bgb})" fill-opacity="1"/>`
+
+  // Accent bar at top
+  svg += `<rect x="0" y="0" width="${W}" height="12" fill="rgb(${pr},${pg},${pb})" fill-opacity="1"/>`
+
+  // Channel name
+  svg += `<text x="${cx}" y="96" font-family="${FONT_STACK}" font-size="24" font-weight="700" fill="rgb(${pr},${pg},${pb})" fill-opacity="1" text-anchor="middle" letter-spacing="4">${escapeXml(channelName.toUpperCase())}</text>`
+
+  // POLL label
+  svg += `<text x="${cx}" y="158" font-family="${FONT_STACK}" font-size="20" font-weight="600" fill="white" fill-opacity="0.45" text-anchor="middle" letter-spacing="4">POLL</text>`
+
+  // Divider
+  svg += `<rect x="${cx - 60}" y="174" width="120" height="1.5" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.5"/>`
+
+  // Question
+  const qStartY = 250
+  qLines.forEach((line, i) => {
+    svg += `<text x="${cx}" y="${qStartY + i * qLineH}" font-family="${FONT_STACK}" font-size="${qFontSize}" font-weight="600" fill="white" fill-opacity="1" text-anchor="middle">${escapeXml(line)}</text>`
+  })
+
+  // Options
+  const optStartY = qStartY + totalQH + 56
+  options.forEach((opt, i) => {
+    const y = optStartY + i * (optionH + optionGap)
+
+    // Box
+    svg += `<rect x="${pad}" y="${y}" width="${optionW}" height="${optionH}" rx="18" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.14" stroke="rgb(${pr},${pg},${pb})" stroke-opacity="0.45" stroke-width="1.5"/>`
+
+    // Letter badge
+    const badgeSide = 52
+    const badgeX = pad + 18
+    const badgeY = y + (optionH - badgeSide) / 2
+    svg += `<rect x="${badgeX}" y="${badgeY}" width="${badgeSide}" height="${badgeSide}" rx="12" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.85"/>`
+    svg += `<text x="${badgeX + badgeSide / 2}" y="${badgeY + badgeSide / 2 + 9}" font-family="${FONT_STACK}" font-size="24" font-weight="700" fill="white" fill-opacity="1" text-anchor="middle">${escapeXml(letters[i])}</text>`
+
+    // Option text
+    const textX = badgeX + badgeSide + 18
+    const textMaxW = optionW - 18 - badgeSide - 18 - 18
+    const optLines2 = wrapText(opt, Math.floor(textMaxW / (26 * 0.55)))
+    const lineH2 = 34
+    const textBlockH = optLines2.length * lineH2
+    const textStartY = y + (optionH - textBlockH) / 2 + 22
+    optLines2.forEach((ln, li) => {
+      svg += `<text x="${textX}" y="${textStartY + li * lineH2}" font-family="${FONT_STACK}" font-size="26" fill="white" fill-opacity="0.88">${escapeXml(ln)}</text>`
+    })
+  })
+
+  // "Comment your pick below ↓"
+  const footerY = optStartY + options.length * (optionH + optionGap) + 50
+  svg += `<text x="${cx}" y="${footerY}" font-family="${FONT_STACK}" font-size="28" fill="white" fill-opacity="0.65" text-anchor="middle">Comment your pick below &#x2193;</text>`
+
+  // Handle
+  svg += `<text x="${cx}" y="${H - 60}" font-family="${FONT_STACK}" font-size="24" fill="white" fill-opacity="0.25" text-anchor="middle" letter-spacing="1">${escapeXml(handle)}</text>`
+
+  return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`
+}
+
 function determineTileType(
   slide: SlideInput,
   index: number,
   total: number,
-): 'hook' | 'brand' | 'story' | 'story-text' | 'cta' {
+): 'hook' | 'brand' | 'story' | 'story-text' | 'cta' | 'poll' {
   if (slide.tileType) return slide.tileType
   if (index === 0) return 'hook'
   if (index === 1) return 'brand'
@@ -498,7 +589,7 @@ export async function POST(req: NextRequest) {
       let base: sharp.Sharp
 
       // Solid-bg tiles: never use image
-      if (tileType === 'brand' || tileType === 'story-text') {
+      if (tileType === 'brand' || tileType === 'story-text' || tileType === 'poll') {
         base = sharp({
           create: { width: W, height: H, channels: 3, background: { r: bgr, g: bgg, b: bgb } },
         })
@@ -524,6 +615,7 @@ export async function POST(req: NextRequest) {
           case 'story': return buildStorySvg(slide, ch.primary)
           case 'story-text': return buildStoryTextSvg(slide, ch.primary, ch.bg)
           case 'cta': return buildCtaSvg(slide, ch.primary, ch.name, ch.handle, ch.tagline)
+          case 'poll': return buildPollSvg(slide, ch.primary, ch.bg, ch.name, ch.handle)
         }
       })()
 
