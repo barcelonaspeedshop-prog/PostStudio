@@ -127,6 +127,9 @@ export default function LongFormPage() {
   const [metaError, setMetaError] = useState<Record<string, string>>({})
   const [ytPublishedUrl, setYtPublishedUrl] = useState<Record<string, string>>({})
   const [confirmPublishOpen, setConfirmPublishOpen] = useState(false)
+  const [ytPoll, setYtPoll] = useState<{ question: string; options: string[] } | null>(null)
+  const [ytGenerating, setYtGenerating] = useState(false)
+  const [copiedPoll, setCopiedPoll] = useState(false)
 
   // ─── Restore draft ───
   useEffect(() => {
@@ -867,15 +870,15 @@ export default function LongFormPage() {
       return platforms
     })
 
-    const { ytTags, igTags } = deriveTagsFromScript(script)
+    const { ytTags: fallbackYtTags, igTags: fallbackIgTags } = deriveTagsFromScript(script)
     setPublishMeta(prev => {
       const meta: Record<string, { title: string; description: string; ytTags: string; igTags: string }> = {}
       for (const ch of CHANNELS) {
         meta[ch] = prev[ch] || {
           title: script?.title ?? '',
           description: script?.summary || script?.chapters?.map(c => c.narration).join(' ').slice(0, 400) || '',
-          ytTags,
-          igTags,
+          ytTags: fallbackYtTags,
+          igTags: fallbackIgTags,
         }
       }
       return meta
@@ -886,6 +889,32 @@ export default function LongFormPage() {
     setMetaError({})
     setYtPublishedUrl({})
     setPublishPanelOpen(true)
+
+    // Generate Claude-powered tags and poll in background
+    if (script) {
+      setYtGenerating(true)
+      setYtPoll(null)
+      fetch('/api/story-video/yt-metadata', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: script.title, summary: script.summary, chapters: script.chapters, channel }),
+      })
+        .then(r => r.ok ? r.json() : Promise.reject(new Error('yt-metadata failed')))
+        .then((data: { ytTags?: string; igTags?: string; poll?: { question: string; options: string[] } }) => {
+          if (data.ytTags) {
+            setPublishMeta(prev => {
+              const meta: Record<string, { title: string; description: string; ytTags: string; igTags: string }> = {}
+              for (const ch of CHANNELS) {
+                meta[ch] = { ...prev[ch], ytTags: data.ytTags!, igTags: data.igTags || prev[ch]?.igTags || '' }
+              }
+              return meta
+            })
+          }
+          if (data.poll) setYtPoll(data.poll)
+        })
+        .catch(() => { /* fallback tags already set */ })
+        .finally(() => setYtGenerating(false))
+    }
   }
 
   // Open YouTube OAuth popup for one channel; auto-upload after successful login
@@ -1454,6 +1483,42 @@ export default function LongFormPage() {
                                   />
                                 )}
 
+                                {/* YouTube Poll Card suggestion */}
+                                {plat.yt && (
+                                  <div className="bg-red-50 border border-red-100 rounded-lg p-2.5 space-y-1.5">
+                                    <div className="flex items-center justify-between">
+                                      <p className="text-[10px] font-semibold text-red-700 uppercase tracking-wide">YouTube Poll Card</p>
+                                      {ytGenerating && <span className="flex items-center gap-1 text-[10px] text-stone-400"><Spinner className="w-2.5 h-2.5" /> Generating...</span>}
+                                    </div>
+                                    {ytPoll ? (
+                                      <>
+                                        <p className="text-[12px] font-medium text-stone-800">{ytPoll.question}</p>
+                                        <div className="space-y-0.5">
+                                          {ytPoll.options.map((opt, i) => (
+                                            <p key={i} className="text-[11px] text-stone-600 pl-2">• {opt}</p>
+                                          ))}
+                                        </div>
+                                        <div className="flex items-center justify-between pt-0.5">
+                                          <p className="text-[10px] text-stone-400 italic">Add as YouTube Card at 80% duration in YouTube Studio</p>
+                                          <button
+                                            onClick={() => {
+                                              const text = `Poll: ${ytPoll.question}\n${ytPoll.options.map((o, i) => `${i + 1}. ${o}`).join('\n')}`
+                                              navigator.clipboard.writeText(text)
+                                              setCopiedPoll(true)
+                                              setTimeout(() => setCopiedPoll(false), 2000)
+                                            }}
+                                            className="text-[10px] text-red-600 hover:text-red-700 font-medium shrink-0 ml-2"
+                                          >{copiedPoll ? '✓ Copied' : 'Copy'}</button>
+                                        </div>
+                                      </>
+                                    ) : ytGenerating ? (
+                                      <p className="text-[11px] text-stone-400 italic">Generating poll suggestion...</p>
+                                    ) : (
+                                      <p className="text-[11px] text-stone-400 italic">No poll suggestion yet</p>
+                                    )}
+                                  </div>
+                                )}
+
                                 {/* YouTube per-channel action — GoF only */}
                                 {plat.yt && (
                                   <div className="pt-0.5">
@@ -1906,6 +1971,41 @@ export default function LongFormPage() {
                                     placeholder="Instagram hashtags: #f1 #formula1 #motorsport"
                                     className="w-full px-2.5 py-1.5 text-[12px] border border-pink-100 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-pink-200 bg-white"
                                   />
+                                )}
+                                {/* YouTube Poll Card suggestion */}
+                                {plat.yt && (
+                                  <div className="bg-red-50 border border-red-100 rounded-lg p-2.5 space-y-1.5">
+                                    <div className="flex items-center justify-between">
+                                      <p className="text-[10px] font-semibold text-red-700 uppercase tracking-wide">YouTube Poll Card</p>
+                                      {ytGenerating && <span className="flex items-center gap-1 text-[10px] text-stone-400"><Spinner className="w-2.5 h-2.5" /> Generating...</span>}
+                                    </div>
+                                    {ytPoll ? (
+                                      <>
+                                        <p className="text-[12px] font-medium text-stone-800">{ytPoll.question}</p>
+                                        <div className="space-y-0.5">
+                                          {ytPoll.options.map((opt, i) => (
+                                            <p key={i} className="text-[11px] text-stone-600 pl-2">• {opt}</p>
+                                          ))}
+                                        </div>
+                                        <div className="flex items-center justify-between pt-0.5">
+                                          <p className="text-[10px] text-stone-400 italic">Add as YouTube Card at 80% duration in YouTube Studio</p>
+                                          <button
+                                            onClick={() => {
+                                              const text = `Poll: ${ytPoll.question}\n${ytPoll.options.map((o, i) => `${i + 1}. ${o}`).join('\n')}`
+                                              navigator.clipboard.writeText(text)
+                                              setCopiedPoll(true)
+                                              setTimeout(() => setCopiedPoll(false), 2000)
+                                            }}
+                                            className="text-[10px] text-red-600 hover:text-red-700 font-medium shrink-0 ml-2"
+                                          >{copiedPoll ? '✓ Copied' : 'Copy'}</button>
+                                        </div>
+                                      </>
+                                    ) : ytGenerating ? (
+                                      <p className="text-[11px] text-stone-400 italic">Generating poll suggestion...</p>
+                                    ) : (
+                                      <p className="text-[11px] text-stone-400 italic">No poll suggestion yet</p>
+                                    )}
+                                  </div>
                                 )}
                                 {/* YouTube upload action — GoF only */}
                                 {plat.yt && (
