@@ -1,13 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createReadStream, existsSync } from 'fs'
+import { readFile, writeFile, mkdir, unlink } from 'fs/promises'
 import { spawn } from 'child_process'
 import path from 'path'
+import crypto from 'crypto'
 import { google } from 'googleapis'
-import { getAuthenticatedClient } from '@/lib/youtube'
+import { getAuthenticatedClient, loadTokens } from '@/lib/youtube'
+import {
+  getChannelConfig,
+  publishVideoToInstagram,
+  publishToFacebook,
+  saveVideoPathToTempFile,
+  deleteTempFile,
+} from '@/lib/meta'
 import { getJob, updateJob } from '../jobs'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
+
+// ─── Scheduled queue helpers (mirrors /api/scheduled logic) ─────────────────
+
+const DATA_DIR = process.env.TOKEN_STORAGE_PATH || '/data'
+const SCHEDULED_PATH = path.join(DATA_DIR, 'scheduled.json')
+
+async function appendScheduledItem(item: {
+  id: string; channel: string; headline: string
+  format: string; platform: string; scheduledTime: string
+  status: string; createdAt: string
+}) {
+  try {
+    let items: unknown[] = []
+    try {
+      const raw = await readFile(SCHEDULED_PATH, 'utf-8')
+      items = JSON.parse(raw)
+    } catch { /* empty / missing file */ }
+    items.push(item)
+    if (!existsSync(DATA_DIR)) await mkdir(DATA_DIR, { recursive: true })
+    await writeFile(SCHEDULED_PATH, JSON.stringify(items, null, 2))
+  } catch (e) {
+    console.warn('[publish] Could not append scheduled item:', e instanceof Error ? e.message : e)
+  }
+}
+
+// ─── FFmpeg helpers ──────────────────────────────────────────────────────────
 
 function runFfmpeg(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -22,10 +57,7 @@ function runFfmpeg(args: string[]): Promise<void> {
   })
 }
 
-async function getVideoPathForFormat(
-  jobId: string,
-  format: string,
-): Promise<string> {
+async function getVideoPathForFormat(jobId: string, format: string): Promise<string> {
   const job = getJob(jobId)
   if (!job) throw new Error('Job not found')
   if (job.status !== 'complete') throw new Error('Job not complete')
@@ -70,7 +102,11 @@ async function getVideoPathForFormat(
   throw new Error(`Unknown format: ${format}`)
 }
 
+// ─── POST handler ────────────────────────────────────────────────────────────
+
 export async function POST(req: NextRequest) {
+  const tempFiles: string[] = []
+
   try {
     const body = await req.json() as {
       jobId: string
@@ -81,9 +117,15 @@ export async function POST(req: NextRequest) {
       format?: string
       thumbnailBase64?: string
       privacyStatus?: string
+      publishInstagram?: boolean
+      publishFacebook?: boolean
+      storyTopic?: string
     }
 
-    const { jobId, channelName, title, description, tags, thumbnailBase64 } = body
+    const {
+      jobId, channelName, title, description, tags,
+      thumbnailBase64, publishInstagram, publishFacebook, storyTopic,
+    } = body
     const format = body.format || 'youtube'
     const privacyStatus = body.privacyStatus || 'public'
 
@@ -91,63 +133,150 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'jobId, channelName, and title are required' }, { status: 400 })
     }
 
-    const videoPath = await getVideoPathForFormat(jobId, format)
+    const results: {
+      youtube?: { videoId: string; videoUrl: string }
+      instagram?: { id: string }
+      facebook?: { id: string }
+      scheduledCarousel?: { id: string }
+      errors: Record<string, string>
+    } = { errors: {} }
 
-    const oauth2 = await getAuthenticatedClient(channelName)
-    const youtube = google.youtube({ version: 'v3', auth: oauth2 })
+    // ── YouTube ──────────────────────────────────────────────────────────────
 
-    console.log(`[publish] Uploading "${title}" to ${channelName} (format: ${format})`)
-
-    const insertRes = await youtube.videos.insert({
-      part: ['snippet', 'status'],
-      requestBody: {
-        snippet: {
-          title,
-          description,
-          tags,
-          categoryId: '17',
-          defaultLanguage: 'en',
-          defaultAudioLanguage: 'en',
-        },
-        status: { privacyStatus },
-      },
-      media: {
-        mimeType: 'video/mp4',
-        body: createReadStream(videoPath),
-      },
-    })
-
-    const videoId = insertRes.data.id
-    if (!videoId) throw new Error('YouTube did not return a video ID')
-
-    console.log(`[publish] Upload complete: https://youtube.com/watch?v=${videoId}`)
-
-    // Set custom thumbnail if provided
-    if (thumbnailBase64) {
+    // Check if this channel has a YouTube token before attempting upload
+    const ytTokens = await loadTokens()
+    if (ytTokens[channelName]) {
       try {
-        const thumbBuffer = Buffer.from(thumbnailBase64.replace(/^data:image\/\w+;base64,/, ''), 'base64')
-        const { Readable } = await import('stream')
-        await youtube.thumbnails.set({
-          videoId,
-          media: {
-            mimeType: 'image/jpeg',
-            body: Readable.from(thumbBuffer),
+        const ytVideoPath = await getVideoPathForFormat(jobId, format)
+        const oauth2 = await getAuthenticatedClient(channelName)
+        const youtube = google.youtube({ version: 'v3', auth: oauth2 })
+
+        console.log(`[publish] Uploading "${title}" to YouTube for ${channelName}`)
+
+        const insertRes = await youtube.videos.insert({
+          part: ['snippet', 'status'],
+          requestBody: {
+            snippet: { title, description, tags, categoryId: '17', defaultLanguage: 'en', defaultAudioLanguage: 'en' },
+            status: { privacyStatus },
           },
+          media: { mimeType: 'video/mp4', body: createReadStream(ytVideoPath) },
         })
-        console.log(`[publish] Thumbnail set for video ${videoId}`)
-      } catch (thumbErr) {
-        console.warn(`[publish] Thumbnail upload failed (non-fatal):`, thumbErr instanceof Error ? thumbErr.message : thumbErr)
+
+        const videoId = insertRes.data.id
+        if (!videoId) throw new Error('YouTube did not return a video ID')
+        console.log(`[publish] YouTube upload complete: https://youtube.com/watch?v=${videoId}`)
+
+        results.youtube = { videoId, videoUrl: `https://www.youtube.com/watch?v=${videoId}` }
+
+        // Set custom thumbnail
+        if (thumbnailBase64) {
+          try {
+            const thumbBuffer = Buffer.from(thumbnailBase64.replace(/^data:image\/\w+;base64,/, ''), 'base64')
+            const { Readable } = await import('stream')
+            await youtube.thumbnails.set({
+              videoId,
+              media: { mimeType: 'image/jpeg', body: Readable.from(thumbBuffer) },
+            })
+          } catch (e) {
+            console.warn('[publish] Thumbnail upload failed (non-fatal):', e instanceof Error ? e.message : e)
+          }
+        }
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e)
+        console.error(`[publish] YouTube error for ${channelName}:`, msg)
+        results.errors.youtube = msg
+      }
+    } else {
+      console.log(`[publish] No YouTube token for "${channelName}" — skipping YouTube upload`)
+      results.errors.youtube = `No YouTube credentials for "${channelName}". Connect via the Accounts page.`
+    }
+
+    // ── Instagram Reel (9:16) ─────────────────────────────────────────────────
+
+    if (publishInstagram) {
+      const metaCfg = await getChannelConfig(channelName)
+      if (!metaCfg?.instagramAccountId) {
+        results.errors.instagram = `No Instagram credentials for "${channelName}"`
+      } else {
+        try {
+          const reelsPath = await getVideoPathForFormat(jobId, 'reels')
+          const saved = await saveVideoPathToTempFile(reelsPath)
+          if (!saved) throw new Error('Could not create public URL for Instagram video')
+          tempFiles.push(saved.filePath)
+          console.log(`[publish] Publishing Instagram Reel for ${channelName}: ${saved.publicUrl}`)
+          const igResult = await publishVideoToInstagram(channelName, saved.publicUrl, `${title}\n\n${description}`.slice(0, 2200))
+          results.instagram = { id: igResult.id }
+          console.log(`[publish] Instagram Reel published: ${igResult.id}`)
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e)
+          console.error(`[publish] Instagram error for ${channelName}:`, msg)
+          results.errors.instagram = msg
+        }
       }
     }
 
+    // ── Facebook (16:9) ──────────────────────────────────────────────────────
+
+    if (publishFacebook) {
+      const metaCfg = await getChannelConfig(channelName)
+      if (!metaCfg?.facebookPageId) {
+        results.errors.facebook = `No Facebook credentials for "${channelName}"`
+      } else {
+        try {
+          const fbVideoPath = await getVideoPathForFormat(jobId, 'youtube')
+          const saved = await saveVideoPathToTempFile(fbVideoPath)
+          if (!saved) throw new Error('Could not create public URL for Facebook video')
+          tempFiles.push(saved.filePath)
+          console.log(`[publish] Publishing to Facebook for ${channelName}: ${saved.publicUrl}`)
+          const fbResult = await publishToFacebook(channelName, `${title}\n\n${description}`.slice(0, 63206), saved.publicUrl)
+          results.facebook = { id: fbResult.id }
+          console.log(`[publish] Facebook post published: ${fbResult.id}`)
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e)
+          console.error(`[publish] Facebook error for ${channelName}:`, msg)
+          results.errors.facebook = msg
+        }
+      }
+    }
+
+    // ── Scheduled carousel (4 hours after publish) ───────────────────────────
+
+    const didPublishSomething = results.youtube || results.instagram || results.facebook
+    if (didPublishSomething && (publishInstagram || publishFacebook)) {
+      try {
+        const scheduledTime = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString()
+        const id = crypto.randomUUID()
+        await appendScheduledItem({
+          id,
+          channel: channelName,
+          headline: storyTopic || title,
+          format: 'carousel',
+          platform: 'instagram',
+          scheduledTime,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        })
+        results.scheduledCarousel = { id }
+        console.log(`[publish] Carousel scheduled for ${channelName} at ${scheduledTime}`)
+      } catch (e) {
+        console.warn('[publish] Scheduled carousel failed (non-fatal):', e instanceof Error ? e.message : e)
+      }
+    }
+
+    const anySuccess = !!(results.youtube || results.instagram || results.facebook)
     return NextResponse.json({
-      videoId,
-      videoUrl: `https://www.youtube.com/watch?v=${videoId}`,
+      ...results,
       channelName,
+      videoId: results.youtube?.videoId,
+      videoUrl: results.youtube?.videoUrl,
+      ok: anySuccess,
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
     console.error('[publish] Error:', msg)
     return NextResponse.json({ error: msg }, { status: 500 })
+  } finally {
+    // Clean up temp files created for Meta publishing
+    await Promise.all(tempFiles.map(f => deleteTempFile(f).catch(() => {})))
   }
 }

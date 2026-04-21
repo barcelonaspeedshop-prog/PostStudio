@@ -94,6 +94,7 @@ export default function LongFormPage() {
   // ─── Publish panel ───
   const [publishPanelOpen, setPublishPanelOpen] = useState(false)
   const [ytConnected, setYtConnected] = useState<Record<string, boolean>>({})
+  const [metaConnected, setMetaConnected] = useState<Record<string, { instagram: boolean; facebook: boolean }>>({})
   const [selectedPublishChannels, setSelectedPublishChannels] = useState<string[]>([])
   const [publishMeta, setPublishMeta] = useState<Record<string, { title: string; description: string; tags: string }>>({})
   const [publishStatus, setPublishStatus] = useState<Record<string, 'idle' | 'connecting' | 'uploading' | 'done' | 'error'>>({})
@@ -784,13 +785,25 @@ export default function LongFormPage() {
   // ─── Publish panel ───
   const openPublishPanel = async () => {
     if (!script) return
-    // Load YouTube connection status
+    // Load YouTube + Meta connection status in parallel
     try {
-      const res = await fetch('/api/auth/youtube?action=status')
-      const status = await res.json()
-      const connected: Record<string, boolean> = {}
-      for (const ch of CHANNELS) connected[ch] = !!status[ch]?.connected
-      setYtConnected(connected)
+      const [ytRes, metaRes] = await Promise.all([
+        fetch('/api/auth/youtube?action=status'),
+        fetch('/api/auth/meta?action=status'),
+      ])
+      const ytStatus = ytRes.ok ? await ytRes.json() : {}
+      const metaStatus = metaRes.ok ? await metaRes.json() : {}
+      const ytMap: Record<string, boolean> = {}
+      const metaMap: Record<string, { instagram: boolean; facebook: boolean }> = {}
+      for (const ch of CHANNELS) {
+        ytMap[ch] = !!ytStatus[ch]?.connected
+        metaMap[ch] = {
+          instagram: !!metaStatus[ch]?.instagram,
+          facebook: !!metaStatus[ch]?.facebook,
+        }
+      }
+      setYtConnected(ytMap)
+      setMetaConnected(metaMap)
     } catch { /* non-fatal */ }
     // Init per-channel metadata from script
     const meta: Record<string, { title: string; description: string; tags: string }> = {}
@@ -819,12 +832,19 @@ export default function LongFormPage() {
     const poll = setInterval(async () => {
       if (!popup || popup.closed) {
         clearInterval(poll)
+        let nowConnected = false
         try {
           const res = await fetch('/api/auth/youtube?action=status')
           const status = await res.json()
-          setYtConnected(prev => ({ ...prev, [ch]: !!status[ch]?.connected }))
+          nowConnected = !!status[ch]?.connected
+          setYtConnected(prev => ({ ...prev, [ch]: nowConnected }))
         } catch { /* ignore */ }
-        setPublishStatus(prev => ({ ...prev, [ch]: 'idle' }))
+        if (nowConnected && selectedPublishChannels.includes(ch)) {
+          // Auto-upload immediately after OAuth
+          publishToChannel(ch)
+        } else {
+          setPublishStatus(prev => ({ ...prev, [ch]: 'idle' }))
+        }
       }
     }, 1000)
   }
@@ -836,6 +856,8 @@ export default function LongFormPage() {
     try {
       const meta = publishMeta[ch] || { title: script?.title || '', description: '', tags: '' }
       const tags = meta.tags.split(',').map(t => t.trim()).filter(Boolean)
+      const igConnected = metaConnected[ch]?.instagram ?? false
+      const fbConnected = metaConnected[ch]?.facebook ?? false
       const res = await fetch('/api/story-video/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -847,12 +869,18 @@ export default function LongFormPage() {
           tags,
           format: 'youtube',
           thumbnailBase64: thumbnailUrl || undefined,
+          publishInstagram: igConnected,
+          publishFacebook: fbConnected,
+          storyTopic: script?.title,
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setPublishStatus(prev => ({ ...prev, [ch]: 'done' }))
-      setPublishedUrls(prev => ({ ...prev, [ch]: data.videoUrl }))
+      if (data.videoUrl) setPublishedUrls(prev => ({ ...prev, [ch]: data.videoUrl }))
+      // Surface any per-platform errors as non-blocking warnings
+      const errs = Object.values(data.errors || {}) as string[]
+      if (errs.length > 0) showToast(`${ch}: ${errs[0]}`, 'error')
     } catch (e: unknown) {
       setPublishStatus(prev => ({ ...prev, [ch]: 'error' }))
       setPublishError(prev => ({ ...prev, [ch]: e instanceof Error ? e.message : 'Upload failed' }))
@@ -861,12 +889,13 @@ export default function LongFormPage() {
 
   const publishAll = async () => {
     for (const ch of selectedPublishChannels) {
-      if (publishStatus[ch] === 'done') continue
+      if (publishStatus[ch] === 'done' || publishStatus[ch] === 'uploading') continue
       if (!ytConnected[ch]) {
-        showToast(`Connect ${ch} before publishing`, 'error')
-        continue
+        // No YouTube token — open OAuth popup; auto-upload fires after connection
+        connectYtChannel(ch)
+      } else {
+        await publishToChannel(ch)
       }
-      await publishToChannel(ch)
     }
   }
 
@@ -1238,7 +1267,9 @@ export default function LongFormPage() {
                           {CHANNELS.map(ch => {
                             const isSelected = selectedPublishChannels.includes(ch)
                             const status = publishStatus[ch]
-                            const isConnected = ytConnected[ch]
+                            const ytOk = ytConnected[ch]
+                            const igOk = metaConnected[ch]?.instagram
+                            const fbOk = metaConnected[ch]?.facebook
                             return (
                               <div key={ch} className="rounded-xl border border-stone-100 overflow-hidden">
                                 <div className="flex items-center gap-3 px-3 py-2.5">
@@ -1251,11 +1282,18 @@ export default function LongFormPage() {
                                     className="rounded"
                                     disabled={status === 'uploading'}
                                   />
-                                  <span className="flex-1 text-[13px] font-medium text-stone-800 truncate">{ch}</span>
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-[13px] font-medium text-stone-800 truncate block">{ch}</span>
+                                    <div className="flex gap-1.5 mt-0.5">
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${ytOk ? 'bg-red-50 text-red-500' : 'bg-stone-100 text-stone-400'}`}>YT</span>
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${igOk ? 'bg-pink-50 text-pink-500' : 'bg-stone-100 text-stone-400'}`}>IG</span>
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${fbOk ? 'bg-blue-50 text-blue-500' : 'bg-stone-100 text-stone-400'}`}>FB</span>
+                                    </div>
+                                  </div>
                                   {status === 'done' ? (
-                                    <a href={publishedUrls[ch]} target="_blank" rel="noopener noreferrer"
+                                    <a href={publishedUrls[ch] || '#'} target="_blank" rel="noopener noreferrer"
                                       className="text-[11px] text-emerald-600 font-medium hover:underline shrink-0">
-                                      ✓ Published ↗
+                                      ✓ Done ↗
                                     </a>
                                   ) : status === 'uploading' ? (
                                     <span className="flex items-center gap-1 text-[11px] text-stone-500 shrink-0">
@@ -1266,20 +1304,25 @@ export default function LongFormPage() {
                                       <Spinner className="w-3 h-3" /> Connecting...
                                     </span>
                                   ) : status === 'error' ? (
-                                    <span className="text-[11px] text-red-500 shrink-0">✕ Error</span>
-                                  ) : isConnected ? (
-                                    <span className="text-[11px] text-emerald-500 shrink-0">● Connected</span>
+                                    <button
+                                      onClick={() => connectYtChannel(ch)}
+                                      className="text-[11px] text-red-500 hover:text-red-700 border border-red-200 rounded-md px-2 py-0.5 shrink-0"
+                                    >
+                                      Retry
+                                    </button>
+                                  ) : ytOk ? (
+                                    <span className="text-[11px] text-emerald-500 shrink-0">● YT ready</span>
                                   ) : (
                                     <button
                                       onClick={() => connectYtChannel(ch)}
                                       className="text-[11px] text-stone-500 hover:text-stone-800 border border-stone-200 rounded-md px-2 py-0.5 shrink-0"
                                     >
-                                      Connect
+                                      Connect YT
                                     </button>
                                   )}
                                 </div>
                                 {publishError[ch] && (
-                                  <p className="px-3 pb-2 text-[11px] text-red-500">{publishError[ch]}</p>
+                                  <p className="px-3 pb-2 text-[11px] text-red-500 leading-tight">{publishError[ch]}</p>
                                 )}
                                 {/* Per-channel metadata when selected */}
                                 {isSelected && status !== 'done' && (
@@ -1305,6 +1348,12 @@ export default function LongFormPage() {
                                       placeholder="Tags (comma-separated)"
                                       className="w-full px-2.5 py-1.5 text-[12px] border border-stone-200 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-300 bg-white"
                                     />
+                                    {(igOk || fbOk) && (
+                                      <p className="text-[10px] text-stone-400 leading-tight">
+                                        Will also publish to:{igOk && ' Instagram Reel (9:16)'}{igOk && fbOk && ' +'}{fbOk && ' Facebook (16:9)'}
+                                        {(igOk || fbOk) && ' · Carousel scheduled +4h'}
+                                      </p>
+                                    )}
                                   </div>
                                 )}
                               </div>

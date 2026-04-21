@@ -1,4 +1,4 @@
-import { readFile, writeFile, unlink, mkdir } from 'fs/promises'
+import { readFile, writeFile, unlink, mkdir, copyFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
 import { randomUUID } from 'crypto'
@@ -167,6 +167,26 @@ export async function deleteTempFile(filePath: string): Promise<void> {
  * Write a base64 video data URI to a temp .mp4 file and return its public URL.
  * Returns null on failure (caller should fall through to image/text-only).
  */
+/**
+ * Copy a local server-side video file to temp-images so Meta's servers can fetch it.
+ * Use this when you have a local path from the video assembly pipeline.
+ */
+export async function saveVideoPathToTempFile(localPath: string): Promise<{ publicUrl: string; filePath: string } | null> {
+  try {
+    if (!existsSync(TEMP_IMAGE_DIR)) {
+      await mkdir(TEMP_IMAGE_DIR, { recursive: true })
+    }
+    const filename = `${randomUUID()}.mp4`
+    const destPath = path.join(TEMP_IMAGE_DIR, filename)
+    await copyFile(localPath, destPath)
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com').replace(/\/$/, '')
+    return { publicUrl: `${appUrl}/api/temp-image/${filename}`, filePath: destPath }
+  } catch (e) {
+    console.warn('[meta] Failed to copy video path to temp:', e instanceof Error ? e.message : e)
+    return null
+  }
+}
+
 export async function saveVideoToTempFile(videoBase64: string): Promise<{ publicUrl: string; filePath: string } | null> {
   if (!existsSync(TEMP_IMAGE_DIR)) {
     await mkdir(TEMP_IMAGE_DIR, { recursive: true })
