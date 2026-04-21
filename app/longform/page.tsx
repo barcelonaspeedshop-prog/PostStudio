@@ -805,6 +805,11 @@ export default function LongFormPage() {
 
   // ─── Publish panel ───
   const openPublishPanel = async () => {
+    // If currentJobId is missing (e.g. after page navigation), recover it from the videoUrl path
+    if (!currentJobId && videoUrl) {
+      const m = videoUrl.match(/\/download\/([^/?]+)/)
+      if (m?.[1]) setCurrentJobId(m[1])
+    }
     // Load YouTube + Meta connection status in parallel
     try {
       const [ytRes, metaRes] = await Promise.all([
@@ -872,7 +877,8 @@ export default function LongFormPage() {
   }
 
   const publishToChannel = async (ch: string) => {
-    if (!currentJobId) return
+    const jobId = currentJobId || videoUrl?.match(/\/download\/([^/?]+)/)?.[1]
+    if (!jobId) return
     setPublishStatus(prev => ({ ...prev, [ch]: 'uploading' }))
     setPublishError(prev => { const n = { ...prev }; delete n[ch]; return n })
     try {
@@ -884,7 +890,7 @@ export default function LongFormPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          jobId: currentJobId,
+          jobId,
           channelName: ch,
           title: meta.title,
           description: meta.description,
@@ -1264,8 +1270,8 @@ export default function LongFormPage() {
                   )}
                 </div>
 
-                {/* Publish to YouTube */}
-                {currentJobId && (
+                {/* Publish to channels */}
+                {videoUrl && (
                   <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
                     <button
                       onClick={publishPanelOpen ? () => setPublishPanelOpen(false) : openPublishPanel}
@@ -1723,7 +1729,7 @@ export default function LongFormPage() {
                     </div>
                   )}
                   {/* Publish panel — advanced mode */}
-                  {currentJobId && (
+                  {videoUrl && (
                     <div className="pt-1 border-t border-emerald-200">
                       <button
                         onClick={publishPanelOpen ? () => setPublishPanelOpen(false) : openPublishPanel}
