@@ -426,8 +426,41 @@ export async function POST(req: NextRequest) {
       const newsData = await newsRes.json()
       if (!newsRes.ok) throw new Error(newsData.error || 'News fetch failed')
 
-      const slides: Slide[] = newsData.slides
-      const topic: string = newsData.topic || newsData.story || ''
+      let slides: Slide[] = newsData.slides
+      let topic: string = newsData.topic || newsData.story || ''
+
+      // Word-overlap duplicate check: retry if 3+ significant words match a recent used topic
+      if (topic && !channelPreSelected) {
+        const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'is', 'was', 'are', 'vs', 'with', 'that', 'this', 'has', 'have', 'had'])
+        const significantWords = (s: string) => new Set(s.toLowerCase().split(/\s+/).filter(w => w.length > 3 && !stopWords.has(w)))
+        const topicWords = significantWords(topic)
+        const recentTopics = usedTopics[channel] || []
+        const isDuplicate = recentTopics.some(used => {
+          const usedWords = significantWords(used)
+          const overlap = [...topicWords].filter(w => usedWords.has(w))
+          return overlap.length >= 3
+        })
+
+        if (isDuplicate) {
+          console.warn(`[auto-generate] [${channel}] Topic "${topic.substring(0, 60)}" overlaps with recent used topics — retrying`)
+          const retryRes = await fetch(`${baseUrl}/api/news-brief`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              channel,
+              timestamp: Date.now(),
+              exclude_topics: [...channelExclusions, topic],
+            }),
+          })
+          const retryData = await retryRes.json()
+          if (retryRes.ok && retryData.slides) {
+            slides = retryData.slides
+            topic = retryData.topic || retryData.story || topic
+            console.log(`[auto-generate] [${channel}] Duplicate retry returned: "${topic.substring(0, 60)}"`)
+          }
+        }
+      }
+
       enforceTilePattern(slides)
 
       // Auto-generate chart data for story-text tiles from body text
@@ -663,9 +696,9 @@ export async function POST(req: NextRequest) {
       if (topic) {
         if (!usedTopics[channel]) usedTopics[channel] = []
         usedTopics[channel].push(topic)
-        // Keep only the last 7 entries per channel
-        if (usedTopics[channel].length > 7) {
-          usedTopics[channel] = usedTopics[channel].slice(-7)
+        // Keep only the last 14 entries per channel
+        if (usedTopics[channel].length > 14) {
+          usedTopics[channel] = usedTopics[channel].slice(-14)
         }
         await saveUsedTopics(usedTopics)
       }

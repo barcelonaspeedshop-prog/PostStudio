@@ -122,6 +122,16 @@ async function fetchArticleImage(url: string): Promise<string | null> {
   }
 }
 
+function hasFreshnessMarkers(topic: string, headline: string, today: string): boolean {
+  const combined = (topic + ' ' + headline).toLowerCase()
+  const dateObj = new Date(today + 'T00:00:00Z')
+  const monthNames = ['january','february','march','april','may','june','july','august','september','october','november','december']
+  const currentMonthName = monthNames[dateObj.getUTCMonth()]
+  const currentYear = today.split('-')[0]
+  const markers = [today, currentMonthName, currentYear, 'today', 'latest', 'breaking']
+  return markers.some(m => combined.includes(m))
+}
+
 // Build the search prompt for a given attempt
 function buildSearchPrompt(opts: {
   channel: string
@@ -132,8 +142,9 @@ function buildSearchPrompt(opts: {
   hasExclusions: boolean
   exclusionList: string
   broadFallback: boolean
+  strongFreshness?: boolean
 }): string {
-  const { topicKeywords, angles, today, yesterday, hasExclusions, exclusionList, broadFallback } = opts
+  const { topicKeywords, angles, today, yesterday, hasExclusions, exclusionList, broadFallback, strongFreshness } = opts
   const anglesText = angles.map((a, i) => `${i + 1}. "${a} news"`).join('\n')
   const dateWindow = broadFallback
     ? `the last 72 hours (since ${opts.yesterday})`
@@ -142,13 +153,17 @@ function buildSearchPrompt(opts: {
     ? `Include date terms like "${yesterday}" or "${today}" in your searches.`
     : `Include "${today}" or "${yesterday}" in your web searches to find fresh results.`
 
+  const freshnessBanner = strongFreshness
+    ? `CRITICAL: You MUST return a story published on ${today} or ${yesterday} ONLY. Do NOT return any story from before ${yesterday}. If your first search returns old results, search again with "${today}" or "${yesterday}" explicitly in the query. Reject any article whose publish date is earlier than ${yesterday}.`
+    : ''
+
   return `Today is ${today}. Find a news story published in ${dateWindow} about: ${topicKeywords}.
 
 Try these search angles in order — use whichever finds the most recent story:
 ${anglesText}
 
 ${dateHint}
-${hasExclusions ? `\nYou MUST NOT cover any of these topics:\n${exclusionList}\nFind a completely different story.\n` : ''}
+${freshnessBanner ? `\n${freshnessBanner}\n` : ''}${hasExclusions ? `\nYou MUST NOT cover any of these topics:\n${exclusionList}\nFind a completely different story.\n` : ''}
 If you genuinely cannot find any story from the last ${broadFallback ? '72' : '48'} hours, respond with ONLY this JSON:
 {"topic":"no news found","headline":"No story available","articleUrl":"","searchTerms":[]}
 
@@ -181,6 +196,7 @@ async function searchForNews(opts: {
   exclusionList: string
   excludeTopics: string[]
   broadFallback: boolean
+  strongFreshness?: boolean
 }): Promise<{ topic: string; headline: string; articleUrl?: string; searchTerms?: string[] } | null> {
   const systemPrompt = opts.hasExclusions
     ? `You are a news researcher. You MUST NOT cover any of the following topics:\n${opts.exclusionList}\nFind a completely different story about different people, teams, and events.`
@@ -260,6 +276,16 @@ export async function POST(req: NextRequest) {
       // Attempt 1: last 48 hours with channel-specific search angles
       console.log(`[news-brief] [${channel}] Attempt 1 — 48h window, ${angles.length} angles`)
       trend = await searchForNews({ ...searchOpts, broadFallback: false })
+
+      // Freshness verification: if topic lacks current-date markers, retry with stronger prompt
+      if (trend && !hasFreshnessMarkers(trend.topic, trend.headline || '', today)) {
+        console.warn(`[news-brief] [${channel}] Topic "${trend.topic.substring(0, 60)}" lacks freshness markers — retrying with strong freshness prompt`)
+        const freshnessRetry = await searchForNews({ ...searchOpts, broadFallback: false, strongFreshness: true })
+        if (freshnessRetry) {
+          trend = freshnessRetry
+          console.log(`[news-brief] [${channel}] Freshness retry returned: "${trend.topic.substring(0, 60)}"`)
+        }
+      }
 
       // Attempt 2: widen to 72 hours with broader terms if first attempt found nothing
       if (!trend) {
