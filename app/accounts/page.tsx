@@ -76,6 +76,20 @@ const EXPECTED_YT_CHANNEL_IDS: Record<string, string> = {
   'Omnira Travel':     'UCkehLjuwibcMWVeP5xzWlJA',
 }
 
+// YouTube handles to look for in Google's channel picker during OAuth.
+// Note: some Brand Account names differ from PostStudio channel names.
+const YT_PICKER_HANDLE: Record<string, string> = {
+  'Gentlemen of Fuel': '@gentlemenoffuel',
+  'Omnira F1':         '@omniraf1',
+  'Road & Trax':       '@roadandtrax',
+  'Omnira Football':   '@omnirafc',       // channel name is "Omnira FC"
+  'Omnira Cricket':    '@omniracricket',
+  'Omnira Golf':       '@omniragolf',
+  'Omnira NFL':        '@omniranfl',
+  'Omnira Food':       '@omnirafood',
+  'Omnira Travel':     '@omniratravel',
+}
+
 const PLATFORM_TIPS: Record<string, string> = {
   TikTok: 'Set up TikTok to reach a younger, high-engagement audience',
   Instagram: 'Instagram Reels drive significant organic reach',
@@ -375,15 +389,20 @@ function AccountsPageInner() {
           {/* Shared YouTube token warning */}
           {ytHealth && ytHealth.sharedGroups.length > 0 && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-xl px-5 py-4">
-              <p className="text-[13px] font-semibold text-red-800 mb-1">YouTube publishing misconfigured — {ytHealth.sharedGroups.flatMap(g => g.channels).length} channels share the same Google token</p>
-              <p className="text-[12px] text-red-700 leading-relaxed mb-2">
-                These channels will all publish to the same YouTube channel (the managing account&apos;s default). Each Brand Account needs its own unique OAuth token. Click <strong>Revoke &amp; Reconnect</strong> on each affected channel, then sign in and select the correct Brand Account.
+              <p className="text-[13px] font-semibold text-red-800 mb-2">
+                YouTube publishing broken — {ytHealth.sharedGroups.flatMap(g => g.channels).length} channels share the same Google token
               </p>
+              <p className="text-[12px] text-red-700 leading-relaxed mb-3">
+                Videos from all affected channels will upload to the same place. Each Brand Account needs its own unique OAuth token.
+              </p>
+              <p className="text-[12px] font-semibold text-red-800 mb-1">How to fix (takes ~5 minutes):</p>
+              <ol className="text-[12px] text-red-700 space-y-1 list-decimal list-inside mb-3">
+                <li>Click <strong>↻ Revoke &amp; Reconnect</strong> on any affected channel below (this clears all shared tokens)</li>
+                <li>On Google&apos;s screen, when asked &quot;Choose your channel&quot; — pick the matching Brand Account handle</li>
+                <li>Return here and repeat for each remaining affected channel</li>
+              </ol>
               <p className="text-[11px] text-red-600 font-medium">
                 Affected: {ytHealth.sharedGroups.flatMap(g => g.channels).join(', ')}
-              </p>
-              <p className="text-[11px] text-red-500 mt-1">
-                Tip: use a fresh incognito window or run <code className="bg-red-100 px-1 rounded font-mono">node scripts/setup-youtube.js</code> on the server to re-auth all channels at once.
               </p>
             </div>
           )}
@@ -476,6 +495,7 @@ function AccountsPageInner() {
                       const connectedId = yt?.youtube_channel_id
                       const wrongChannel = yt?.connected && expectedId && connectedId && connectedId !== expectedId
                       const sharedToken = ytHealth?.channels.find(c => c.channel === ch.channel)?.shared ?? false
+                      const expectedHandle = YT_PICKER_HANDLE[ch.channel] || ch.channel
                       const hasIssue = wrongChannel || sharedToken
                       return (
                         <div className="mt-4 pt-4 border-t border-stone-100">
@@ -555,7 +575,7 @@ function AccountsPageInner() {
                           {sharedToken && (
                             <div className="mt-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
                               <p className="text-[10px] text-amber-800 leading-relaxed">
-                                <strong>Action required:</strong> Click <strong>↻ Revoke &amp; Reconnect</strong>. This clears the shared token then opens Google OAuth — when you see the channel picker, select <strong>{ch.channel}</strong> specifically.
+                                <strong>Action required:</strong> Click <strong>↻ Revoke &amp; Reconnect</strong>. On Google&apos;s &quot;Choose your channel&quot; screen, select <strong><code className="bg-amber-100 px-0.5 rounded font-mono">{expectedHandle}</code></strong>.
                               </p>
                             </div>
                           )}
