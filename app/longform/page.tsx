@@ -148,6 +148,20 @@ export default function LongFormPage() {
       if (savedMode) setAdvancedMode(savedMode === 'true')
     } catch {}
 
+    // Restore assembled video across page navigations (sessionStorage survives tab reloads)
+    try {
+      const savedVideo = sessionStorage.getItem('longform_video')
+      if (savedVideo) {
+        const { jobId, videoUrl: savedUrl } = JSON.parse(savedVideo)
+        if (jobId && savedUrl) {
+          setCurrentJobId(jobId)
+          setVideoUrl(savedUrl)
+          setBuildPhase('complete')
+          setBuildMessage('ready to publish')
+        }
+      }
+    } catch {}
+
     setIsRestored(true)
   }, [])
 
@@ -318,6 +332,7 @@ export default function LongFormPage() {
       setCurrentJobId(startData.jobId)
       setVideoUrl(result.downloadUrl)
       setClips([])
+      sessionStorage.setItem('longform_video', JSON.stringify({ jobId: startData.jobId, videoUrl: result.downloadUrl }))
       showToast(`Video ready — ${Math.round(result.duration)}s`)
       openPublishPanel()
     } catch (e: unknown) {
@@ -330,6 +345,7 @@ export default function LongFormPage() {
 
   const clearDraft = () => {
     localStorage.removeItem(DRAFT_KEY)
+    sessionStorage.removeItem('longform_video')
     setTopic('')
     setChannel(CHANNELS[0])
     setScript(null)
@@ -741,7 +757,7 @@ export default function LongFormPage() {
       setVideoUrl(result.downloadUrl)
       setBuildPhase('complete')
       setBuildMessage(`${Math.round(result.duration)}s · ready to download`)
-      // Auto-open the publish panel so it's immediately visible
+      sessionStorage.setItem('longform_video', JSON.stringify({ jobId: startData.jobId, videoUrl: result.downloadUrl }))
       openPublishPanel()
 
     } catch (e: unknown) {
@@ -789,7 +805,6 @@ export default function LongFormPage() {
 
   // ─── Publish panel ───
   const openPublishPanel = async () => {
-    if (!script) return
     // Load YouTube + Meta connection status in parallel
     try {
       const [ytRes, metaRes] = await Promise.all([
@@ -810,20 +825,22 @@ export default function LongFormPage() {
       setYtConnected(ytMap)
       setMetaConnected(metaMap)
     } catch { /* non-fatal */ }
-    // Init per-channel metadata from script
-    const meta: Record<string, { title: string; description: string; tags: string }> = {}
-    for (const ch of CHANNELS) {
-      meta[ch] = {
-        title: script.title,
-        description: script.summary || script.chapters.map(c => c.narration).join(' ').slice(0, 400),
-        tags: '',
+    // Init per-channel metadata — use current script state if available, else blank fields
+    setPublishMeta(prev => {
+      const meta: Record<string, { title: string; description: string; tags: string }> = {}
+      for (const ch of CHANNELS) {
+        meta[ch] = prev[ch] || {
+          title: script?.title ?? '',
+          description: script?.summary || script?.chapters?.map(c => c.narration).join(' ').slice(0, 400) || '',
+          tags: '',
+        }
       }
-    }
-    setPublishMeta(meta)
+      return meta
+    })
     setPublishStatus({})
     setPublishError({})
     setPublishedUrls({})
-    setSelectedPublishChannels([channel])
+    setSelectedPublishChannels(prev => prev.length > 0 ? prev : [channel])
     setPublishPanelOpen(true)
   }
 
@@ -1706,9 +1723,23 @@ export default function LongFormPage() {
                     </div>
                   )}
                   {/* Publish panel — advanced mode */}
-                  {currentJobId && publishPanelOpen && (
-                    <div className="space-y-2 pt-1 border-t border-emerald-200">
-                      <p className="text-[10px] font-medium text-emerald-700 uppercase tracking-widest">Publish to channels</p>
+                  {currentJobId && (
+                    <div className="pt-1 border-t border-emerald-200">
+                      <button
+                        onClick={publishPanelOpen ? () => setPublishPanelOpen(false) : openPublishPanel}
+                        className="w-full flex items-center justify-between px-2 py-1.5 mb-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <svg className="w-3 h-3 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                          </svg>
+                          Publish to channels
+                        </span>
+                        <svg className={`w-3 h-3 text-emerald-500 transition-transform ${publishPanelOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    {publishPanelOpen && (<div className="space-y-2">
                       {CHANNELS.map(ch => {
                         const isSelected = selectedPublishChannels.includes(ch)
                         const status = publishStatus[ch]
@@ -1769,6 +1800,7 @@ export default function LongFormPage() {
                           ? <><Spinner className="w-3 h-3" /> Publishing...</>
                           : `Publish to ${selectedPublishChannels.length} channel${selectedPublishChannels.length !== 1 ? 's' : ''}`}
                       </button>
+                    </div>)}
                     </div>
                   )}
 
