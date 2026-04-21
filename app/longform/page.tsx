@@ -319,6 +319,7 @@ export default function LongFormPage() {
       setVideoUrl(result.downloadUrl)
       setClips([])
       showToast(`Video ready — ${Math.round(result.duration)}s`)
+      openPublishPanel()
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Error assembling video', 'error')
     } finally {
@@ -740,6 +741,8 @@ export default function LongFormPage() {
       setVideoUrl(result.downloadUrl)
       setBuildPhase('complete')
       setBuildMessage(`${Math.round(result.duration)}s · ready to download`)
+      // Auto-open the publish panel so it's immediately visible
+      openPublishPanel()
 
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Build failed'
@@ -1702,6 +1705,73 @@ export default function LongFormPage() {
                       </a>
                     </div>
                   )}
+                  {/* Publish panel — advanced mode */}
+                  {currentJobId && publishPanelOpen && (
+                    <div className="space-y-2 pt-1 border-t border-emerald-200">
+                      <p className="text-[10px] font-medium text-emerald-700 uppercase tracking-widest">Publish to channels</p>
+                      {CHANNELS.map(ch => {
+                        const isSelected = selectedPublishChannels.includes(ch)
+                        const status = publishStatus[ch]
+                        const ytOk = ytConnected[ch]
+                        const igOk = metaConnected[ch]?.instagram
+                        const fbOk = metaConnected[ch]?.facebook
+                        return (
+                          <div key={ch} className="rounded-lg border border-stone-100 overflow-hidden bg-white text-[11px]">
+                            <div className="flex items-center gap-2 px-2 py-2">
+                              <input type="checkbox" checked={isSelected}
+                                onChange={e => setSelectedPublishChannels(prev =>
+                                  e.target.checked ? [...prev, ch] : prev.filter(c => c !== ch)
+                                )}
+                                disabled={status === 'uploading'} className="rounded" />
+                              <div className="flex-1 min-w-0">
+                                <span className="text-[11px] font-medium text-stone-800 truncate block">{ch}</span>
+                                <div className="flex gap-1 mt-0.5">
+                                  <span className={`text-[9px] px-1 py-0.5 rounded-full ${ytOk ? 'bg-red-50 text-red-500' : 'bg-stone-100 text-stone-400'}`}>YT</span>
+                                  <span className={`text-[9px] px-1 py-0.5 rounded-full ${igOk ? 'bg-pink-50 text-pink-500' : 'bg-stone-100 text-stone-400'}`}>IG</span>
+                                  <span className={`text-[9px] px-1 py-0.5 rounded-full ${fbOk ? 'bg-blue-50 text-blue-500' : 'bg-stone-100 text-stone-400'}`}>FB</span>
+                                </div>
+                              </div>
+                              {status === 'done' ? (
+                                <a href={publishedUrls[ch] || '#'} target="_blank" rel="noopener noreferrer" className="text-[10px] text-emerald-600 font-medium shrink-0">✓ Done ↗</a>
+                              ) : status === 'uploading' ? (
+                                <span className="flex items-center gap-1 text-[10px] text-stone-500 shrink-0"><Spinner className="w-2.5 h-2.5" /> Uploading...</span>
+                              ) : status === 'connecting' ? (
+                                <span className="flex items-center gap-1 text-[10px] text-stone-500 shrink-0"><Spinner className="w-2.5 h-2.5" /> Connecting...</span>
+                              ) : status === 'error' ? (
+                                <button onClick={() => connectYtChannel(ch)} className="text-[10px] text-red-500 border border-red-200 rounded px-1.5 py-0.5 shrink-0">Retry</button>
+                              ) : ytOk ? (
+                                <span className="text-[10px] text-emerald-500 shrink-0">● Ready</span>
+                              ) : (
+                                <button onClick={() => connectYtChannel(ch)} className="text-[10px] text-stone-500 hover:text-stone-800 border border-stone-200 rounded px-1.5 py-0.5 shrink-0">Connect YT</button>
+                              )}
+                            </div>
+                            {publishError[ch] && <p className="px-2 pb-1.5 text-[10px] text-red-500">{publishError[ch]}</p>}
+                            {isSelected && status !== 'done' && (
+                              <div className="border-t border-stone-100 px-2 py-1.5 space-y-1.5 bg-stone-50">
+                                <input type="text" value={publishMeta[ch]?.title || ''} placeholder="Title"
+                                  onChange={e => setPublishMeta(prev => ({ ...prev, [ch]: { ...prev[ch], title: e.target.value } }))}
+                                  className="w-full px-2 py-1 text-[11px] border border-stone-200 rounded bg-white text-stone-800 placeholder-stone-400 focus:outline-none" />
+                                <textarea value={publishMeta[ch]?.description || ''} placeholder="Description" rows={2}
+                                  onChange={e => setPublishMeta(prev => ({ ...prev, [ch]: { ...prev[ch], description: e.target.value } }))}
+                                  className="w-full px-2 py-1 text-[11px] border border-stone-200 rounded bg-white text-stone-800 placeholder-stone-400 focus:outline-none resize-none" />
+                                <input type="text" value={publishMeta[ch]?.tags || ''} placeholder="Tags (comma-separated)"
+                                  onChange={e => setPublishMeta(prev => ({ ...prev, [ch]: { ...prev[ch], tags: e.target.value } }))}
+                                  className="w-full px-2 py-1 text-[11px] border border-stone-200 rounded bg-white text-stone-800 placeholder-stone-400 focus:outline-none" />
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                      <button onClick={publishAll}
+                        disabled={selectedPublishChannels.length === 0 || selectedPublishChannels.every(ch => publishStatus[ch] === 'done' || publishStatus[ch] === 'uploading')}
+                        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-40">
+                        {selectedPublishChannels.some(ch => publishStatus[ch] === 'uploading')
+                          ? <><Spinner className="w-3 h-3" /> Publishing...</>
+                          : `Publish to ${selectedPublishChannels.length} channel${selectedPublishChannels.length !== 1 ? 's' : ''}`}
+                      </button>
+                    </div>
+                  )}
+
                   {currentJobId && (
                     <div className="pt-1 border-t border-emerald-200">
                       <button onClick={createClips} disabled={clippingVideo} className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[12px] font-medium border border-emerald-400 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors disabled:opacity-50">
