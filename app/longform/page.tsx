@@ -91,6 +91,15 @@ export default function LongFormPage() {
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null)
   const thumbnailFileRef = useRef<HTMLInputElement>(null)
 
+  // ─── Publish panel ───
+  const [publishPanelOpen, setPublishPanelOpen] = useState(false)
+  const [ytConnected, setYtConnected] = useState<Record<string, boolean>>({})
+  const [selectedPublishChannels, setSelectedPublishChannels] = useState<string[]>([])
+  const [publishMeta, setPublishMeta] = useState<Record<string, { title: string; description: string; tags: string }>>({})
+  const [publishStatus, setPublishStatus] = useState<Record<string, 'idle' | 'connecting' | 'uploading' | 'done' | 'error'>>({})
+  const [publishError, setPublishError] = useState<Record<string, string>>({})
+  const [publishedUrls, setPublishedUrls] = useState<Record<string, string>>({})
+
   // ─── Restore draft ───
   useEffect(() => {
     // Check for URL params first (coming from /stories "Use this story →")
@@ -285,6 +294,7 @@ export default function LongFormPage() {
       formData.append('musicMood', musicMood)
       formData.append('musicVolume', '0.15')
       formData.append('musicEnabled', String(musicEnabled))
+      formData.append('channel', channel)
       const startRes = await fetch('/api/story-video/start', { method: 'POST', body: formData })
       const startData = await startRes.json()
       if (!startRes.ok) throw new Error(startData.error)
@@ -702,6 +712,7 @@ export default function LongFormPage() {
       formData.append('musicMood', musicMood)
       formData.append('musicVolume', '0.15')
       formData.append('musicEnabled', String(musicEnabled))
+      formData.append('channel', channel)
 
       const startRes = await fetch('/api/story-video/start', { method: 'POST', body: formData })
       const startData = await startRes.json()
@@ -767,6 +778,95 @@ export default function LongFormPage() {
       showToast(e instanceof Error ? e.message : 'Thumbnail generation failed', 'error')
     } finally {
       setThumbnailGenerating(false)
+    }
+  }
+
+  // ─── Publish panel ───
+  const openPublishPanel = async () => {
+    if (!script) return
+    // Load YouTube connection status
+    try {
+      const res = await fetch('/api/auth/youtube?action=status')
+      const status = await res.json()
+      const connected: Record<string, boolean> = {}
+      for (const ch of CHANNELS) connected[ch] = !!status[ch]?.connected
+      setYtConnected(connected)
+    } catch { /* non-fatal */ }
+    // Init per-channel metadata from script
+    const meta: Record<string, { title: string; description: string; tags: string }> = {}
+    for (const ch of CHANNELS) {
+      meta[ch] = {
+        title: script.title,
+        description: script.summary || script.chapters.map(c => c.narration).join(' ').slice(0, 400),
+        tags: '',
+      }
+    }
+    setPublishMeta(meta)
+    setPublishStatus({})
+    setPublishError({})
+    setPublishedUrls({})
+    setSelectedPublishChannels([channel])
+    setPublishPanelOpen(true)
+  }
+
+  const connectYtChannel = (ch: string) => {
+    setPublishStatus(prev => ({ ...prev, [ch]: 'connecting' }))
+    const popup = window.open(
+      `/api/auth/youtube?channel=${encodeURIComponent(ch)}`,
+      `yt_auth_${ch.replace(/\s/g, '_')}`,
+      'width=600,height=700,left=200,top=100',
+    )
+    const poll = setInterval(async () => {
+      if (!popup || popup.closed) {
+        clearInterval(poll)
+        try {
+          const res = await fetch('/api/auth/youtube?action=status')
+          const status = await res.json()
+          setYtConnected(prev => ({ ...prev, [ch]: !!status[ch]?.connected }))
+        } catch { /* ignore */ }
+        setPublishStatus(prev => ({ ...prev, [ch]: 'idle' }))
+      }
+    }, 1000)
+  }
+
+  const publishToChannel = async (ch: string) => {
+    if (!currentJobId) return
+    setPublishStatus(prev => ({ ...prev, [ch]: 'uploading' }))
+    setPublishError(prev => { const n = { ...prev }; delete n[ch]; return n })
+    try {
+      const meta = publishMeta[ch] || { title: script?.title || '', description: '', tags: '' }
+      const tags = meta.tags.split(',').map(t => t.trim()).filter(Boolean)
+      const res = await fetch('/api/story-video/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId: currentJobId,
+          channelName: ch,
+          title: meta.title,
+          description: meta.description,
+          tags,
+          format: 'youtube',
+          thumbnailBase64: thumbnailUrl || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setPublishStatus(prev => ({ ...prev, [ch]: 'done' }))
+      setPublishedUrls(prev => ({ ...prev, [ch]: data.videoUrl }))
+    } catch (e: unknown) {
+      setPublishStatus(prev => ({ ...prev, [ch]: 'error' }))
+      setPublishError(prev => ({ ...prev, [ch]: e instanceof Error ? e.message : 'Upload failed' }))
+    }
+  }
+
+  const publishAll = async () => {
+    for (const ch of selectedPublishChannels) {
+      if (publishStatus[ch] === 'done') continue
+      if (!ytConnected[ch]) {
+        showToast(`Connect ${ch} before publishing`, 'error')
+        continue
+      }
+      await publishToChannel(ch)
     }
   }
 
@@ -1112,6 +1212,126 @@ export default function LongFormPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Publish to YouTube */}
+                {currentJobId && (
+                  <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
+                    <button
+                      onClick={publishPanelOpen ? () => setPublishPanelOpen(false) : openPublishPanel}
+                      className="w-full flex items-center justify-between px-4 py-3.5 text-[13px] font-medium text-stone-700 hover:bg-stone-50 transition-colors"
+                    >
+                      <span className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                        </svg>
+                        Publish to YouTube
+                      </span>
+                      <svg className={`w-4 h-4 text-stone-400 transition-transform duration-200 ${publishPanelOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {publishPanelOpen && (
+                      <div className="border-t border-stone-100 p-4 space-y-4">
+                        {/* Channel list */}
+                        <div className="space-y-2">
+                          {CHANNELS.map(ch => {
+                            const isSelected = selectedPublishChannels.includes(ch)
+                            const status = publishStatus[ch]
+                            const isConnected = ytConnected[ch]
+                            return (
+                              <div key={ch} className="rounded-xl border border-stone-100 overflow-hidden">
+                                <div className="flex items-center gap-3 px-3 py-2.5">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={e => setSelectedPublishChannels(prev =>
+                                      e.target.checked ? [...prev, ch] : prev.filter(c => c !== ch)
+                                    )}
+                                    className="rounded"
+                                    disabled={status === 'uploading'}
+                                  />
+                                  <span className="flex-1 text-[13px] font-medium text-stone-800 truncate">{ch}</span>
+                                  {status === 'done' ? (
+                                    <a href={publishedUrls[ch]} target="_blank" rel="noopener noreferrer"
+                                      className="text-[11px] text-emerald-600 font-medium hover:underline shrink-0">
+                                      ✓ Published ↗
+                                    </a>
+                                  ) : status === 'uploading' ? (
+                                    <span className="flex items-center gap-1 text-[11px] text-stone-500 shrink-0">
+                                      <Spinner className="w-3 h-3" /> Uploading...
+                                    </span>
+                                  ) : status === 'connecting' ? (
+                                    <span className="flex items-center gap-1 text-[11px] text-stone-500 shrink-0">
+                                      <Spinner className="w-3 h-3" /> Connecting...
+                                    </span>
+                                  ) : status === 'error' ? (
+                                    <span className="text-[11px] text-red-500 shrink-0">✕ Error</span>
+                                  ) : isConnected ? (
+                                    <span className="text-[11px] text-emerald-500 shrink-0">● Connected</span>
+                                  ) : (
+                                    <button
+                                      onClick={() => connectYtChannel(ch)}
+                                      className="text-[11px] text-stone-500 hover:text-stone-800 border border-stone-200 rounded-md px-2 py-0.5 shrink-0"
+                                    >
+                                      Connect
+                                    </button>
+                                  )}
+                                </div>
+                                {publishError[ch] && (
+                                  <p className="px-3 pb-2 text-[11px] text-red-500">{publishError[ch]}</p>
+                                )}
+                                {/* Per-channel metadata when selected */}
+                                {isSelected && status !== 'done' && (
+                                  <div className="border-t border-stone-100 px-3 py-2 space-y-2 bg-stone-50">
+                                    <input
+                                      type="text"
+                                      value={publishMeta[ch]?.title || ''}
+                                      onChange={e => setPublishMeta(prev => ({ ...prev, [ch]: { ...prev[ch], title: e.target.value } }))}
+                                      placeholder="Title"
+                                      className="w-full px-2.5 py-1.5 text-[12px] border border-stone-200 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-300 bg-white"
+                                    />
+                                    <textarea
+                                      value={publishMeta[ch]?.description || ''}
+                                      onChange={e => setPublishMeta(prev => ({ ...prev, [ch]: { ...prev[ch], description: e.target.value } }))}
+                                      placeholder="Description"
+                                      rows={3}
+                                      className="w-full px-2.5 py-1.5 text-[12px] border border-stone-200 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-300 resize-none bg-white"
+                                    />
+                                    <input
+                                      type="text"
+                                      value={publishMeta[ch]?.tags || ''}
+                                      onChange={e => setPublishMeta(prev => ({ ...prev, [ch]: { ...prev[ch], tags: e.target.value } }))}
+                                      placeholder="Tags (comma-separated)"
+                                      className="w-full px-2.5 py-1.5 text-[12px] border border-stone-200 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-300 bg-white"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+
+                        {/* Publish all button */}
+                        <button
+                          onClick={publishAll}
+                          disabled={
+                            selectedPublishChannels.length === 0 ||
+                            selectedPublishChannels.every(ch => publishStatus[ch] === 'done' || publishStatus[ch] === 'uploading')
+                          }
+                          className="w-full flex items-center justify-center gap-2 px-4 py-3 text-[13px] font-semibold bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors disabled:opacity-40"
+                        >
+                          {selectedPublishChannels.some(ch => publishStatus[ch] === 'uploading')
+                            ? <><Spinner className="w-3.5 h-3.5" /> Publishing...</>
+                            : `Publish to ${selectedPublishChannels.length} channel${selectedPublishChannels.length !== 1 ? 's' : ''}`}
+                        </button>
+                        {thumbnailUrl && (
+                          <p className="text-[11px] text-stone-400 text-center">Generated thumbnail will be applied to all uploads</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Chapter clips */}
                 {currentJobId && (

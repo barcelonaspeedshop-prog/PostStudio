@@ -7,6 +7,7 @@ import { pipeline } from 'stream/promises'
 import path from 'path'
 import { createJob, updateJob, cleanOldJobs } from '../jobs'
 import { getRandomDriveMusicTrack, downloadDriveFileToPath } from '@/lib/drive-images'
+import { getChannel } from '@/lib/channels'
 
 // Local fallback music directories (mounted from /docker/poststudio/music)
 const LOCAL_MUSIC: Record<'calm' | 'energy', string> = {
@@ -128,6 +129,40 @@ function buildAss(chapters: ChapterInfo[], chapterDurations: Record<number, numb
 
 // ─── Background assembly ───
 
+function escapeDrawtext(text: string): string {
+  return text.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "\\'").replace(/\[/g, '\\[').replace(/\]/g, '\\]')
+}
+
+async function appendCtaEndCard(mainPath: string, ctaPath: string, outPath: string, tmpDir: string): Promise<void> {
+  try {
+    await runFfmpeg([
+      '-i', mainPath, '-i', ctaPath,
+      '-filter_complex', '[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[outv][outa]',
+      '-map', '[outv]', '-map', '[outa]',
+      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'fast', '-crf', '23',
+      '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', '-y', outPath,
+    ])
+  } catch {
+    // Main video may have no audio stream — add silent audio then retry
+    const mainSilenced = path.join(tmpDir, 'main_with_silence.mp4')
+    const dur = await probeDuration(mainPath)
+    await runFfmpeg([
+      '-i', mainPath,
+      '-f', 'lavfi', '-i', `anullsrc=r=44100:cl=stereo`,
+      '-filter_complex', `[1:a]atrim=duration=${dur.toFixed(3)}[aout]`,
+      '-map', '0:v', '-map', '[aout]',
+      '-c:v', 'copy', '-c:a', 'aac', '-b:a', '128k', '-y', mainSilenced,
+    ])
+    await runFfmpeg([
+      '-i', mainSilenced, '-i', ctaPath,
+      '-filter_complex', '[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[outv][outa]',
+      '-map', '[outv]', '-map', '[outa]',
+      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'fast', '-crf', '23',
+      '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', '-y', outPath,
+    ])
+  }
+}
+
 async function assembleInBackground(
   jobId: string,
   chapters: ChapterInfo[],
@@ -136,6 +171,7 @@ async function assembleInBackground(
   musicPath: string | null,
   musicVolume: number,
   tmpDir: string,
+  channelName?: string,
 ) {
   const W = 1920, H = 1080, DEFAULT_IMAGE_DUR = 5
   const chapterIds = chapters.map(c => c.id)
@@ -375,6 +411,43 @@ async function assembleInBackground(
       }
     }
 
+    // Append 5-second CTA end card if a channel name is provided
+    if (channelName) {
+      try {
+        updateJob(jobId, { progress: 'Adding end card...' })
+        const ch = getChannel(channelName)
+        const boldFont = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+        const regFont = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
+        const colorHex = ch.primary.replace('#', '0x')
+        const nameEsc = escapeDrawtext(ch.name)
+        const handleEsc = escapeDrawtext(ch.handle)
+        const ctaDur = 5
+        const ctaCard = path.join(tmpDir, 'cta_end_card.mp4')
+        const vfFilters = [
+          `drawtext=fontfile='${boldFont}':text='${nameEsc}':fontcolor=${colorHex}:fontsize=72:x=(w-text_w)/2:y=(h-text_h)/2-80`,
+          `drawtext=fontfile='${regFont}':text='${handleEsc}':fontcolor=white:fontsize=44:x=(w-text_w)/2:y=(h-text_h)/2+20`,
+          `drawtext=fontfile='${regFont}':text='Subscribe for more':fontcolor=0xAAAAAA:fontsize=32:x=(w-text_w)/2:y=(h-text_h)/2+80`,
+          `fade=t=in:st=0:d=0.5`,
+          `fade=t=out:st=${ctaDur - 0.5}:d=0.5`,
+        ].join(',')
+        await runFfmpeg([
+          '-f', 'lavfi', '-i', `color=c=black:s=1920x1080:d=${ctaDur}:r=30`,
+          '-f', 'lavfi', '-i', `anullsrc=r=44100:cl=stereo`,
+          '-t', String(ctaDur),
+          '-vf', vfFilters,
+          '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'fast',
+          '-c:a', 'aac', '-b:a', '128k',
+          '-y', ctaCard,
+        ])
+        const withCta = path.join(tmpDir, 'master_with_cta.mp4')
+        await appendCtaEndCard(outputVideo, ctaCard, withCta, tmpDir)
+        outputVideo = withCta
+        console.log(`[story-video] CTA end card appended for "${channelName}"`)
+      } catch (e) {
+        console.warn('[story-video] CTA end card failed (non-fatal):', e instanceof Error ? e.message : e)
+      }
+    }
+
     const totalDuration = Object.values(chapterDurations).reduce((a, b) => a + b, 0)
     updateJob(jobId, {
       status: 'complete',
@@ -500,8 +573,10 @@ export async function POST(req: NextRequest) {
       musicVolume = Math.max(0, Math.min(1, parseFloat(musicVolumeRaw) || 0.15))
     }
 
+    const channelName = (formData.get('channel') as string | null) || undefined
+
     const job = createJob()
-    assembleInBackground(job.id, chapters, mediaByChapter, audioByChapter, musicPath, musicVolume, tmpDir)
+    assembleInBackground(job.id, chapters, mediaByChapter, audioByChapter, musicPath, musicVolume, tmpDir, channelName)
     return NextResponse.json({ jobId: job.id })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
