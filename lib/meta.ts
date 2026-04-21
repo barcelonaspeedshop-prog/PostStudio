@@ -354,11 +354,17 @@ export async function publishToFacebook(
     // Determine media type by extension / MIME hint
     const isVideo = /\.(mp4|mov|avi|webm)(\?|$)/i.test(mediaUrl)
     if (isVideo) {
+      // Extract first line as title, rest as description
+      const [firstLine, ...rest] = message.split('\n')
+      const videoTitle = firstLine?.trim().slice(0, 255) || 'Video'
+      const videoDesc = rest.join('\n').trim().slice(0, 60000) || message.slice(0, 60000)
+      console.log(`[meta] Facebook video upload for ${channelName}: pageId=${pageId}, url=${mediaUrl.slice(0, 80)}`)
       const data = await graphPost(
         `/${pageId}/videos`,
-        { file_url: mediaUrl, description: message },
+        { file_url: mediaUrl, title: videoTitle, description: videoDesc, published: 'true' },
         token,
       )
+      console.log(`[meta] Facebook video upload response for ${channelName}:`, JSON.stringify(data))
       return { id: data.id as string }
     } else {
       const data = await graphPost(

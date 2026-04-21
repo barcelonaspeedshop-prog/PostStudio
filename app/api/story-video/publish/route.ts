@@ -135,6 +135,26 @@ export async function POST(req: NextRequest) {
 
     console.log(`[publish] Request — channel: "${channelName}", jobId: ${jobId}, publishInstagram: ${publishInstagram}, publishFacebook: ${publishFacebook}, format: ${format}`)
 
+    // ── Pre-flight: load credentials once ────────────────────────────────────
+    const [ytTokens, metaCfgPreflight] = await Promise.all([
+      loadTokens(),
+      (publishInstagram || publishFacebook) ? getChannelConfig(channelName) : Promise.resolve(null),
+    ])
+
+    const preflight: string[] = []
+    if (publishInstagram && !metaCfgPreflight?.instagramAccountId) {
+      preflight.push(`Instagram: no account ID for "${channelName}"`)
+    }
+    if (publishFacebook && !metaCfgPreflight?.facebookPageId) {
+      preflight.push(`Facebook: no page ID for "${channelName}"`)
+    }
+    if (publishFacebook && !metaCfgPreflight?.pageAccessToken) {
+      preflight.push(`Facebook: no access token for "${channelName}"`)
+    }
+    if (preflight.length > 0) {
+      console.warn(`[publish] Pre-flight credential failures for ${channelName}:`, preflight.join('; '))
+    }
+
     const results: {
       youtube?: { videoId: string; videoUrl: string }
       instagram?: { id: string }
@@ -143,10 +163,16 @@ export async function POST(req: NextRequest) {
       errors: Record<string, string>
     } = { errors: {} }
 
+    // Set pre-flight errors immediately so they surface in the response
+    if (publishInstagram && !metaCfgPreflight?.instagramAccountId) {
+      results.errors.instagram = `No Instagram account ID configured for "${channelName}"`
+    }
+    if (publishFacebook && (!metaCfgPreflight?.facebookPageId || !metaCfgPreflight?.pageAccessToken)) {
+      results.errors.facebook = `No Facebook credentials configured for "${channelName}"`
+    }
+
     // ── YouTube ──────────────────────────────────────────────────────────────
 
-    // Check if this channel has a YouTube token before attempting upload
-    const ytTokens = await loadTokens()
     if (ytTokens[channelName]) {
       try {
         const ytVideoPath = await getVideoPathForFormat(jobId, format)
@@ -195,51 +221,41 @@ export async function POST(req: NextRequest) {
 
     // ── Instagram Reel (9:16) ─────────────────────────────────────────────────
 
-    if (publishInstagram) {
-      const metaCfg = await getChannelConfig(channelName)
-      console.log(`[publish] Instagram — channel: "${channelName}", igAccountId: ${metaCfg?.instagramAccountId || 'NOT FOUND'}`)
-      if (!metaCfg?.instagramAccountId) {
-        results.errors.instagram = `No Instagram credentials for "${channelName}"`
-      } else {
-        try {
-          const reelsPath = await getVideoPathForFormat(jobId, 'reels')
-          const saved = await saveVideoPathToTempFile(reelsPath)
-          if (!saved) throw new Error('Could not create public URL for Instagram video')
-          tempFiles.push(saved.filePath)
-          console.log(`[publish] Publishing Instagram Reel for ${channelName}: ${saved.publicUrl}`)
-          const igResult = await publishVideoToInstagram(channelName, saved.publicUrl, `${title}\n\n${description}`.slice(0, 2200))
-          results.instagram = { id: igResult.id }
-          console.log(`[publish] Instagram Reel published: ${igResult.id}`)
-        } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : String(e)
-          console.error(`[publish] Instagram error for ${channelName}:`, msg)
-          results.errors.instagram = msg
-        }
+    if (publishInstagram && !results.errors.instagram) {
+      console.log(`[publish] Instagram — channel: "${channelName}", igAccountId: ${metaCfgPreflight?.instagramAccountId}`)
+      try {
+        const reelsPath = await getVideoPathForFormat(jobId, 'reels')
+        const saved = await saveVideoPathToTempFile(reelsPath)
+        if (!saved) throw new Error('Could not create public URL for Instagram video')
+        tempFiles.push(saved.filePath)
+        console.log(`[publish] Publishing Instagram Reel for ${channelName}: ${saved.publicUrl}`)
+        const igResult = await publishVideoToInstagram(channelName, saved.publicUrl, `${title}\n\n${description}`.slice(0, 2200))
+        results.instagram = { id: igResult.id }
+        console.log(`[publish] Instagram Reel published: ${igResult.id}`)
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e)
+        console.error(`[publish] Instagram error for ${channelName}:`, msg)
+        results.errors.instagram = msg
       }
     }
 
     // ── Facebook (16:9) ──────────────────────────────────────────────────────
 
-    if (publishFacebook) {
-      const metaCfg = await getChannelConfig(channelName)
-      console.log(`[publish] Facebook — channel: "${channelName}", pageId: ${metaCfg?.facebookPageId || 'NOT FOUND'}`)
-      if (!metaCfg?.facebookPageId) {
-        results.errors.facebook = `No Facebook credentials for "${channelName}"`
-      } else {
-        try {
-          const fbVideoPath = await getVideoPathForFormat(jobId, 'youtube')
-          const saved = await saveVideoPathToTempFile(fbVideoPath)
-          if (!saved) throw new Error('Could not create public URL for Facebook video')
-          tempFiles.push(saved.filePath)
-          console.log(`[publish] Publishing to Facebook for ${channelName}: ${saved.publicUrl}`)
-          const fbResult = await publishToFacebook(channelName, `${title}\n\n${description}`.slice(0, 63206), saved.publicUrl)
-          results.facebook = { id: fbResult.id }
-          console.log(`[publish] Facebook post published: ${fbResult.id}`)
-        } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : String(e)
-          console.error(`[publish] Facebook error for ${channelName}:`, msg)
-          results.errors.facebook = msg
-        }
+    if (publishFacebook && !results.errors.facebook) {
+      console.log(`[publish] Facebook — channel: "${channelName}", pageId: ${metaCfgPreflight?.facebookPageId}`)
+      try {
+        const fbVideoPath = await getVideoPathForFormat(jobId, 'youtube')
+        const saved = await saveVideoPathToTempFile(fbVideoPath)
+        if (!saved) throw new Error('Could not create public URL for Facebook video')
+        tempFiles.push(saved.filePath)
+        console.log(`[publish] Publishing to Facebook for ${channelName}: ${saved.publicUrl}`)
+        const fbResult = await publishToFacebook(channelName, `${title}\n\n${description}`.slice(0, 63206), saved.publicUrl)
+        results.facebook = { id: fbResult.id }
+        console.log(`[publish] Facebook post published: ${fbResult.id}`)
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e)
+        console.error(`[publish] Facebook error for ${channelName}:`, msg)
+        results.errors.facebook = msg
       }
     }
 

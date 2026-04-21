@@ -1019,7 +1019,8 @@ export default function LongFormPage() {
       if ((plat.ig || plat.fb) && metaStatus[ch] !== 'done' && metaStatus[ch] !== 'uploading') {
         publishMetaForChannel(ch)
       }
-      if (plat.yt && ytStatus[ch] !== 'done' && ytStatus[ch] !== 'uploading' && ytStatus[ch] !== 'connecting') {
+      // Hard guard: YouTube only runs for Gentlemen of Fuel
+      if (plat.yt && ch === 'Gentlemen of Fuel' && ytStatus[ch] !== 'done' && ytStatus[ch] !== 'uploading' && ytStatus[ch] !== 'connecting') {
         loginAndUploadYouTube(ch)
       }
     }
@@ -1401,14 +1402,12 @@ export default function LongFormPage() {
                             <div className="flex items-center gap-3 px-3 py-2.5">
                               <span className="text-[13px] font-medium text-stone-800 min-w-0 flex-1">{ch}</span>
                               <div className="flex gap-1.5 shrink-0">
-                                {ytEnabled ? (
+                                {ytEnabled && (
                                   <button
                                     onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], yt: !plat.yt } }))}
                                     title={ytAlready ? 'YouTube — already connected, will upload directly' : 'YouTube — login required'}
                                     className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.yt ? 'bg-red-50 text-red-600 border-red-300' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300'}`}
                                   >YT</button>
-                                ) : (
-                                  <span title="YouTube coming soon" className="text-[10px] px-2 py-0.5 rounded-full border font-semibold bg-stone-50 text-stone-300 border-stone-100 cursor-not-allowed select-none">YT</span>
                                 )}
                                 <button
                                   onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], ig: !plat.ig } }))}
@@ -1859,14 +1858,12 @@ export default function LongFormPage() {
                             <div className="flex items-center gap-3 px-3 py-2.5">
                               <span className="text-[12px] font-medium text-stone-800 min-w-0 flex-1">{ch}</span>
                               <div className="flex gap-1.5 shrink-0">
-                                {ytEnabled ? (
+                                {ytEnabled && (
                                   <button
                                     onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], yt: !plat.yt } }))}
                                     title={ytAlready ? 'YouTube — already connected, will upload directly' : 'YouTube — login required'}
                                     className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.yt ? 'bg-red-50 text-red-600 border-red-300' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300'}`}
                                   >YT</button>
-                                ) : (
-                                  <span title="YouTube coming soon" className="text-[10px] px-2 py-0.5 rounded-full border font-semibold bg-stone-50 text-stone-300 border-stone-100 cursor-not-allowed select-none">YT</span>
                                 )}
                                 <button
                                   onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], ig: !plat.ig } }))}
