@@ -15,6 +15,8 @@ const VOICES = [
   { id: 'B9PDs7mcHTMxHUw5U8Cf', label: 'Holly — Soft UK' },
   { id: 'yl2ZDV1MzN4HbQJbMihG', label: 'Alex — Energy USA' },
   { id: 'gnPxliFHTp6OK6tcoA6i', label: 'Sam — Sports USA' },
+  { id: 'oTQK6KgOJHp8UGGZjwUu', label: 'Dexter — Energetic (all channels)' },
+  { id: '4dZr8J4CBeokyRkTRpoN', label: 'Harwood — Authoritative (F1, Gentlemen of Fuel)' },
 ]
 
 const BUILD_STEPS: { id: BuildPhase; label: string }[] = [
