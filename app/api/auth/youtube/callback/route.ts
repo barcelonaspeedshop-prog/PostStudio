@@ -46,6 +46,17 @@ export async function GET(req: NextRequest) {
       console.warn(`[youtube-callback] No refresh_token returned for "${state}" — user may need to revoke and reconnect`)
     }
 
+    // Decode id_token to capture the Google account email for future login_hint use
+    let googleEmail = ''
+    if (tokens.id_token) {
+      try {
+        const payload = JSON.parse(
+          Buffer.from(tokens.id_token.split('.')[1], 'base64url').toString('utf-8')
+        )
+        googleEmail = payload.email || ''
+      } catch { /* non-fatal */ }
+    }
+
     // Find out which YouTube channel this token actually belongs to.
     // When the user selected a specific Brand Account on the consent screen,
     // mine=true will return that Brand Account's channel.
@@ -71,12 +82,13 @@ export async function GET(req: NextRequest) {
     // the Brand Account selected on the Google consent screen.
     const allTokens = await loadTokens()
     allTokens[state] = {
-      access_token:         tokens.access_token  || '',
-      refresh_token:        tokens.refresh_token || allTokens[state]?.refresh_token || '',
-      expiry_date:          tokens.expiry_date   || 0,
-      youtube_channel_name: youtubeChannelName,
-      youtube_channel_id:   youtubeChannelId,
-      youtube_handle:       youtubeHandle,
+      access_token:          tokens.access_token  || '',
+      refresh_token:         tokens.refresh_token || allTokens[state]?.refresh_token || '',
+      expiry_date:           tokens.expiry_date   || 0,
+      youtube_channel_name:  youtubeChannelName,
+      youtube_channel_id:    youtubeChannelId,
+      youtube_handle:        youtubeHandle,
+      google_account_email:  googleEmail || allTokens[state]?.google_account_email || '',
     }
     await saveTokens(allTokens)
 

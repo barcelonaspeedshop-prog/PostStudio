@@ -14,6 +14,7 @@ export type YouTubeToken = {
   youtube_channel_name: string
   youtube_channel_id: string
   youtube_handle?: string
+  google_account_email?: string
 }
 
 export type TokenStore = Record<string, YouTubeToken>

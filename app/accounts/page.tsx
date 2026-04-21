@@ -119,6 +119,7 @@ type YouTubeStatus = Record<string, {
   youtube_channel_name?: string
   youtube_channel_id?: string
   youtube_handle?: string
+  google_account_email?: string
 }>
 
 type YouTubeHealth = {
@@ -132,6 +133,8 @@ function AccountsPageInner() {
   const [ytHealth, setYtHealth]     = useState<YouTubeHealth | null>(null)
   const [ytDisconnecting, setYtDisconnecting] = useState<string | null>(null)
   const [ytRevoking, setYtRevoking] = useState<string | null>(null)
+  // Per-channel Google account email inputs (used as login_hint during OAuth)
+  const [loginHints, setLoginHints] = useState<Record<string, string>>({})
   const [connectForm, setConnectForm] = useState<ConnectForm | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [disconnecting, setDisconnecting] = useState<string | null>(null)
@@ -171,18 +174,28 @@ function AccountsPageInner() {
     } catch { /* ignore */ }
   }
 
-  // Revoke the shared token for a channel, then redirect to fresh OAuth
+  // Revoke the shared token for a channel, then redirect to fresh OAuth.
+  // Passes login_hint so Google pre-selects the correct account in the picker.
   const revokeAndReconnect = async (channel: string) => {
     setYtRevoking(channel)
     try {
       await fetch(`/api/auth/youtube?action=revoke&channel=${encodeURIComponent(channel)}`)
       await fetchYtStatus()
       await fetchYtHealth()
-      window.location.href = `/api/auth/youtube?channel=${encodeURIComponent(channel)}`
+      const hint = loginHints[channel]?.trim() || ytStatus[channel]?.google_account_email || ''
+      const hintParam = hint ? `&login_hint=${encodeURIComponent(hint)}` : ''
+      window.location.href = `/api/auth/youtube?channel=${encodeURIComponent(channel)}${hintParam}`
     } catch {
       showToast('Revoke failed', 'error')
       setYtRevoking(null)
     }
+  }
+
+  // Build OAuth URL including login_hint for Connect / Reconnect links
+  const ytOAuthUrl = (channel: string) => {
+    const hint = loginHints[channel]?.trim() || ytStatus[channel]?.google_account_email || ''
+    const hintParam = hint ? `&login_hint=${encodeURIComponent(hint)}` : ''
+    return `/api/auth/youtube?channel=${encodeURIComponent(channel)}${hintParam}`
   }
 
   const disconnectYt = async (channel: string) => {
@@ -549,7 +562,7 @@ function AccountsPageInner() {
                                   </button>
                                 ) : (
                                   <a
-                                    href={`/api/auth/youtube?channel=${encodeURIComponent(ch.channel)}`}
+                                    href={ytOAuthUrl(ch.channel)}
                                     className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${hasIssue ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
                                   >
                                     ↻ Reconnect
@@ -565,24 +578,47 @@ function AccountsPageInner() {
                               </div>
                             ) : (
                               <a
-                                href={`/api/auth/youtube?channel=${encodeURIComponent(ch.channel)}`}
+                                href={ytOAuthUrl(ch.channel)}
                                 className="shrink-0 px-3 py-1.5 text-[12px] font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                               >
                                 Connect
                               </a>
                             )}
                           </div>
+                          {/* Google account email — shown when connected; used as login_hint */}
+                          {yt?.connected && yt.google_account_email && !hasIssue && (
+                            <p className="mt-1.5 text-[10px] text-stone-400">
+                              Google: {yt.google_account_email}
+                            </p>
+                          )}
+
+                          {/* login_hint email input — shown when there's a problem or no email stored */}
+                          {(hasIssue || (yt?.connected && !yt.google_account_email) || !yt?.connected) && (
+                            <div className="mt-2">
+                              <input
+                                type="email"
+                                value={loginHints[ch.channel] || ''}
+                                onChange={(e) => setLoginHints(h => ({ ...h, [ch.channel]: e.target.value }))}
+                                placeholder="Google account email (login_hint)"
+                                className="w-full px-2 py-1.5 text-[11px] border border-stone-200 rounded-lg text-stone-700 placeholder-stone-300 focus:outline-none focus:ring-1 focus:ring-stone-400"
+                              />
+                              <p className="mt-0.5 text-[10px] text-stone-400">
+                                Enter the Google account email for this channel so OAuth targets the right account.
+                              </p>
+                            </div>
+                          )}
+
                           {sharedToken && (
                             <div className="mt-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
                               <p className="text-[10px] text-amber-800 leading-relaxed">
-                                <strong>Action required:</strong> Click <strong>↻ Revoke &amp; Reconnect</strong>. On Google&apos;s &quot;Choose your channel&quot; screen, select <strong><code className="bg-amber-100 px-0.5 rounded font-mono">{expectedHandle}</code></strong>.
+                                <strong>Action required:</strong> Enter the Google email above, then click <strong>↻ Revoke &amp; Reconnect</strong>. On Google&apos;s &quot;Choose your channel&quot; screen, select <strong><code className="bg-amber-100 px-0.5 rounded font-mono">{expectedHandle}</code></strong>.
                               </p>
                             </div>
                           )}
                           {!sharedToken && wrongChannel && (
                             <div className="mt-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
                               <p className="text-[10px] text-red-700 leading-relaxed">
-                                <strong>Action required:</strong> Click <strong>↻ Reconnect</strong>. On Google&apos;s screen, click <strong>&quot;Switch account&quot;</strong> and sign in as the <strong>{ch.channel}</strong> Brand Account.
+                                <strong>Action required:</strong> Enter the Google email above, then click <strong>↻ Reconnect</strong>. On Google&apos;s screen, click <strong>&quot;Switch account&quot;</strong> and sign in as the <strong>{ch.channel}</strong> Brand Account.
                               </p>
                             </div>
                           )}

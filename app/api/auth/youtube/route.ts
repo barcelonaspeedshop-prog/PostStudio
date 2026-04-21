@@ -10,13 +10,14 @@ export async function GET(req: NextRequest) {
   // Return connected status for all channels
   if (action === 'status') {
     const tokens = await loadTokens()
-    const status: Record<string, { connected: boolean; youtube_channel_name?: string; youtube_channel_id?: string; youtube_handle?: string }> = {}
+    const status: Record<string, { connected: boolean; youtube_channel_name?: string; youtube_channel_id?: string; youtube_handle?: string; google_account_email?: string }> = {}
     for (const [channel, token] of Object.entries(tokens)) {
       status[channel] = {
         connected: true,
         youtube_channel_name: token.youtube_channel_name,
         youtube_channel_id: token.youtube_channel_id,
         youtube_handle: token.youtube_handle,
+        google_account_email: token.google_account_email,
       }
     }
     return NextResponse.json(status)
@@ -93,6 +94,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'YOUTUBE_CLIENT_ID not configured' }, { status: 500 })
   }
 
+  // login_hint: passed explicitly from the accounts page, or auto-loaded from the
+  // previously-saved google_account_email for this channel.  Passing login_hint
+  // alongside prompt=select_account steers Google to the correct account in the
+  // picker so the user doesn't accidentally reuse the wrong session.
+  const loginHintParam = searchParams.get('login_hint') || ''
+  let loginHint = loginHintParam
+  if (!loginHint) {
+    try {
+      const storedTokens = await loadTokens()
+      loginHint = storedTokens[channel]?.google_account_email || ''
+    } catch { /* non-fatal */ }
+  }
+
   const oauth2 = getOAuth2Client()
   const authUrl = oauth2.generateAuthUrl({
     access_type: 'offline',
@@ -107,6 +121,7 @@ export async function GET(req: NextRequest) {
       'https://www.googleapis.com/auth/drive.file',
     ],
     state: channel,
+    ...(loginHint ? { login_hint: loginHint } : {}),
   })
 
   return NextResponse.redirect(authUrl)
