@@ -1,9 +1,12 @@
 'use client'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 import PostPreview from '@/components/PostPreview'
 import { generatePostContent, regenerateField, PostContent } from '@/lib/claude'
 import { PLATFORMS, TONES, FORMATS } from '@/lib/platforms'
+import { CHANNELS as CHANNEL_CONFIGS } from '@/lib/channels'
+
+const CHANNEL_NAMES = Object.keys(CHANNEL_CONFIGS)
 
 type Toast = { msg: string; type?: 'success' | 'error' }
 
@@ -19,11 +22,17 @@ function useToast() {
 export default function ComposerPage() {
   const { toast, show } = useToast()
 
+  // Channel
+  const [selectedChannel, setSelectedChannel] = useState(CHANNEL_NAMES[0])
+  const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([])
+  const [statusLoading, setStatusLoading] = useState(false)
+
   // AI prompt
   const [aiPrompt, setAiPrompt] = useState('')
   const [tone, setTone] = useState('casual')
   const [generating, setGenerating] = useState(false)
   const [aiStatus, setAiStatus] = useState('')
+  const [publishing, setPublishing] = useState(false)
 
   // Post fields
   const [title, setTitle] = useState('')
@@ -34,7 +43,7 @@ export default function ComposerPage() {
   const [tagInput, setTagInput] = useState('')
 
   // Platform / format
-  const [selPlatforms, setSelPlatforms] = useState<string[]>(['instagram', 'tiktok'])
+  const [selPlatforms, setSelPlatforms] = useState<string[]>([])
   const [selFormat, setSelFormat] = useState('30s reel')
   const [timing, setTiming] = useState('now')
   const [scheduleDt, setScheduleDt] = useState('')
@@ -42,6 +51,36 @@ export default function ComposerPage() {
   // Media
   const [mediaFiles, setMediaFiles] = useState<File[]>([])
   const [mediaSrc, setMediaSrc] = useState<string | null>(null)
+
+  // Load connected platform status whenever the channel changes
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      setStatusLoading(true)
+      try {
+        const [ytRes, metaRes] = await Promise.all([
+          fetch('/api/auth/youtube?action=status'),
+          fetch('/api/auth/meta?action=status'),
+        ])
+        const ytStatus = ytRes.ok ? await ytRes.json() : {}
+        const metaStatus = metaRes.ok ? await metaRes.json() : {}
+        if (cancelled) return
+        const connected: string[] = []
+        if (ytStatus[selectedChannel]?.connected) connected.push('youtube')
+        if (metaStatus[selectedChannel]?.instagram) connected.push('instagram')
+        if (metaStatus[selectedChannel]?.facebook) connected.push('facebook')
+        setConnectedPlatforms(connected)
+        setSelPlatforms(prev => prev.filter(p => connected.includes(p)))
+      } catch {
+        // non-fatal — show all platforms if status check fails
+        setConnectedPlatforms([])
+      } finally {
+        if (!cancelled) setStatusLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [selectedChannel])
 
   // Readiness
   const readiness = Math.min(
@@ -130,16 +169,49 @@ export default function ComposerPage() {
     }
   }
 
-  const publishAll = () => {
-    if (!selPlatforms.length) { show('Select at least one platform', 'error'); return }
-    show(`Publishing to ${selPlatforms.length} platform${selPlatforms.length > 1 ? 's' : ''}...`)
-    setTimeout(() => show('Posted successfully!'), 1800)
+  const doPublish = async (platforms: string[]) => {
+    const connected = platforms.filter(p => connectedPlatforms.includes(p))
+    if (!connected.length) {
+      show('No connected platforms selected — connect them on the Accounts page first', 'error')
+      return
+    }
+    setPublishing(true)
+    try {
+      const res = await fetch('/api/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: caption || description || title,
+          imageUrls: mediaSrc ? [mediaSrc] : undefined,
+          platforms: connected,
+          channel: selectedChannel,
+        }),
+      })
+      const data = await res.json()
+      const succeeded = (data.results as Array<{ success: boolean }> | undefined)
+        ?.filter(r => r.success).length ?? 0
+      const errors = (data.results as Array<{ success: boolean; skipped?: boolean; error?: string }> | undefined)
+        ?.filter(r => !r.success && !r.skipped).map(r => r.error).filter(Boolean) ?? []
+      if (succeeded > 0) {
+        show(`Published to ${succeeded} platform${succeeded !== 1 ? 's' : ''}!`)
+      } else if (errors.length) {
+        show(errors[0] || 'Publish failed', 'error')
+      } else {
+        show('No platforms published — check connection status', 'error')
+      }
+    } catch (e: unknown) {
+      show(e instanceof Error ? e.message : 'Publish failed', 'error')
+    } finally {
+      setPublishing(false)
+    }
   }
 
-  const publishTo = (p: string) => {
-    show(`Publishing to ${p}...`)
-    setTimeout(() => show('Done!'), 1400)
+  const publishAll = () => {
+    if (!selPlatforms.length) { show('Select at least one platform', 'error'); return }
+    doPublish(selPlatforms)
   }
+
+  const publishTo = (p: string) => doPublish([p])
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -158,9 +230,10 @@ export default function ComposerPage() {
             </button>
             <button
               onClick={publishAll}
-              className="px-3 py-2 min-h-[44px] text-[13px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors"
+              disabled={publishing}
+              className="px-3 py-2 min-h-[44px] text-[13px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors disabled:opacity-50"
             >
-              Publish
+              {publishing ? 'Publishing...' : 'Publish'}
             </button>
           </div>
         </div>
@@ -168,6 +241,40 @@ export default function ComposerPage() {
         <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
           {/* Composer scroll area */}
           <div className="flex-1 overflow-y-auto p-4 md:p-5 flex flex-col gap-4">
+
+            {/* Channel selector */}
+            <div className="bg-white border border-stone-100 rounded-xl p-4">
+              <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-3">Channel</p>
+              <div className="relative">
+                <span
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full shrink-0 pointer-events-none"
+                  style={{ background: CHANNEL_CONFIGS[selectedChannel]?.primary ?? '#888' }}
+                />
+                <select
+                  value={selectedChannel}
+                  onChange={e => setSelectedChannel(e.target.value)}
+                  className="w-full pl-8 pr-4 py-2.5 text-[13px] border border-stone-200 rounded-lg bg-white text-stone-900 focus:outline-none focus:border-stone-400 appearance-none cursor-pointer"
+                >
+                  {CHANNEL_NAMES.map(ch => (
+                    <option key={ch} value={ch}>{ch}</option>
+                  ))}
+                </select>
+                <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+              {!statusLoading && connectedPlatforms.length === 0 && (
+                <p className="text-[11px] text-amber-600 mt-2">
+                  No platforms connected for this channel —{' '}
+                  <a href="/accounts" className="underline hover:text-amber-800">connect on Accounts page</a>
+                </p>
+              )}
+              {!statusLoading && connectedPlatforms.length > 0 && (
+                <p className="text-[11px] text-stone-400 mt-2">
+                  Connected: {connectedPlatforms.join(', ')}
+                </p>
+              )}
+            </div>
 
             {/* AI Prompt Card */}
             <div className="bg-stone-50 border border-stone-100 rounded-xl p-4">
@@ -266,20 +373,28 @@ export default function ComposerPage() {
             <div className="bg-white border border-stone-100 rounded-xl p-4">
               <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-3">Platforms</p>
               <div className="flex flex-wrap gap-2">
-                {PLATFORMS.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => togglePlatform(p.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] border transition-all ${
-                      selPlatforms.includes(p.id)
-                        ? 'border-stone-400 bg-stone-100 text-stone-900 font-medium'
-                        : 'border-stone-200 text-stone-500 hover:bg-stone-50'
-                    }`}
-                  >
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.color }} />
-                    {p.label}
-                  </button>
-                ))}
+                {PLATFORMS.map((p) => {
+                  const isConnected = connectedPlatforms.includes(p.id)
+                  const isSelected = selPlatforms.includes(p.id)
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => isConnected && togglePlatform(p.id)}
+                      title={isConnected ? undefined : `${p.label} not connected for ${selectedChannel}`}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] border transition-all ${
+                        !isConnected
+                          ? 'border-stone-100 text-stone-300 cursor-not-allowed'
+                          : isSelected
+                          ? 'border-stone-400 bg-stone-100 text-stone-900 font-medium'
+                          : 'border-stone-200 text-stone-500 hover:bg-stone-50'
+                      }`}
+                    >
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: isConnected ? p.color : '#d4d4d4' }} />
+                      {p.label}
+                      {!isConnected && <span className="text-[9px] text-stone-300">✕</span>}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 

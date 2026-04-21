@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { loadMetaTokens } from '@/lib/meta'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,10 +12,23 @@ const SCOPES = [
   'business_management',
 ].join(',')
 
-// GET /api/auth/meta
-// Redirects the browser to Facebook's OAuth consent screen.
-// On approval the user lands at /api/auth/meta/callback.
-export async function GET() {
+// GET /api/auth/meta?action=status — returns which channels have Meta tokens configured
+// GET /api/auth/meta — redirects to Facebook OAuth consent screen
+export async function GET(req: NextRequest) {
+  const action = new URL(req.url).searchParams.get('action')
+
+  if (action === 'status') {
+    const tokens = await loadMetaTokens()
+    const status: Record<string, { instagram: boolean; facebook: boolean }> = {}
+    for (const [ch, cfg] of Object.entries(tokens)) {
+      status[ch] = {
+        instagram: !!(cfg.instagramAccountId),
+        facebook: !!(cfg.facebookPageId),
+      }
+    }
+    return NextResponse.json(status)
+  }
+
   const appId      = process.env.META_APP_ID
   const baseUrl    = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
   const redirectUri = `${baseUrl}/api/auth/meta/callback`
