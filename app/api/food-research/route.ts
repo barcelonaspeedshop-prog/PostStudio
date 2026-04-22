@@ -12,13 +12,20 @@ export type ResearchResult = {
   country: string
   cuisine: string
   priceRange: string
+  priceContext: string
   credibilityScore: number
   hiddenGemScore: number
   whyItKills: string
   mustTry: string
+  mustOrder: { name: string; description: string; price: string }[]
   localBuzz: string
   sources: string[]
   mapsQuery: string
+  mapsUrl: string
+  phone: string
+  website: string
+  payment: string
+  proTips: string[]
   bookingUrl: string
   series: 'no-frills' | 'top5'
 }
@@ -42,13 +49,19 @@ export async function POST(req: NextRequest) {
 Look on Reddit (r/food, r/${city.replace(/\s+/g, '').toLowerCase()}, local subreddits), local food blogs, Google Maps reviews from local guides, and neighbourhood forums.
 
 For each restaurant find:
-- Exact restaurant name and full address
-- Cuisine type and price range per person
+- Exact restaurant name and full address including neighbourhood
+- Cuisine type and price range per person with currency context (e.g. "about €5-8 per dish")
 - What makes it a hidden gem (not a tourist trap)
 - The must-try dish
+- 2-3 must-order dishes with descriptions AND individual prices
 - What locals are saying about it
 - Credibility score 1-10 (based on how many authentic local sources mention it)
 - Hidden gem score 1-10 (10 = completely off the tourist radar)
+- Google Maps URL: https://maps.google.com/search?q=restaurant+name+city
+- Phone number if available
+- Website URL if available
+- Payment: cash only / cards accepted / both
+- 3-4 genuine insider pro tips
 - Any booking info
 
 Return ONLY this JSON (an array, no other text):
@@ -59,13 +72,25 @@ Return ONLY this JSON (an array, no other text):
     "country": "country name",
     "cuisine": "cuisine type",
     "priceRange": "e.g. £10-20pp",
+    "priceContext": "about €5-8 per dish",
     "credibilityScore": 8,
     "hiddenGemScore": 9,
     "whyItKills": "2-3 sentences on what makes this place special and why it deserves attention",
     "mustTry": "one specific dish or item",
+    "mustOrder": [
+      { "name": "dish name", "description": "one sentence why unmissable", "price": "£8" }
+    ],
     "localBuzz": "one sentence quoting or summarising what locals say",
     "sources": ["url1", "url2"],
     "mapsQuery": "${city} restaurant name",
+    "mapsUrl": "https://maps.google.com/search?q=restaurant+name+city",
+    "phone": "+XX XXXX XXXX or empty string",
+    "website": "https://example.com or empty string",
+    "payment": "Cash only / Cards accepted / Cash or card",
+    "proTips": [
+      "Arrive early — queues form fast",
+      "Order the [dish] on your first visit"
+    ],
     "bookingUrl": "booking url or empty string",
     "series": "no-frills"
   }
@@ -75,13 +100,19 @@ Return ONLY this JSON (an array, no other text):
 Search for critically acclaimed restaurants, iconic local institutions, and places that serious food lovers consider essential when visiting ${city}. Include variety across cuisine types and price points.
 
 For each restaurant find:
-- Exact restaurant name and address
-- Cuisine type and price range
+- Exact restaurant name and address including neighbourhood
+- Cuisine type and price range with currency context
 - Why it's considered essential — history, reputation, what sets it apart
 - The signature dish
+- 2-3 must-order dishes with descriptions AND individual prices
 - What critics and locals say
 - Credibility score 1-10 (based on critical acclaim and local reputation)
 - Any awards, Michelin stars, or notable press
+- Google Maps URL: https://maps.google.com/search?q=restaurant+name+city
+- Phone number if available
+- Website URL if available
+- Payment info
+- 3-4 pro tips
 - Booking info
 
 Return ONLY this JSON (an array, no other text):
@@ -92,13 +123,25 @@ Return ONLY this JSON (an array, no other text):
     "country": "country name",
     "cuisine": "cuisine type",
     "priceRange": "e.g. £40-80pp",
+    "priceContext": "about €45-90 per person",
     "credibilityScore": 9,
     "hiddenGemScore": 3,
     "whyItKills": "2-3 sentences on what makes this a must-visit and its place in the city's food culture",
     "mustTry": "signature dish or experience",
+    "mustOrder": [
+      { "name": "dish name", "description": "one sentence why unmissable", "price": "£28" }
+    ],
     "localBuzz": "one sentence on its reputation — awards, press, or what food lovers say",
     "sources": ["url1", "url2"],
     "mapsQuery": "${city} restaurant name",
+    "mapsUrl": "https://maps.google.com/search?q=restaurant+name+city",
+    "phone": "+XX XXXX XXXX or empty string",
+    "website": "https://example.com or empty string",
+    "payment": "Cash only / Cards accepted / Cash or card",
+    "proTips": [
+      "Book weeks in advance",
+      "Ask for the tasting menu"
+    ],
     "bookingUrl": "booking url or empty string",
     "series": "top5"
   }

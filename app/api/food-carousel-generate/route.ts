@@ -15,11 +15,18 @@ export type RestaurantMeta = {
   country: string
   cuisine: string
   priceRange: string
+  priceContext: string      // e.g. "about €5-8 per dish"
   series: 'no-frills' | 'top5'
   story: string
-  mustOrder: { name: string; description: string }[]
+  mustOrder: { name: string; description: string; price: string }[]
   hoursNote: string
   address: string
+  neighbourhood: string
+  mapsUrl: string           // Google Maps URL
+  phone: string
+  website: string
+  payment: string           // e.g. "Cash only" / "Cards accepted"
+  proTips: string[]         // 3-4 insider tips
   bookingNote: string
 }
 
@@ -32,10 +39,11 @@ type SlideResult = {
   body: string
   badge: string
   accent: string
-  tileType: 'food-image' | 'food-must-order' | 'food-info' | 'story-text' | 'story'
-  foodMustOrder?: { name: string; description: string; priceRange?: string }
+  tileType: 'food-image' | 'food-must-order' | 'food-info' | 'food-pro-tips' | 'story-text' | 'story'
+  foodDishes?: { name: string; description: string; price?: string }[]
   foodInfoItems?: FoodInfoItem[]
   foodRestaurantName?: string
+  foodProTips?: string[]
 }
 
 function slugify(name: string): string {
@@ -70,58 +78,71 @@ Always respond with valid JSON only — no markdown, no backticks, no preamble. 
     tools: [{ type: 'web_search_20250305', name: 'web_search' }] as any,
     messages: [{
       role: 'user',
-      content: `Research "${restaurant.name}" in ${restaurant.city} using web search. Find:
-- The restaurant's story and what makes it special
-- Opening hours and price range per person
-- 2-3 must-order dishes with descriptions
-- The address
-- What makes it a hidden gem (low tourist footprint, local favourite)
+      content: `Research "${restaurant.name}" in ${restaurant.city} thoroughly using web search. Find ALL of:
+- Restaurant story, history, what makes it special to locals
+- Complete address including street, neighbourhood
+- Full opening hours (each day if possible, or clear range)
+- Price range with currency context (e.g. "¥800-1200 — about €5-8 per dish")
+- 2-3 must-order dishes with descriptions AND individual prices
+- Google Maps search URL: https://maps.google.com/search?q=RESTAURANT+NAME+CITY
+- Phone number if available
+- Website URL if available
+- Payment: cash only / cards accepted / both
+- 3-4 genuine insider pro tips a traveler actually needs (best time to visit, what to order, etiquette, secrets)
 
-Create a 6-slide "No Frills But Kills" carousel:
-- Slide 1 (HOOK): Punchy hook. Tag: location/vibe label. Badge: "NO FRILLS BUT KILLS"
-- Slide 2 (THE STORY): Background — history, vibe, why locals love it
-- Slide 3 (MUST ORDER #1): First signature dish — name it, describe why it's special
-- Slide 4 (MUST ORDER #2): Second signature dish — name it, describe why it's special
-- Slide 5 (THE DETAILS): Practical info — hours, price per person, how to find it
+Create a 6-slide "No Frills But Kills" carousel with these slides:
+- Slide 1: Punchy hook headline (3-5 words). Tag will be set to "NO FRILLS BUT KILLS"
+- Slide 2: The story — background, history, why locals love it. Tag will be set to "THE STORY"
+- Slide 3: Will be auto-generated from must-order dishes data
+- Slide 4: Will be auto-generated from practical info data
+- Slide 5: Will be auto-generated from pro tips data
 - Slide 6 (CTA): "Would you eat here?" or similar audience question
-
-Also provide a restaurantMeta object with structured data for the website.
 
 Return ONLY this JSON (plain text only — no HTML tags):
 {
   "slides": [
-    {
-      "num": "01",
-      "tag": "SHORT TAG IN CAPS",
-      "headline": "Punchy headline max 7 words",
-      "body": "2-3 sentence description max 35 words. Plain text only.",
-      "badge": "SHORT BADGE IN CAPS",
-      "accent": "amber"
-    }
+    { "num": "01", "tag": "SHORT TAG IN CAPS", "headline": "Punchy 3-5 word hook", "body": "2-3 sentence description max 30 words.", "badge": "NO FRILLS BUT KILLS", "accent": "amber" },
+    { "num": "02", "tag": "THE STORY", "headline": "Background headline 4-6 words", "body": "2-3 sentences on history and local love. Max 30 words.", "badge": "NO FRILLS BUT KILLS", "accent": "amber" },
+    { "num": "03", "tag": "MUST ORDER", "headline": "Must Order", "body": "See must-order dishes below.", "badge": "SIGNATURE DISHES", "accent": "amber" },
+    { "num": "04", "tag": "FIND US", "headline": "The Details", "body": "Practical info.", "badge": "PRACTICAL INFO", "accent": "amber" },
+    { "num": "05", "tag": "PRO TIPS", "headline": "Pro Tips", "body": "Insider knowledge.", "badge": "INSIDER", "accent": "amber" },
+    { "num": "06", "tag": "WOULD YOU?", "headline": "Would you eat here?", "body": "Tag a friend who needs to know about this place. Follow for more hidden gems.", "badge": "NO FRILLS BUT KILLS", "accent": "amber" }
   ],
   "imageQueries": [
-    "restaurant name city food photography",
-    "restaurant interior atmosphere"
+    "RESTAURANT_NAME CITY food dish photography",
+    "RESTAURANT_NAME CITY interior atmosphere"
   ],
   "restaurantMeta": {
     "name": "exact restaurant name",
     "city": "${restaurant.city}",
     "country": "country name",
     "cuisine": "cuisine type",
-    "priceRange": "e.g. £15-25pp or ¥800-1200",
+    "priceRange": "e.g. ¥800-1200",
+    "priceContext": "about €5-8 per dish",
     "story": "2-3 sentences about what makes this place special. Plain text.",
     "mustOrder": [
-      { "name": "dish name", "description": "one sentence why it is unmissable" },
-      { "name": "dish name", "description": "one sentence why it is unmissable" }
+      { "name": "dish name", "description": "one sentence why it is unmissable", "price": "¥800" },
+      { "name": "dish name", "description": "one sentence why it is unmissable", "price": "¥1000" }
     ],
-    "hoursNote": "opening hours as plain text e.g. Mon-Sat 11am-3pm",
-    "address": "street address or neighbourhood",
-    "bookingNote": "booking info or walk-in only"
+    "hoursNote": "e.g. Mon-Sat 11:30am-3pm, 6pm-10pm. Closed Sun.",
+    "address": "street address",
+    "neighbourhood": "neighbourhood or district",
+    "mapsUrl": "https://maps.google.com/search?q=restaurant+name+city",
+    "phone": "+XX X-XXXX-XXXX or empty string",
+    "website": "https://example.com or empty string",
+    "payment": "Cash only / Cards accepted / Cash or card",
+    "proTips": [
+      "Arrive before opening to avoid the queue — it fills up fast",
+      "Order the [dish] on your first visit — it's what they're known for",
+      "Cash only — bring enough before you go",
+      "The daily special is not on the menu — ask the staff"
+    ],
+    "bookingNote": "Walk-ins only / Book via website"
   }
 }
 
-Accent colours: "amber" for warmth, "red" for bold/spicy, "teal" for seafood, "green" for vegetarian.
-imageQueries: use actual restaurant name + city + dish/vibe for best photo results.`,
+Accent colours: "amber" for warmth/general, "red" for bold/spicy, "teal" for seafood, "green" for vegetarian.
+imageQueries: use actual restaurant name + city + dish/atmosphere for best Serper results.`,
     }],
   })
 
@@ -135,56 +156,64 @@ imageQueries: use actual restaurant name + city + dish/vibe for best photo resul
   if (!jsonMatch) throw new Error('No JSON found in response')
   const parsed = JSON.parse(jsonMatch)
 
-  // Assign food-specific tile types and structured fields from restaurantMeta
+  // Build structured data from restaurantMeta fields
   const meta = parsed.restaurantMeta || {}
-  const mustOrderList: { name: string; description: string }[] = (meta.mustOrder || []).map(
-    (d: { name: string; description: string }) => ({
+  const mustOrderList: { name: string; description: string; price: string }[] = (meta.mustOrder || []).map(
+    (d: { name: string; description: string; price?: string }) => ({
       name: stripHtml(d.name || ''),
       description: stripHtml(d.description || ''),
+      price: stripHtml(d.price || ''),
     })
   )
   const priceRange = stripHtml(meta.priceRange || '')
-  const address = stripHtml(meta.address || meta.city || '')
+  const priceContext = stripHtml(meta.priceContext || '')
+  const address = stripHtml(meta.address || '')
+  const neighbourhood = stripHtml(meta.neighbourhood || '')
   const hoursNote = stripHtml(meta.hoursNote || '')
+  const mapsUrl = stripHtml(meta.mapsUrl || '')
+  const phone = stripHtml(meta.phone || '')
+  const website = stripHtml(meta.website || '')
+  const payment = stripHtml(meta.payment || '')
+  const proTips: string[] = (meta.proTips || []).map((t: string) => stripHtml(t))
   const restName = stripHtml(meta.name || restaurant.name)
 
   const rawSlides: SlideResult[] = (parsed.slides || []).map((s: SlideResult, i: number) => {
-    if (i === 0 || i === 1) {
-      // Hook + story: full-bleed image tile with headline only
-      return { ...s, tileType: 'food-image' }
+    if (i === 0) {
+      return { ...s, tileType: 'food-image', tag: 'NO FRILLS BUT KILLS' }
     }
-    if (i === 2 && mustOrderList[0]) {
-      // Must Order #1
-      return {
-        ...s,
-        tileType: 'food-must-order',
-        foodMustOrder: { name: mustOrderList[0].name, description: mustOrderList[0].description, priceRange },
-      }
+    if (i === 1) {
+      return { ...s, tileType: 'food-image', tag: 'THE STORY' }
     }
-    if (i === 3 && (mustOrderList[1] || mustOrderList[0])) {
-      // Must Order #2
-      const dish = mustOrderList[1] || mustOrderList[0]
-      return {
-        ...s,
-        tileType: 'food-must-order',
-        foodMustOrder: { name: dish.name, description: dish.description, priceRange },
-      }
+    if (i === 2) {
+      // Must Order — all dishes on one tile
+      const dishes = mustOrderList.length > 0
+        ? mustOrderList
+        : [{ name: s.headline, description: s.body, price: priceRange }]
+      return { ...s, tileType: 'food-must-order', foodDishes: dishes }
+    }
+    if (i === 3) {
+      // Practical Info tile
+      const infoItems: FoodInfoItem[] = []
+      const fullAddress = [address, neighbourhood].filter(Boolean).join(', ')
+      if (fullAddress) infoItems.push({ icon: 'A', label: 'ADDRESS', value: fullAddress })
+      if (hoursNote) infoItems.push({ icon: 'H', label: 'HOURS', value: hoursNote })
+      const priceDisplay = priceRange + (priceContext ? `  ${priceContext}` : '')
+      if (priceDisplay.trim()) infoItems.push({ icon: 'P', label: 'PRICE RANGE', value: priceDisplay.trim() })
+      const mapsDisplay = mapsUrl || `maps.google.com/search?q=${encodeURIComponent(restName + ' ' + restaurant.city)}`
+      infoItems.push({ icon: 'M', label: 'GOOGLE MAPS', value: mapsDisplay })
+      if (phone) infoItems.push({ icon: 'T', label: 'PHONE', value: phone })
+      if (website) infoItems.push({ icon: 'W', label: 'WEBSITE', value: website })
+      if (payment) infoItems.push({ icon: 'C', label: 'PAYMENT', value: payment })
+      return { ...s, tileType: 'food-info', foodRestaurantName: restName, foodInfoItems: infoItems }
     }
     if (i === 4) {
-      // Practical info slide
-      const infoItems: FoodInfoItem[] = []
-      if (address) infoItems.push({ icon: 'A', label: 'ADDRESS', value: address })
-      if (hoursNote) infoItems.push({ icon: 'H', label: 'HOURS', value: hoursNote })
-      if (priceRange) infoItems.push({ icon: 'P', label: 'PRICE RANGE', value: priceRange })
-      infoItems.push({ icon: 'M', label: 'FIND ON MAPS', value: `Search "${restName}"` })
-      return {
-        ...s,
-        tileType: 'food-info',
-        foodRestaurantName: restName,
-        foodInfoItems: infoItems,
-      }
+      // Pro Tips tile
+      const tips = proTips.length > 0
+        ? proTips
+        : [s.body]
+      return { ...s, tileType: 'food-pro-tips', foodProTips: tips }
     }
-    // Slide 5 (CTA): solid text tile with call-to-action question
+    // CTA (i=5)
     return { ...s, tileType: 'story-text' }
   })
 
@@ -193,19 +222,23 @@ imageQueries: use actual restaurant name + city + dish/vibe for best photo resul
 
   const restaurantMeta: RestaurantMeta = {
     slug: slugify(meta.name || restaurant.name),
-    name: stripHtml(meta.name || restaurant.name),
+    name: restName,
     city: stripHtml(meta.city || restaurant.city),
     country: stripHtml(meta.country || ''),
     cuisine: stripHtml(meta.cuisine || ''),
-    priceRange: stripHtml(meta.priceRange || ''),
+    priceRange,
+    priceContext,
     series: 'no-frills',
     story: stripHtml(meta.story || ''),
-    mustOrder: (meta.mustOrder || []).map((d: { name: string; description: string }) => ({
-      name: stripHtml(d.name || ''),
-      description: stripHtml(d.description || ''),
-    })),
-    hoursNote: stripHtml(meta.hoursNote || ''),
-    address: stripHtml(meta.address || ''),
+    mustOrder: mustOrderList,
+    hoursNote,
+    address,
+    neighbourhood,
+    mapsUrl,
+    phone,
+    website,
+    payment,
+    proTips,
     bookingNote: stripHtml(meta.bookingNote || ''),
   }
 
@@ -276,14 +309,22 @@ Return ONLY this JSON (plain text, no HTML):
     country: stripHtml(meta.country || ''),
     cuisine: stripHtml(meta.cuisine || ''),
     priceRange: stripHtml(meta.priceRange || ''),
+    priceContext: stripHtml(meta.priceContext || ''),
     series: 'top5',
     story: stripHtml(meta.story || ''),
-    mustOrder: (meta.mustOrder || []).map((d: { name: string; description: string }) => ({
+    mustOrder: (meta.mustOrder || []).map((d: { name: string; description: string; price?: string }) => ({
       name: stripHtml(d.name || ''),
       description: stripHtml(d.description || ''),
+      price: stripHtml(d.price || ''),
     })),
     hoursNote: stripHtml(meta.hoursNote || ''),
     address: stripHtml(meta.address || ''),
+    neighbourhood: stripHtml(meta.neighbourhood || ''),
+    mapsUrl: stripHtml(meta.mapsUrl || ''),
+    phone: stripHtml(meta.phone || ''),
+    website: stripHtml(meta.website || ''),
+    payment: stripHtml(meta.payment || ''),
+    proTips: (meta.proTips || []).map((t: string) => stripHtml(t)),
     bookingNote: stripHtml(meta.bookingNote || ''),
   }
 

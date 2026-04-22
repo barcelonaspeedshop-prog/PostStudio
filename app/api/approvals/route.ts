@@ -20,7 +20,7 @@ export type ApprovalItem = {
   channel: string
   headline: string
   topic: string
-  slides: Array<{ num: string; tag: string; headline: string; body: string; badge: string; accent: string; image?: string; imageOptions?: string[]; tileType?: string; foodMustOrder?: { name: string; description: string; priceRange?: string }; foodInfoItems?: Array<{ icon: string; label: string; value: string }>; foodRestaurantName?: string }>
+  slides: Array<{ num: string; tag: string; headline: string; body: string; badge: string; accent: string; image?: string; imageOptions?: string[]; tileType?: string; foodDishes?: Array<{ name: string; description: string; price?: string }>; foodMustOrder?: { name: string; description: string; priceRange?: string }; foodInfoItems?: Array<{ icon: string; label: string; value: string }>; foodRestaurantName?: string; foodProTips?: string[] }>
   videoBase64?: string
   platforms: string[]
   ytTitle?: string
@@ -74,7 +74,7 @@ function metaToRestaurant(meta: RestaurantMeta): Restaurant {
     ogDescription: meta.story.slice(0, 160),
     excerpt: meta.story,
     story: [meta.story],
-    mustOrder: meta.mustOrder.length ? meta.mustOrder : [{ name: 'Ask the staff', description: 'The daily special is always worth ordering.' }],
+    mustOrder: meta.mustOrder.length ? meta.mustOrder.map(({ name, description }) => ({ name, description })) : [{ name: 'Ask the staff', description: 'The daily special is always worth ordering.' }],
     hours: meta.hoursNote ? [{ label: 'Hours', value: meta.hoursNote }] : [],
     hoursNote: undefined,
     bookingNote: meta.bookingNote || 'Walk-ins welcome.',
