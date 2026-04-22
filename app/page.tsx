@@ -53,6 +53,54 @@ const POST_TYPES: { value: PostTypeValue; label: string; placeholder: string }[]
 const FOOD_POST_TYPES: PostTypeValue[] = ['no-frills', 'top5', 'restaurant-feature']
 const RESTAURANT_RESEARCH_TYPES: PostTypeValue[] = ['no-frills', 'restaurant-feature']
 
+// ── Video creation helpers ──────────────────────────────────────────────────
+async function startVideoJob(
+  images: File[],
+  channel: string,
+  musicOn: boolean,
+  mood: string,
+  musicTrack: File | null,
+  slideTitle: string,
+): Promise<string> {
+  const formData = new FormData()
+  formData.append('chapters', JSON.stringify([{ id: 1, title: slideTitle || 'Slides' }]))
+  formData.append('channel', channel)
+  formData.append('musicEnabled', musicOn ? 'true' : 'false')
+  if (musicOn) formData.append('musicMood', mood)
+  if (musicOn && musicTrack) formData.append('music', musicTrack)
+  images.forEach(img => {
+    formData.append('media', img)
+    formData.append('mediaChapterIds', '1')
+  })
+  const res = await fetch('/api/story-video/start', { method: 'POST', body: formData })
+  if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Video start failed') }
+  return (await res.json()).jobId
+}
+
+async function pollVideoJob(jobId: string, onProgress: (p: number) => void): Promise<void> {
+  for (let i = 0; i < 90; i++) {
+    await new Promise(r => setTimeout(r, 3000))
+    const res = await fetch(`/api/story-video/status/${jobId}`)
+    const d = await res.json()
+    onProgress(d.progress ?? 0)
+    if (d.status === 'complete') return
+    if (d.status === 'error') throw new Error(d.error || 'Video creation failed')
+  }
+  throw new Error('Video creation timed out')
+}
+
+async function downloadJobVideo(jobId: string, format: 'youtube' | 'reels'): Promise<string> {
+  const res = await fetch(`/api/story-video/download/${jobId}?format=${format}`)
+  if (!res.ok) throw new Error(`Download failed for format: ${format}`)
+  const blob = await res.blob()
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onload = e => resolve(e.target?.result as string)
+    r.onerror = reject
+    r.readAsDataURL(blob)
+  })
+}
+
 // ── Toast + Publish Results ───────────────────────────────────────────────────
 type Toast = { msg: string; type?: 'success' | 'error' }
 type PlatformResult = { platform: string; success: boolean; id?: string; error?: string; skipped?: boolean; reason?: string }
@@ -368,6 +416,10 @@ export default function ComposerPage() {
   const [generatingThumb, setGeneratingThumb] = useState(false)
   const thumbnailInputRef = useRef<HTMLInputElement>(null)
 
+  // Video reel toggle
+  const [postAsVideo, setPostAsVideo] = useState(false)
+  const [videoCreationStatus, setVideoCreationStatus] = useState('')
+
   // Load connected platforms on channel change
   useEffect(() => {
     let cancelled = false
@@ -580,6 +632,7 @@ export default function ComposerPage() {
       return
     }
     setPublishing(true)
+    setVideoCreationStatus('')
 
     const allResults: PlatformResult[] = []
 
@@ -587,34 +640,60 @@ export default function ComposerPage() {
       new Promise(resolve => { const r = new FileReader(); r.onload = e => resolve(e.target?.result as string); r.readAsDataURL(file) })
 
     // ── Resolve media from mediaFiles (source of truth) ──────────────────────
-    // Video: find the first video file regardless of what mediaSrc holds
     const videoFile = mediaFiles.find(f => f.type.startsWith('video/'))
     const imageFiles = mediaFiles.filter(f => f.type.startsWith('image/'))
 
-    // Use already-read mediaSrc if it's a video, otherwise read the video File
     const videoData: string | null = videoFile
       ? (mediaSrc?.startsWith('data:video/') ? mediaSrc : await readAsDataURL(videoFile))
       : null
 
-    // Read ALL image files so carousel gets every selected image
     const allImages: string[] = imageFiles.length > 0
       ? await Promise.all(imageFiles.map(readAsDataURL))
       : (mediaSrc?.startsWith('data:image/') ? [mediaSrc] : [])
 
     console.log(
-      `[doPublish] videoFile=${!!videoFile} imageFiles=${imageFiles.length} allImages=${allImages.length} videoData=${!!videoData} mediaSrc=${mediaSrc?.slice(0, 30) ?? 'null'}`,
+      `[doPublish] postAsVideo=${postAsVideo} videoFile=${!!videoFile} imageFiles=${imageFiles.length} allImages=${allImages.length}`,
     )
+
+    // ── Auto-create video from images if "Video Reel" mode ───────────────────
+    let videoJobId: string | null = null
+    if (postAsVideo && imageFiles.length > 0 && !videoFile) {
+      try {
+        setVideoCreationStatus('Creating video reel...')
+        videoJobId = await startVideoJob(imageFiles, selectedChannel, musicEnabled, musicMood, musicFile, title)
+        await pollVideoJob(videoJobId, p => setVideoCreationStatus(`Creating video... ${p}%`))
+        setVideoCreationStatus('Video ready — publishing...')
+      } catch (e: unknown) {
+        show(e instanceof Error ? e.message : 'Video creation failed', 'error')
+        setPublishing(false)
+        setVideoCreationStatus('')
+        return
+      }
+    }
+
+    // Cache downloaded video blobs to avoid fetching the same format twice
+    const videoFormatCache: Partial<Record<'youtube' | 'reels', string>> = {}
+    const getVideo = async (format: 'youtube' | 'reels'): Promise<string> => {
+      if (!videoFormatCache[format]) {
+        setVideoCreationStatus(`Preparing ${format === 'youtube' ? '16:9' : '9:16 reel'}...`)
+        videoFormatCache[format] = await downloadJobVideo(videoJobId!, format)
+      }
+      return videoFormatCache[format]!
+    }
 
     try {
       // ── YouTube ──────────────────────────────────────────────────────────────
       if (connected.includes('youtube')) {
-        if (videoData) {
+        let ytVideo = videoData
+        if (!ytVideo && videoJobId) ytVideo = await getVideo('youtube')
+
+        if (ytVideo) {
           try {
             const ytRes = await fetch('/api/publish/youtube', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                videoBase64: videoData,
+                videoBase64: ytVideo,
                 title: title || caption?.split('\n')[0]?.slice(0, 100) || 'PostStudio Upload',
                 description: [description, caption].filter(Boolean).join('\n\n').slice(0, 5000),
                 tags: tags.slice(0, 30),
@@ -639,14 +718,17 @@ export default function ComposerPage() {
       // ── Meta + other platforms ───────────────────────────────────────────────
       const otherPlatforms = connected.filter(p => p !== 'youtube')
       if (otherPlatforms.length > 0) {
+        // For video reel mode: download 9:16 reel for Instagram/Facebook
+        let metaVideo = videoData
+        if (!metaVideo && videoJobId) metaVideo = await getVideo('reels')
+
         const res = await fetch('/api/publish', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             content: caption || description || title,
-            // Send ALL images so carousel uses every selected file
-            imageUrls: allImages.length > 0 ? allImages : undefined,
-            videoBase64: videoData || undefined,
+            imageUrls: !metaVideo && allImages.length > 0 ? allImages : undefined,
+            videoBase64: metaVideo || undefined,
             platforms: otherPlatforms,
             channel: selectedChannel,
             thumbnailBase64: thumbnailSrc || undefined,
@@ -656,7 +738,6 @@ export default function ComposerPage() {
         if (Array.isArray(data.results)) allResults.push(...data.results)
       }
 
-      // Show per-platform results
       if (allResults.length > 0) {
         showResults(allResults)
       } else {
@@ -666,6 +747,7 @@ export default function ComposerPage() {
       show(e instanceof Error ? e.message : 'Publish failed', 'error')
     } finally {
       setPublishing(false)
+      setVideoCreationStatus('')
     }
   }
 
@@ -705,7 +787,9 @@ export default function ComposerPage() {
               disabled={publishing}
               className="px-3 py-2 min-h-[44px] text-[13px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors disabled:opacity-50"
             >
-              {publishing ? 'Publishing...' : 'Publish'}
+              {publishing && videoCreationStatus
+                ? videoCreationStatus.length > 28 ? videoCreationStatus.slice(0, 26) + '…' : videoCreationStatus
+                : publishing ? 'Publishing...' : 'Publish'}
             </button>
           </div>
         </div>
@@ -926,6 +1010,30 @@ export default function ComposerPage() {
                       >×</button>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Post As toggle — shown when images present but no video */}
+              {mediaFiles.some(f => f.type.startsWith('image/')) && !mediaFiles.some(f => f.type.startsWith('video/')) && (
+                <div className="mt-3 flex items-center gap-2.5">
+                  <p className="text-[11px] text-stone-500 shrink-0">Post as:</p>
+                  <div className="flex rounded-lg border border-stone-200 overflow-hidden text-[11px] font-medium">
+                    <button
+                      onClick={() => setPostAsVideo(false)}
+                      className={`px-3 py-1.5 transition-colors ${!postAsVideo ? 'bg-stone-900 text-white' : 'text-stone-500 hover:bg-stone-50'}`}
+                    >
+                      Carousel
+                    </button>
+                    <button
+                      onClick={() => setPostAsVideo(true)}
+                      className={`px-3 py-1.5 transition-colors border-l border-stone-200 ${postAsVideo ? 'bg-stone-900 text-white' : 'text-stone-500 hover:bg-stone-50'}`}
+                    >
+                      Video Reel
+                    </button>
+                  </div>
+                  {postAsVideo && (
+                    <p className="text-[10px] text-stone-400">Images will be assembled into an MP4 reel on publish</p>
+                  )}
                 </div>
               )}
             </div>
