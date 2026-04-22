@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Omnira Food — Discover. Taste. Remember.</title>
+  <meta name="description" content="Omnira Food — your guide to extraordinary dining. Discover hidden gems, iconic restaurants, and unforgettable meals around the world.">
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://premirafirst.com/food">
+  <meta property="og:title" content="Omnira Food — Discover. Taste. Remember.">
+  <meta property="og:description" content="Your guide to extraordinary dining. From backstreet noodle counters in Tokyo to iconic Bombay cafés in London.">
+  <meta property="og:image" content="https://premirafirst.com/food/assets/og-home.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="/food/assets/style.css">
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <a href="/food" class="nav-brand">
+    <img src="https://drive.google.com/thumbnail?id=1RRb284GGOwoOWdy8URqZ0G56KCmc8h4i&sz=w80"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+         alt="Omnira Food" class="nav-logo">
+    <span class="nav-logo" style="display:none;background:var(--gold-dim);align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:0.85rem;color:var(--gold)">OF</span>
+    <span class="nav-wordmark">Omnira Food</span>
+  </a>
+  <ul class="nav-links" id="navLinks">
+    <li><a href="/food" class="active">Home</a></li>
+    <li><a href="/food/no-frills">No Frills But Kills</a></li>
+    <li><a href="/food/top5">Top 5 Eats</a></li>
+  </ul>
+  <button class="nav-menu-btn" onclick="document.getElementById('navLinks').classList.toggle('open')" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+
+<!-- HERO -->
+<section class="hero hero--tall">
+  <div class="hero-bg grad-food-hero" style="background-image:url('/food/assets/banner.jpg')"></div>
+  <div class="hero-overlay"></div>
+  <div class="hero-content">
+    <span class="hero-eyebrow">Omnira Food</span>
+    <h1 class="hero-title">Discover.<br>Taste.<br>Remember.</h1>
+    <p class="hero-sub">The places worth travelling for. The meals you'll never forget.</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <a href="/food/no-frills" class="btn btn--gold">No Frills But Kills</a>
+      <a href="/food/top5" class="btn btn--outline">Top 5 Eats</a>
+    </div>
+  </div>
+</section>
+
+<!-- TAGLINE -->
+<div class="tagline-block">
+  <p class="eyebrow">The World on a Plate</p>
+  <h2 class="tagline">Some restaurants change the way you think about food. We find them.</h2>
+</div>
+
+<!-- FEATURED RESTAURANT -->
+<section class="section">
+  <div class="section-header">
+    <h2 class="section-title">Featured Restaurant</h2>
+    <a href="/food/no-frills" class="section-link">View All</a>
+  </div>
+  <a href="/food/restaurant/dishoom-kensington" style="display:block">
+    <div class="card" style="display:grid;grid-template-columns:1fr 1fr;max-width:860px" id="featured-card">
+      <div class="card-img" style="aspect-ratio:auto;min-height:360px">
+        <div class="card-img-placeholder grad-london" style="min-height:360px">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none" style="opacity:0.2">
+            <path d="M32 8C32 8 16 20 16 34C16 42.837 23.163 50 32 50C40.837 50 48 42.837 48 34C48 20 32 8 32 8Z" fill="#C9A84C"/>
+          </svg>
+        </div>
+        <div class="card-badge"><span class="badge badge--featured">Featured</span></div>
+      </div>
+      <div class="card-body" style="padding:36px 32px;display:flex;flex-direction:column;justify-content:center">
+        <p class="card-label">London, United Kingdom</p>
+        <h3 class="card-title" style="font-size:1.7rem;margin-bottom:12px">Dishoom Kensington</h3>
+        <p class="card-location">Kensington, London, UK</p>
+        <p class="card-excerpt" style="-webkit-line-clamp:5">
+          Dishoom reimagines the Irani cafés of old Bombay with impeccable style. The Kensington branch is the most elegant of the group. Queue outside is part of the experience.
+        </p>
+        <div style="margin-top:24px;display:flex;align-items:center;gap:16px">
+          <span style="font-size:0.75rem;color:var(--muted)">Modern Indian · £25–40pp</span>
+          <span class="badge badge--featured">Featured</span>
+        </div>
+      </div>
+    </div>
+  </a>
+</section>
+
+<style>
+@media(max-width:640px){
+  #featured-card { grid-template-columns:1fr !important; }
+  #featured-card .card-img { min-height:220px !important; }
+}
+</style>
+
+<!-- NO FRILLS BUT KILLS -->
+<section class="section" style="padding-top:0">
+  <div class="section-header">
+    <h2 class="section-title">No Frills But Kills</h2>
+    <a href="/food/no-frills" class="section-link">All Restaurants</a>
+  </div>
+  <div class="card-grid">
+
+    <a href="/food/restaurant/chinchinken">
+      <div class="card">
+        <div class="card-img">
+          <div class="card-img-placeholder grad-tokyo"></div>
+          <div class="card-badge"><span class="badge badge--kills">Kills</span></div>
+        </div>
+        <div class="card-body">
+          <p class="card-label">Tokyo, Japan</p>
+          <h3 class="card-title">Chinchinken</h3>
+          <p class="card-location">Taito City, Tokyo</p>
+          <p class="card-excerpt">A tiny counter restaurant in the backstreets of Taito City. The Abura Soba is legendary among Tokyo locals. No tourists, no frills, just extraordinary noodles.</p>
+        </div>
+      </div>
+    </a>
+
+    <a href="/food/restaurant/restaurante-garcia">
+      <div class="card">
+        <div class="card-img">
+          <div class="card-img-placeholder grad-navarra"></div>
+          <div class="card-badge"><span class="badge badge--kills">Kills</span></div>
+        </div>
+        <div class="card-body">
+          <p class="card-label">Navarra, Spain</p>
+          <h3 class="card-title">Restaurante Garcia</h3>
+          <p class="card-location">Murchante, Navarra</p>
+          <p class="card-excerpt">In the small town of Murchante in Navarra, Garcia has been serving honest, exceptional food for decades. A local secret that deserves to be known.</p>
+        </div>
+      </div>
+    </a>
+
+  </div>
+</section>
+
+<!-- LATEST NEWS -->
+<section class="section" style="background:var(--surface);max-width:100%;padding-left:0;padding-right:0">
+  <div style="max-width:1200px;margin:0 auto;padding:80px 40px">
+    <div class="section-header">
+      <h2 class="section-title">Latest from Omnira Food</h2>
+    </div>
+    <div class="news-list">
+      <div class="news-item">
+        <span class="news-num">01</span>
+        <div class="news-body">
+          <p class="news-category">No Frills But Kills</p>
+          <p class="news-title">The Tokyo noodle bar with no sign, no menu, and a permanent queue — Chinchinken</p>
+          <p class="news-date">April 2026</p>
+        </div>
+      </div>
+      <div class="news-item">
+        <span class="news-num">02</span>
+        <div class="news-body">
+          <p class="news-category">Destination</p>
+          <p class="news-title">Why Navarra is Spain's most underrated food destination (and Garcia is proof)</p>
+          <p class="news-date">April 2026</p>
+        </div>
+      </div>
+      <div class="news-item">
+        <span class="news-num">03</span>
+        <div class="news-body">
+          <p class="news-category">Featured</p>
+          <p class="news-title">Dishoom Kensington: the Irani café that changed London's relationship with Indian food</p>
+          <p class="news-date">April 2026</p>
+        </div>
+      </div>
+      <div class="news-item">
+        <span class="news-num">04</span>
+        <div class="news-body">
+          <p class="news-category">Guide</p>
+          <p class="news-title">Abura Soba 101: Tokyo's brothless ramen that locals love and tourists miss completely</p>
+          <p class="news-date">March 2026</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA STRIP -->
+<section style="padding:80px 40px;text-align:center;background:var(--black)">
+  <p style="font-size:0.7rem;font-weight:700;letter-spacing:0.25em;text-transform:uppercase;color:var(--gold);margin-bottom:16px">Explore the Series</p>
+  <h2 style="font-family:'Playfair Display',serif;font-size:clamp(1.8rem,4vw,3rem);font-weight:900;max-width:600px;margin:0 auto 32px">Find your next remarkable meal.</h2>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap">
+    <a href="/food/no-frills" class="btn btn--gold">No Frills But Kills →</a>
+    <a href="/food/top5" class="btn btn--outline">Top 5 Eats →</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <p class="footer-brand">Omnira Food</p>
+  <p class="footer-tagline">Discover · Taste · Remember</p>
+  <nav class="footer-links">
+    <a href="/food/no-frills">No Frills But Kills</a>
+    <a href="/food/top5">Top 5 Eats</a>
+  </nav>
+  <p class="footer-copy">© 2026 Omnira Food · Part of the Premira First network</p>
+</footer>
+
+</body>
+</html>
