@@ -533,7 +533,7 @@ export default function ComposerPage() {
     }
   }
 
-  // Bug fix: use already-selected channel + auto-fallback to all connected platforms
+  // Publish handler — routes YouTube through its own API, others through /api/publish
   const doPublish = async (platforms: string[]) => {
     const connected = platforms.filter(p => connectedPlatforms.includes(p))
     if (!connected.length) {
@@ -541,26 +541,73 @@ export default function ComposerPage() {
       return
     }
     setPublishing(true)
+
+    type PlatformResult = { platform: string; success: boolean; id?: string; error?: string; skipped?: boolean; reason?: string }
+    const allResults: PlatformResult[] = []
+
     try {
-      const res = await fetch('/api/publish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: caption || description || title,
-          imageUrls: mediaSrc ? [mediaSrc] : undefined,
-          platforms: connected,
-          channel: selectedChannel,
-        }),
-      })
-      const data = await res.json()
-      const succeeded = (data.results as Array<{ success: boolean }> | undefined)
-        ?.filter(r => r.success).length ?? 0
-      const errors = (data.results as Array<{ success: boolean; skipped?: boolean; error?: string }> | undefined)
-        ?.filter(r => !r.success && !r.skipped).map(r => r.error).filter(Boolean) ?? []
+      // ── YouTube ──────────────────────────────────────────────────────────────
+      if (connected.includes('youtube')) {
+        const videoFile = mediaFiles.find(f => f.type.startsWith('video/'))
+        const videoSrc = mediaSrc?.startsWith('data:video/') ? mediaSrc : null
+        const videoData = videoSrc || (videoFile ? await new Promise<string>(resolve => {
+          const r = new FileReader(); r.onload = e => resolve(e.target?.result as string); r.readAsDataURL(videoFile)
+        }) : null)
+
+        if (videoData) {
+          try {
+            const ytRes = await fetch('/api/publish/youtube', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                videoBase64: videoData,
+                title: title || caption?.split('\n')[0]?.slice(0, 100) || 'PostStudio Upload',
+                description: [description, caption].filter(Boolean).join('\n\n').slice(0, 5000),
+                tags: tags.slice(0, 30),
+                channelName: selectedChannel,
+              }),
+            })
+            const ytData = await ytRes.json()
+            if (ytRes.ok && ytData.id) {
+              allResults.push({ platform: 'youtube', success: true, id: ytData.id })
+            } else {
+              allResults.push({ platform: 'youtube', success: false, error: ytData.error || 'YouTube upload failed' })
+            }
+          } catch (e: unknown) {
+            allResults.push({ platform: 'youtube', success: false, error: e instanceof Error ? e.message : 'YouTube upload failed' })
+          }
+        } else {
+          allResults.push({ platform: 'youtube', success: false, skipped: true, reason: 'YouTube requires a video — upload a video file or use the Carousel builder to create a YouTube video post.' })
+        }
+      }
+
+      // ── Meta + other platforms ───────────────────────────────────────────────
+      const otherPlatforms = connected.filter(p => p !== 'youtube')
+      if (otherPlatforms.length > 0) {
+        const res = await fetch('/api/publish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: caption || description || title,
+            imageUrls: mediaSrc ? [mediaSrc] : undefined,
+            platforms: otherPlatforms,
+            channel: selectedChannel,
+          }),
+        })
+        const data = await res.json()
+        if (Array.isArray(data.results)) allResults.push(...data.results)
+      }
+
+      const succeeded = allResults.filter(r => r.success).length
+      const errors = allResults.filter(r => !r.success && !r.skipped).map(r => r.error).filter(Boolean)
+      const skipped = allResults.filter(r => r.skipped)
+
       if (succeeded > 0) {
         show(`Published to ${succeeded} platform${succeeded !== 1 ? 's' : ''}!`)
       } else if (errors.length) {
         show(errors[0] || 'Publish failed', 'error')
+      } else if (skipped.length) {
+        show(skipped[0].reason || 'No platforms published', 'error')
       } else {
         show('No platforms published — check connection status', 'error')
       }
