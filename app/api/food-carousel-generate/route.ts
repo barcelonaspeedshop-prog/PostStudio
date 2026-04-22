@@ -177,44 +177,47 @@ imageQueries: use actual restaurant name + city + dish/atmosphere for best Serpe
   const proTips: string[] = (meta.proTips || []).map((t: string) => stripHtml(t))
   const restName = stripHtml(meta.name || restaurant.name)
 
+  // Build body text for the text-only slides from structured research data
+  const mustOrderBody = mustOrderList.length > 0
+    ? mustOrderList.map(d => [d.name, d.price, d.description].filter(Boolean).join(' — ')).join('. ')
+    : ''
+
+  const fullAddress = [address, neighbourhood].filter(Boolean).join(', ')
+  const priceDisplay = [priceRange, priceContext].filter(Boolean).join(' — ')
+  const mapsDisplay = mapsUrl || `maps.google.com/?q=${encodeURIComponent(restName + '+' + restaurant.city)}`
+  const infoBody = [fullAddress, hoursNote, priceDisplay, payment, mapsDisplay]
+    .filter(Boolean).join(' · ')
+
+  const tipsBody = proTips.length > 0
+    ? proTips.slice(0, 3).join('. ')
+    : ''
+
   const rawSlides: SlideResult[] = (parsed.slides || []).map((s: SlideResult, i: number) => {
-    if (i === 0) {
-      return { ...s, tileType: 'food-image', tag: 'NO FRILLS BUT KILLS' }
+    if (i === 0) return { ...s, tileType: 'hook' }
+    if (i === 1) return { ...s, tileType: 'story', tag: 'THE STORY' }
+    if (i === 2) return {
+      ...s,
+      tileType: 'story-text',
+      tag: 'MUST ORDER',
+      headline: mustOrderList[0]?.name || s.headline,
+      body: mustOrderBody || s.body,
     }
-    if (i === 1) {
-      return { ...s, tileType: 'food-image', tag: 'THE STORY' }
+    if (i === 3) return {
+      ...s,
+      tileType: 'story-text',
+      tag: 'FIND US',
+      headline: restName,
+      body: infoBody || s.body,
     }
-    if (i === 2) {
-      // Must Order — all dishes on one tile
-      const dishes = mustOrderList.length > 0
-        ? mustOrderList
-        : [{ name: s.headline, description: s.body, price: priceRange }]
-      return { ...s, tileType: 'food-must-order', foodDishes: dishes }
+    if (i === 4) return {
+      ...s,
+      tileType: 'story-text',
+      tag: 'PRO TIPS',
+      headline: 'Insider Tips',
+      body: tipsBody || s.body,
     }
-    if (i === 3) {
-      // Practical Info tile
-      const infoItems: FoodInfoItem[] = []
-      const fullAddress = [address, neighbourhood].filter(Boolean).join(', ')
-      if (fullAddress) infoItems.push({ icon: 'A', label: 'ADDRESS', value: fullAddress })
-      if (hoursNote) infoItems.push({ icon: 'H', label: 'HOURS', value: hoursNote })
-      const priceDisplay = priceRange + (priceContext ? `  ${priceContext}` : '')
-      if (priceDisplay.trim()) infoItems.push({ icon: 'P', label: 'PRICE RANGE', value: priceDisplay.trim() })
-      const mapsDisplay = mapsUrl || `maps.google.com/search?q=${encodeURIComponent(restName + ' ' + restaurant.city)}`
-      infoItems.push({ icon: 'M', label: 'GOOGLE MAPS', value: mapsDisplay })
-      if (phone) infoItems.push({ icon: 'T', label: 'PHONE', value: phone })
-      if (website) infoItems.push({ icon: 'W', label: 'WEBSITE', value: website })
-      if (payment) infoItems.push({ icon: 'C', label: 'PAYMENT', value: payment })
-      return { ...s, tileType: 'food-info', foodRestaurantName: restName, foodInfoItems: infoItems }
-    }
-    if (i === 4) {
-      // Pro Tips tile
-      const tips = proTips.length > 0
-        ? proTips
-        : [s.body]
-      return { ...s, tileType: 'food-pro-tips', foodProTips: tips }
-    }
-    // CTA (i=5)
-    return { ...s, tileType: 'story-text' }
+    // Slide 5: CTA
+    return { ...s, tileType: 'cta' }
   })
 
   const slides = rawSlides.map(cleanSlide)
