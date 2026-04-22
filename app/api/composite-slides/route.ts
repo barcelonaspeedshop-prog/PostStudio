@@ -273,7 +273,7 @@ function buildBrandSvg(slide: SlideInput, primary: string, bg: string, channelNa
 // Full-bleed image. Bottom gradient same as hook.
 // Top-left: accent tag 26px. Top-right: slide num white 25%.
 // Bottom: headline 96px/500 max 3 lines → 2px accent divider 160px → body 36px/65%.
-function buildStorySvg(slide: SlideInput, primary: string): string {
+function buildStorySvg(slide: SlideInput, primary: string, h: number = H): string {
   const [pr, pg, pb] = hexToRgb(primary)
   const pad = 72
 
@@ -286,7 +286,7 @@ function buildStorySvg(slide: SlideInput, primary: string): string {
   const bodyH = bodyLines.length * bodyLineH
   const hedH = hedLines.length * hedLineH
 
-  let y = H - pad
+  let y = h - pad
   y -= bodyH
   const bodyY = y
   y -= 30
@@ -308,7 +308,7 @@ function buildStorySvg(slide: SlideInput, primary: string): string {
 
   let svg = defs
   svg += `<rect width="${W}" height="200" fill="url(#topgrad)"/>`
-  svg += `<rect width="${W}" height="${H}" fill="url(#grad)"/>`
+  svg += `<rect width="${W}" height="${h}" fill="url(#grad)"/>`
 
   // Tag top-left accent 26px
   svg += `<text x="${pad}" y="92" font-family="${FONT_STACK}" font-size="26" font-weight="500" fill="rgb(${pr},${pg},${pb})" fill-opacity="1" letter-spacing="1">${escapeXml(slide.tag)}</text>`
@@ -329,7 +329,7 @@ function buildStorySvg(slide: SlideInput, primary: string): string {
     svg += `<text x="${pad}" y="${bodyY + 38 + i * bodyLineH}" font-family="${FONT_STACK}" font-size="36" fill="white" fill-opacity="0.65">${escapeXml(line)}</text>`
   })
 
-  return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`
+  return `<svg width="${W}" height="${h}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`
 }
 
 // ── Tile 4: STORY-TEXT ──────────────────────────────────────────────────────
@@ -975,7 +975,8 @@ function determineTileType(
 
 export async function POST(req: NextRequest) {
   try {
-    const { slides, channel } = await req.json()
+    const { slides, channel, reelMode } = await req.json()
+    const effectiveH = reelMode ? 1920 : H
 
     if (!slides || !Array.isArray(slides)) {
       return NextResponse.json({ error: 'slides array is required' }, { status: 400 })
@@ -995,12 +996,12 @@ export async function POST(req: NextRequest) {
       if (tileType === 'brand' || tileType === 'story-text' || tileType === 'poll' || tileType === 'food-must-order' || tileType === 'food-info' || tileType === 'food-pro-tips') {
         // food-magazine, thumbnail, find-us-map are intentionally excluded — they use images
         base = sharp({
-          create: { width: W, height: H, channels: 3, background: { r: bgr, g: bgg, b: bgb } },
+          create: { width: W, height: effectiveH, channels: 3, background: { r: bgr, g: bgg, b: bgb } },
         })
       } else if (tileType === 'find-us-map') {
         // find-us-map: dark base; map image (if present) composited into top 580px only
         base = sharp({
-          create: { width: W, height: H, channels: 3, background: { r: 13, g: 13, b: 13 } },
+          create: { width: W, height: effectiveH, channels: 3, background: { r: 13, g: 13, b: 13 } },
         })
         if (slide.image && slide.image.startsWith('data:')) {
           const base64Data = slide.image.replace(/^data:image\/\w+;base64,/, '')
@@ -1017,10 +1018,10 @@ export async function POST(req: NextRequest) {
         // landscape images (wider than tall) → crop from centre
         const meta = await sharp(imgBuffer).metadata()
         const isPortrait = (meta.height ?? 0) >= (meta.width ?? 1)
-        base = sharp(imgBuffer).resize(W, H, { fit: 'cover', position: isPortrait ? 'top' : 'centre' })
+        base = sharp(imgBuffer).resize(W, effectiveH, { fit: 'cover', position: isPortrait ? 'top' : 'centre' })
       } else {
         base = sharp({
-          create: { width: W, height: H, channels: 3, background: { r: bgr, g: bgg, b: bgb } },
+          create: { width: W, height: effectiveH, channels: 3, background: { r: bgr, g: bgg, b: bgb } },
         })
       }
 
@@ -1030,7 +1031,7 @@ export async function POST(req: NextRequest) {
         switch (tileType) {
           case 'hook': return buildHookSvg(slide, ch.primary, ch.name)
           case 'brand': return buildBrandSvg(slide, ch.primary, ch.bg, ch.name, ch.handle)
-          case 'story': return buildStorySvg(slide, ch.primary)
+          case 'story': return buildStorySvg(slide, ch.primary, effectiveH)
           case 'story-text': return buildStoryTextSvg(slide, ch.primary, ch.bg)
           case 'cta': return buildCtaSvg(slide, ch.primary, ch.name, ch.handle, ch.tagline)
           case 'poll': return buildPollSvg(slide, ch.primary, ch.bg, ch.name, ch.handle)

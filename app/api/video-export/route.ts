@@ -30,7 +30,10 @@ export async function POST(req: NextRequest) {
   const tmpDir = `/tmp/carousel_${Date.now()}`
   
   try {
-    const { slides, slideDuration: rawDuration = 5, audioUrl, musicVolume = 20, musicEnabled = true } = await req.json()
+    const { slides, slideDuration: rawDuration = 5, audioUrl, musicVolume = 20, musicEnabled = true, reelMode } = await req.json()
+    const videoW = 1080
+    const videoH = reelMode ? 1920 : 1350
+    const scaleFilter = `scale=${videoW}:${videoH}:force_original_aspect_ratio=decrease,pad=${videoW}:${videoH}:(ow-iw)/2:(oh-ih)/2,setsar=1`
     // Enforce minimum 5 seconds per slide
     const slideDuration = Math.max(5, Number(rawDuration) || 5)
     // Per-tile durations — text tiles need longer display time
@@ -101,9 +104,9 @@ export async function POST(req: NextRequest) {
       const totalDuration = slides.reduce((sum: number, s: { tileType?: string }) => sum + getTileDuration(s), 0)
       // Clamp volume to 0-100 and convert to ffmpeg volume factor (0.0-1.0)
       const vol = Math.max(0, Math.min(100, Number(musicVolume) || 20)) / 100
-      ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -i ${audioPath} -vf "scale=1080:1350:force_original_aspect_ratio=decrease,pad=1080:1350:(ow-iw)/2:(oh-ih)/2,setsar=1" -af "volume=${vol}" -r 30 -vsync cfr -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -t ${totalDuration} -shortest -movflags +faststart -y ${outputPath}`
+      ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -i ${audioPath} -vf "${scaleFilter}" -af "volume=${vol}" -r 30 -vsync cfr -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -t ${totalDuration} -shortest -movflags +faststart -y ${outputPath}`
     } else {
-      ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -vf "scale=1080:1350:force_original_aspect_ratio=decrease,pad=1080:1350:(ow-iw)/2:(oh-ih)/2,setsar=1" -r 30 -vsync cfr -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -preset fast -crf 23 -an -movflags +faststart -y ${outputPath}`
+      ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -vf "${scaleFilter}" -r 30 -vsync cfr -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -preset fast -crf 23 -an -movflags +faststart -y ${outputPath}`
     }
 
     await execAsync(ffmpegCmd)

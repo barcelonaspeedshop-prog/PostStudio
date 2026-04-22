@@ -20,7 +20,10 @@ const CATEGORY_IDS: Record<string, string> = {
 
 export async function POST(req: NextRequest) {
   try {
-    const { videoBase64, title, description, tags, channelName, thumbnailBase64 } = await req.json()
+    const { videoBase64, title, description, tags, channelName, thumbnailBase64, reelMode } = await req.json()
+    const finalDescription = (reelMode && !(description || '').includes('#Shorts'))
+      ? `${description || ''}\n\n#Shorts`.trim()
+      : (description || '')
 
     if (!videoBase64) {
       return NextResponse.json({ error: 'videoBase64 is required' }, { status: 400 })
@@ -54,7 +57,7 @@ export async function POST(req: NextRequest) {
       requestBody: {
         snippet: {
           title:       (title       || 'Carousel Video').slice(0, 100),
-          description: (description || '').slice(0, 5000),
+          description: finalDescription.slice(0, 5000),
           tags:        tags || [],
           categoryId:  CATEGORY_IDS[channelName] || '22',
         },

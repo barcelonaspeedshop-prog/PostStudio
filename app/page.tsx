@@ -88,10 +88,31 @@ function dataUrlToFile(dataUrl: string, filename: string): File {
   return new File([arr], filename, { type: mime })
 }
 
+// Validate that a file is close to 9:16 aspect ratio (±5%)
+function validateReelAspect(file: File): Promise<string | null> {
+  return new Promise(resolve => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const ratio = img.width / img.height
+      const target = 9 / 16
+      if (Math.abs(ratio - target) / target > 0.05) {
+        resolve(`Image is ${img.width}×${img.height} — expected 9:16 (1080×1920). Upload a vertical image.`)
+      } else {
+        resolve(null)
+      }
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null) }
+    img.src = url
+  })
+}
+
 // Full Video Reel pipeline: composite-slides → video-export → base64 video
 // Uses the same /api/video-export path as the Carousel builder's Export MP4 button.
 async function runVideoReelPipeline(opts: {
   images: File[]
+  reelThumbnail: File | null
   channel: string
   slideTitle: string
   captionText: string
@@ -99,20 +120,22 @@ async function runVideoReelPipeline(opts: {
   musicFile: File | null
   onStep: (step: string) => void
 }): Promise<string> {
-  const { images, channel, slideTitle, captionText, musicOn, musicFile, onStep } = opts
+  const { images, reelThumbnail, channel, slideTitle, captionText, musicOn, musicFile, onStep } = opts
 
   console.log(`[runVideoReelPipeline] Starting — ${images.length} images, channel=${channel}, musicOn=${musicOn}`)
 
   // ── Step 1: Resize + composite with channel branding ──
   onStep('Step 1/3: Compositing slides...')
-  const resized = await Promise.all(images.map(resizeImageForSlide))
+  const sourceFiles = reelThumbnail ? [reelThumbnail, ...images] : images
+  const resized = await Promise.all(sourceFiles.map(resizeImageForSlide))
   console.log(`[runVideoReelPipeline] Resized ${resized.length} images`)
 
+  const contentStartIdx = reelThumbnail ? 1 : 0
   const slides = resized.map((image, i) => ({
     num: String(i + 1),
     tag: '',
-    headline: i === 0 ? (slideTitle || '').slice(0, 60) : '',
-    body: i === 0 ? (captionText || '').split('\n')[0]?.slice(0, 120) || '' : '',
+    headline: i === contentStartIdx ? (slideTitle || '').slice(0, 60) : '',
+    body: i === contentStartIdx ? (captionText || '').split('\n')[0]?.slice(0, 120) || '' : '',
     badge: '',
     accent: '',
     image,
@@ -124,7 +147,7 @@ async function runVideoReelPipeline(opts: {
   const compRes = await fetch('/api/composite-slides', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ slides, channel }),
+    body: JSON.stringify({ slides, channel, reelMode: true }),
   })
   console.log(`[runVideoReelPipeline] composite-slides response: ${compRes.status}`)
   if (!compRes.ok) {
@@ -156,7 +179,7 @@ async function runVideoReelPipeline(opts: {
   const exportRes = await fetch('/api/video-export', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ slides: exportSlides, slideDuration: 5, audioUrl, musicVolume: 20, musicEnabled: musicOn }),
+    body: JSON.stringify({ slides: exportSlides, slideDuration: 5, audioUrl, musicVolume: 20, musicEnabled: musicOn, reelMode: true }),
   })
   console.log(`[runVideoReelPipeline] video-export response: ${exportRes.status}`)
   if (!exportRes.ok) {
@@ -488,10 +511,17 @@ export default function ComposerPage() {
   // Video reel toggle — ref mirrors state so doPublish never reads a stale closure value
   const [postAsVideo, setPostAsVideo] = useState(false)
   const postAsVideoRef = useRef(false)
-  const setPostAsVideoAndRef = (v: boolean) => { postAsVideoRef.current = v; setPostAsVideo(v) }
+  const setPostAsVideoAndRef = (v: boolean) => {
+    postAsVideoRef.current = v
+    setPostAsVideo(v)
+    if (!v) { setReelThumbnail(null); setReelThumbnailSrc(null); setCompletedVideoUrl(null) }
+  }
   const [videoCreationStatus, setVideoCreationStatus] = useState('')
   const [completedVideoUrl, setCompletedVideoUrl] = useState<string | null>(null)
   const [reelGenerating, setReelGenerating] = useState(false)
+  const [reelThumbnail, setReelThumbnail] = useState<File | null>(null)
+  const [reelThumbnailSrc, setReelThumbnailSrc] = useState<string | null>(null)
+  const reelThumbnailInputRef = useRef<HTMLInputElement>(null)
 
   // Load connected platforms on channel change
   useEffect(() => {
@@ -658,15 +688,29 @@ export default function ComposerPage() {
     }
   }
 
+  const handleReelThumbnail = async (files: FileList | null) => {
+    const f = files?.[0]
+    if (!f) return
+    const warn = await validateReelAspect(f)
+    if (warn) { show(warn, 'error'); return }
+    setReelThumbnail(f)
+    setCompletedVideoUrl(null)
+    const reader = new FileReader()
+    reader.onload = ev => setReelThumbnailSrc(ev.target?.result as string)
+    reader.readAsDataURL(f)
+  }
+
   const handleGenerateReel = async () => {
     const imageFiles = mediaFiles.filter(f => f.type.startsWith('image/'))
     if (!imageFiles.length) { show('Upload images first', 'error'); return }
+    if (!reelThumbnail) { show('Upload a 9:16 thumbnail first', 'error'); return }
     setReelGenerating(true)
     setVideoCreationStatus('Preparing reel...')
     setCompletedVideoUrl(null)
     try {
       const video = await runVideoReelPipeline({
         images: imageFiles,
+        reelThumbnail,
         channel: selectedChannel,
         slideTitle: title,
         captionText: caption,
@@ -776,6 +820,12 @@ export default function ComposerPage() {
     const needsVideoCreation = isVideoReel && imageFiles.length > 0 && !videoFile && !completedVideoUrl
     console.log(`[doPublish] isVideoReel=${isVideoReel} needsVideoCreation=${needsVideoCreation} images=${imageFiles.length} videoFile=${!!videoFile}`)
 
+    if (needsVideoCreation && !reelThumbnail) {
+      show('Upload a 9:16 Reel thumbnail before publishing', 'error')
+      setPublishing(false)
+      return
+    }
+
     // ── STEP 1: composite-slides → video-export → base64 video (Video Reel only) ─
     // Uses the same /api/video-export path as Carousel builder's Export MP4 button.
     let createdVideoBase64: string | null = null
@@ -783,6 +833,7 @@ export default function ComposerPage() {
       try {
         createdVideoBase64 = await runVideoReelPipeline({
           images: imageFiles,
+          reelThumbnail,
           channel: selectedChannel,
           slideTitle: title,
           captionText: caption,
@@ -830,7 +881,8 @@ export default function ComposerPage() {
                 description: [description, caption].filter(Boolean).join('\n\n').slice(0, 5000),
                 tags: tags.slice(0, 30),
                 channelName: selectedChannel,
-                thumbnailBase64: thumbnailSrc || undefined,
+                thumbnailBase64: (isVideoReel && reelThumbnailSrc) ? reelThumbnailSrc : thumbnailSrc || undefined,
+                reelMode: isVideoReel,
               }),
             })
             const ytData = await ytRes.json()
@@ -1157,28 +1209,67 @@ export default function ComposerPage() {
 
               {/* Post As toggle — shown when images present but no video */}
               {mediaFiles.some(f => f.type.startsWith('image/')) && !mediaFiles.some(f => f.type.startsWith('video/')) && (
-                <div className="mt-3 flex items-center gap-2.5">
-                  <p className="text-[11px] text-stone-500 shrink-0">Post as:</p>
-                  <div className="flex rounded-lg border border-stone-200 overflow-hidden text-[11px] font-medium">
-                    <button
-                      onClick={() => setPostAsVideoAndRef(false)}
-                      className={`px-3 py-1.5 transition-colors ${!postAsVideo ? 'bg-stone-900 text-white' : 'text-stone-500 hover:bg-stone-50'}`}
-                    >
-                      Carousel
-                    </button>
-                    <button
-                      onClick={() => setPostAsVideoAndRef(true)}
-                      className={`px-3 py-1.5 transition-colors border-l border-stone-200 ${postAsVideo ? 'bg-stone-900 text-white' : 'text-stone-500 hover:bg-stone-50'}`}
-                    >
-                      Video Reel
-                    </button>
+                <div className="mt-3 space-y-3">
+                  {/* Toggle row */}
+                  <div className="flex items-center gap-2.5">
+                    <p className="text-[11px] text-stone-500 shrink-0">Post as:</p>
+                    <div className="flex rounded-lg border border-stone-200 overflow-hidden text-[11px] font-medium">
+                      <button
+                        onClick={() => setPostAsVideoAndRef(false)}
+                        className={`px-3 py-1.5 transition-colors ${!postAsVideo ? 'bg-stone-900 text-white' : 'text-stone-500 hover:bg-stone-50'}`}
+                      >
+                        Carousel
+                      </button>
+                      <button
+                        onClick={() => setPostAsVideoAndRef(true)}
+                        className={`px-3 py-1.5 transition-colors border-l border-stone-200 ${postAsVideo ? 'bg-stone-900 text-white' : 'text-stone-500 hover:bg-stone-50'}`}
+                      >
+                        Video Reel
+                      </button>
+                    </div>
                   </div>
+
+                  {/* 9:16 Reel Thumbnail — required for Video Reel */}
+                  {postAsVideo && (
+                    <div className="p-3 bg-stone-50 border border-stone-200 rounded-xl">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">9:16 Reel Thumbnail</p>
+                        <span className="text-[10px] text-red-500 font-medium">Required</span>
+                      </div>
+                      <p className="text-[10px] text-stone-400 mb-2">1080×1920 vertical — used as video cover and YouTube thumbnail</p>
+                      {reelThumbnailSrc ? (
+                        <div className="relative">
+                          <img src={reelThumbnailSrc} alt="9:16 thumbnail" className="w-24 rounded-lg border border-stone-200 object-cover" style={{ aspectRatio: '9/16' }} />
+                          <button
+                            onClick={() => { setReelThumbnail(null); setReelThumbnailSrc(null); setCompletedVideoUrl(null) }}
+                            className="absolute top-1 right-1 w-4 h-4 bg-stone-900/70 text-white rounded-full text-[9px] flex items-center justify-center hover:bg-stone-900"
+                          >×</button>
+                        </div>
+                      ) : (
+                        <label className="flex items-center gap-2 p-3 border-2 border-dashed border-stone-300 rounded-lg cursor-pointer hover:bg-stone-100 transition-colors w-fit">
+                          <input
+                            ref={reelThumbnailInputRef}
+                            type="file"
+                            accept="image/jpeg,.jpg,.jpeg,image/png,.png,image/webp,.webp"
+                            className="hidden"
+                            onChange={e => handleReelThumbnail(e.target.files)}
+                          />
+                          <svg className="w-4 h-4 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <span className="text-[12px] text-stone-500">Upload 9:16 thumbnail</span>
+                        </label>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Generate Reel button */}
                   {postAsVideo && !completedVideoUrl && (
                     <div className="flex flex-col gap-1.5">
                       <button
                         onClick={handleGenerateReel}
-                        disabled={reelGenerating}
-                        className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={reelGenerating || !reelThumbnail}
+                        className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-fit"
                       >
                         {reelGenerating ? (
                           <><Spinner className="w-3 h-3" /> {videoCreationStatus || 'Generating...'}</>
@@ -1186,7 +1277,10 @@ export default function ComposerPage() {
                           <><span className="text-[10px]">▶</span> Generate Reel</>
                         )}
                       </button>
-                      {!reelGenerating && (
+                      {!reelThumbnail && !reelGenerating && (
+                        <p className="text-[10px] text-amber-600">Upload a 9:16 thumbnail above to enable</p>
+                      )}
+                      {reelThumbnail && !reelGenerating && (
                         <p className="text-[10px] text-stone-400">Generate the video before publishing, or publish directly to create on the fly</p>
                       )}
                     </div>
