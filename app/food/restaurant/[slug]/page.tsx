@@ -1,10 +1,13 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { restaurants, getRestaurant, getRelated } from '@/lib/restaurants'
+import { restaurants } from '@/lib/restaurants'
+import { getRestaurantServer, getRelatedServer } from '@/lib/restaurants-server'
 import FoodNav from '../../components/FoodNav'
 import FoodFooter from '../../components/FoodFooter'
 import ShareBar from '../../components/ShareBar'
+
+export const dynamicParams = true
 
 type Props = { params: { slug: string } }
 
@@ -13,7 +16,7 @@ export async function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const r = getRestaurant(params.slug)
+  const r = getRestaurantServer(params.slug)
   if (!r) return {}
   return {
     title: `${r.name} — Omnira Food`,
@@ -37,10 +40,10 @@ const GRAD: Record<string, string> = {
 
 
 export default function RestaurantPage({ params }: Props) {
-  const r = getRestaurant(params.slug)
+  const r = getRestaurantServer(params.slug)
   if (!r) notFound()
 
-  const related = getRelated(r)
+  const related = getRelatedServer(r)
   const seriesLabel = r.series === 'no-frills' ? 'No Frills But Kills' : 'Featured'
 
   return (

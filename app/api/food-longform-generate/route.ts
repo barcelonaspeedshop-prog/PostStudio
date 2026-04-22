@@ -82,10 +82,13 @@ The chapters array must have exactly 7 items (1 intro + 5 restaurants + 1 outro)
       }],
     })
 
-    const text = response.content
+    const rawText = response.content
       .filter(b => b.type === 'text')
       .map(b => (b as { type: 'text'; text: string }).text)
       .join('')
+
+    // Strip all HTML tags (including <cite index="N">) from the response
+    const text = rawText.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ')
 
     const cleaned = text.replace(/```json|```/g, '').trim()
     const jsonMatch = cleaned.match(/\{[\s\S]*\}/)?.[0]

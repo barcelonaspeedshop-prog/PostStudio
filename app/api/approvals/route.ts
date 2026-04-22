@@ -5,6 +5,9 @@ import path from 'path'
 import crypto from 'crypto'
 import { trackHashtags } from '@/lib/hashtags'
 import type { ContentType } from '@/lib/content-mix'
+import type { RestaurantMeta } from '@/app/api/food-carousel-generate/route'
+import { restaurants as staticRestaurants } from '@/lib/restaurants'
+import type { Restaurant } from '@/lib/restaurants'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -29,9 +32,86 @@ export type ApprovalItem = {
   contentType?: ContentType
   pollQuestion?: string
   pollOptions?: string[]
+  restaurantMeta?: RestaurantMeta
+  restaurantMetas?: RestaurantMeta[]
   createdAt: string
   status: 'pending' | 'approved' | 'rejected'
   reviewedAt?: string
+}
+
+const AI_RESTAURANTS_FILE = path.join(DATA_DIR, 'restaurants-ai.json')
+
+async function loadAiRestaurants(): Promise<Restaurant[]> {
+  try {
+    if (!existsSync(AI_RESTAURANTS_FILE)) return []
+    const raw = await readFile(AI_RESTAURANTS_FILE, 'utf-8')
+    return JSON.parse(raw) as Restaurant[]
+  } catch {
+    return []
+  }
+}
+
+async function saveAiRestaurants(data: Restaurant[]): Promise<void> {
+  if (!existsSync(DATA_DIR)) await mkdir(DATA_DIR, { recursive: true })
+  await writeFile(AI_RESTAURANTS_FILE, JSON.stringify(data, null, 2))
+}
+
+function metaToRestaurant(meta: RestaurantMeta): Restaurant {
+  const base = `https%3A%2F%2Fpremirafirst.com%2Ffood%2Frestaurant%2F${meta.slug}`
+  return {
+    slug: meta.slug,
+    name: meta.name,
+    series: meta.series === 'top5' ? 'featured' : 'no-frills',
+    badge: meta.series === 'top5' ? 'Featured' : '★ No Frills But Kills',
+    badgeClass: meta.series === 'top5' ? 'badge--featured' : 'badge--kills',
+    country: meta.country,
+    city: meta.city,
+    location: meta.address ? `${meta.address}, ${meta.city}` : meta.city,
+    cuisine: meta.cuisine,
+    priceRange: meta.priceRange,
+    gradClass: 'grad-tokyo',
+    metaDescription: `${meta.name}, ${meta.city}. ${meta.story.slice(0, 120)}`,
+    ogDescription: meta.story.slice(0, 160),
+    excerpt: meta.story,
+    story: [meta.story],
+    mustOrder: meta.mustOrder.length ? meta.mustOrder : [{ name: 'Ask the staff', description: 'The daily special is always worth ordering.' }],
+    hours: meta.hoursNote ? [{ label: 'Hours', value: meta.hoursNote }] : [],
+    hoursNote: undefined,
+    bookingNote: meta.bookingNote || 'Walk-ins welcome.',
+    bookingUrl: undefined,
+    directionsQuery: `${meta.name.replace(/\s+/g, '+')}+${meta.city.replace(/\s+/g, '+')}`,
+    mapsEmbed: `${meta.name.replace(/\s+/g, '+')}+${meta.city.replace(/\s+/g, '+')}`,
+    mapsLabel: `◉ ${meta.city}`,
+    shareUrlEncoded: base,
+    related: [],
+  }
+}
+
+async function upsertRestaurantsToWebsite(metas: RestaurantMeta[]): Promise<void> {
+  const existing = await loadAiRestaurants()
+  const staticSlugs = new Set(staticRestaurants.map(r => r.slug))
+
+  for (const meta of metas) {
+    if (!meta.slug || !meta.name) continue
+    const restaurant = metaToRestaurant(meta)
+
+    // If it exists in the static file, the server will override with the AI entry via restaurants-server.ts
+    // Just note it in the log
+    if (staticSlugs.has(meta.slug)) {
+      console.log(`[approvals] Restaurant "${meta.name}" (${meta.slug}) exists in static data — storing AI version as override`)
+    }
+
+    const idx = existing.findIndex(r => r.slug === meta.slug)
+    if (idx >= 0) {
+      existing[idx] = restaurant
+      console.log(`[approvals] Updated restaurant "${meta.name}" in restaurants-ai.json`)
+    } else {
+      existing.push(restaurant)
+      console.log(`[approvals] Added new restaurant "${meta.name}" to restaurants-ai.json`)
+    }
+  }
+
+  await saveAiRestaurants(existing)
 }
 
 async function loadApprovals(): Promise<ApprovalItem[]> {
@@ -64,7 +144,7 @@ export async function GET() {
 // POST — add new item to queue
 export async function POST(req: NextRequest) {
   try {
-    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, cta, hashtags, contentType, pollQuestion, pollOptions } = await req.json()
+    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, cta, hashtags, contentType, pollQuestion, pollOptions, restaurantMeta, restaurantMetas } = await req.json()
 
     if (!channel || !slides || !Array.isArray(slides)) {
       return NextResponse.json({ error: 'channel and slides are required' }, { status: 400 })
@@ -86,6 +166,8 @@ export async function POST(req: NextRequest) {
       contentType: contentType || 'news',
       pollQuestion: pollQuestion || undefined,
       pollOptions: Array.isArray(pollOptions) ? pollOptions : undefined,
+      restaurantMeta: restaurantMeta || undefined,
+      restaurantMetas: Array.isArray(restaurantMetas) ? restaurantMetas : undefined,
       createdAt: new Date().toISOString(),
       status: 'pending',
     }
@@ -165,6 +247,18 @@ export async function PATCH(req: NextRequest) {
     }
 
     await saveApprovals(items)
+
+    // ── Auto-publish restaurant(s) to food website ──
+    if (item.channel === 'Omnira Food') {
+      const metas = item.restaurantMetas || (item.restaurantMeta ? [item.restaurantMeta] : [])
+      if (metas.length > 0) {
+        try {
+          await upsertRestaurantsToWebsite(metas)
+        } catch (e) {
+          console.warn('[approvals] upsertRestaurantsToWebsite failed:', e instanceof Error ? e.message : e)
+        }
+      }
+    }
 
     // Approved — publish to Instagram and Facebook only
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'

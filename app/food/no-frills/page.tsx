@@ -1,13 +1,14 @@
 'use client'
 import Link from 'next/link'
-import { useState } from 'react'
-import { restaurants } from '@/lib/restaurants'
+import { useState, useEffect } from 'react'
+import { restaurants, type Restaurant } from '@/lib/restaurants'
 import FoodNav from '../components/FoodNav'
 import FoodFooter from '../components/FoodFooter'
 
 const FILTERS = ['All', 'Japan', 'Spain', 'UK', 'Tokyo', 'Navarra']
 
-const nfbk = restaurants.filter(r => r.series === 'no-frills')
+const staticNfbk = restaurants.filter(r => r.series === 'no-frills')
+const staticSlugs = new Set(staticNfbk.map(r => r.slug))
 
 function SubmitForm() {
   const [name, setName]       = useState('')
@@ -136,6 +137,20 @@ const inputStyle: React.CSSProperties = {
 
 export default function NoFrillsPage() {
   const [active, setActive] = useState('All')
+  const [dynamicRestaurants, setDynamicRestaurants] = useState<Restaurant[]>([])
+
+  useEffect(() => {
+    fetch('/api/restaurants-dynamic')
+      .then(r => r.json())
+      .then((data: Restaurant[]) => {
+        setDynamicRestaurants(
+          data.filter(r => r.series === 'no-frills' && !staticSlugs.has(r.slug))
+        )
+      })
+      .catch(() => {})
+  }, [])
+
+  const nfbk = [...staticNfbk, ...dynamicRestaurants]
 
   const visible = nfbk.filter(r => {
     if (active === 'All') return true

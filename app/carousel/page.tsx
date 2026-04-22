@@ -10,6 +10,7 @@ type Slide = {
   badge: string
   accent: string
   image?: string // base64 data URL
+  tileType?: 'story' | 'story-text' | 'hook' | 'brand' | 'cta' | 'poll'
 }
 
 const CHANNELS = [
@@ -82,6 +83,9 @@ export default function CarouselPage() {
   const [foodRestaurants, setFoodRestaurants] = useState([{ name: '', city: '' }, { name: '', city: '' }, { name: '', city: '' }, { name: '', city: '' }, { name: '', city: '' }])
   const [buildingFood, setBuildingFood] = useState(false)
   const [foodBuildStatus, setFoodBuildStatus] = useState('')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [foodRestaurantMetas, setFoodRestaurantMetas] = useState<any[]>([])
+  const [exportingSlides, setExportingSlides] = useState(false)
   const [selectedSlide, setSelectedSlide] = useState<number | null>(null)
   const [generatingVideo, setGeneratingVideo] = useState(false)
   const [slideDuration, setSlideDuration] = useState(3)
@@ -623,6 +627,9 @@ export default function CarouselPage() {
           ytTitle: ytTitle || slides[0]?.headline || '',
           ytDescription: ytDescription || slides.map(s => s.headline + '\n' + s.body).join('\n\n'),
           ytTags: ytTags ? ytTags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
+          // Food Guide: pass restaurant metadata for auto-publish to website on approval
+          ...(channel === 'Omnira Food' && foodRestaurantMetas.length === 1 && { restaurantMeta: foodRestaurantMetas[0] }),
+          ...(channel === 'Omnira Food' && foodRestaurantMetas.length > 1 && { restaurantMetas: foodRestaurantMetas }),
         }),
       })
       const data = await res.json()
@@ -683,6 +690,10 @@ export default function CarouselPage() {
         ? `${valid[0].name} — ${valid[0].city} (No Frills But Kills)`
         : `Top ${valid.length} Eats — ${valid.map(r => r.city).filter((c, i, a) => a.indexOf(c) === i).join(', ')}`)
 
+      // Store restaurant metadata for the approval workflow + website auto-publish
+      const metas = genData.restaurantMetas || (genData.restaurantMeta ? [genData.restaurantMeta] : [])
+      setFoodRestaurantMetas(metas)
+
       const imageQueries: string[] = genData.imageQueries || []
 
       // Step 2: Auto-fetch images via Serper + proxy
@@ -736,6 +747,35 @@ export default function CarouselPage() {
     } finally {
       setBuildingFood(false)
       setFoodBuildStatus('')
+    }
+  }
+
+  const exportSlides = async () => {
+    if (!slides.length) { showToast('Generate slides first', 'error'); return }
+    setExportingSlides(true)
+    showToast('Compositing slides for export…')
+    try {
+      const res = await fetch('/api/export-slides', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slides, channel }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error || `Export failed (${res.status})`)
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${channel.replace(/\s+/g, '_').toLowerCase()}_slides.zip`
+      a.click()
+      URL.revokeObjectURL(url)
+      showToast('Slides downloaded!')
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Export failed', 'error')
+    } finally {
+      setExportingSlides(false)
     }
   }
 
@@ -812,6 +852,13 @@ export default function CarouselPage() {
                   className="px-3 py-2 min-h-[44px] text-[13px] font-medium border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
                 >
                   Add images
+                </button>
+                <button
+                  onClick={exportSlides}
+                  disabled={exportingSlides}
+                  className="px-3 py-2 min-h-[44px] text-[13px] font-medium border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors disabled:opacity-50"
+                >
+                  {exportingSlides ? 'Zipping…' : 'Export Slides'}
                 </button>
                 <button
                   onClick={generateVideo}
