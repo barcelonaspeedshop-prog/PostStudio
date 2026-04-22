@@ -491,6 +491,7 @@ export default function ComposerPage() {
   const setPostAsVideoAndRef = (v: boolean) => { postAsVideoRef.current = v; setPostAsVideo(v) }
   const [videoCreationStatus, setVideoCreationStatus] = useState('')
   const [completedVideoUrl, setCompletedVideoUrl] = useState<string | null>(null)
+  const [reelGenerating, setReelGenerating] = useState(false)
 
   // Load connected platforms on channel change
   useEffect(() => {
@@ -657,6 +658,33 @@ export default function ComposerPage() {
     }
   }
 
+  const handleGenerateReel = async () => {
+    const imageFiles = mediaFiles.filter(f => f.type.startsWith('image/'))
+    if (!imageFiles.length) { show('Upload images first', 'error'); return }
+    setReelGenerating(true)
+    setVideoCreationStatus('Preparing reel...')
+    setCompletedVideoUrl(null)
+    try {
+      const video = await runVideoReelPipeline({
+        images: imageFiles,
+        channel: selectedChannel,
+        slideTitle: title,
+        captionText: caption,
+        musicOn: musicEnabled,
+        musicFile,
+        onStep: setVideoCreationStatus,
+      })
+      setCompletedVideoUrl(video)
+      setVideoCreationStatus('')
+      show('Reel ready — preview below ↓')
+    } catch (e: unknown) {
+      show(e instanceof Error ? e.message : 'Reel generation failed', 'error')
+      setVideoCreationStatus('')
+    } finally {
+      setReelGenerating(false)
+    }
+  }
+
   const handleRegenField = async (field: 'title' | 'description' | 'caption' | 'tags' | 'cta') => {
     if (!aiPrompt.trim() && !title) { show('Add a description first', 'error'); return }
     setAiStatus(`Regenerating ${field}...`)
@@ -744,7 +772,8 @@ export default function ComposerPage() {
       ? await Promise.all(imageFiles.map(readAsDataURL))
       : (mediaSrc?.startsWith('data:image/') ? [mediaSrc] : [])
 
-    const needsVideoCreation = isVideoReel && imageFiles.length > 0 && !videoFile
+    // Skip pipeline if user already generated the reel via the Generate Reel button
+    const needsVideoCreation = isVideoReel && imageFiles.length > 0 && !videoFile && !completedVideoUrl
     console.log(`[doPublish] isVideoReel=${isVideoReel} needsVideoCreation=${needsVideoCreation} images=${imageFiles.length} videoFile=${!!videoFile}`)
 
     // ── STEP 1: composite-slides → video-export → base64 video (Video Reel only) ─
@@ -781,8 +810,8 @@ export default function ComposerPage() {
       return
     }
 
-    // Resolve the final video source: uploaded file, or just-created video
-    const getVideo = async (): Promise<string | null> => videoData || createdVideoBase64
+    // Resolve the final video source: uploaded file → pre-generated reel → just-created video
+    const getVideo = async (): Promise<string | null> => videoData || completedVideoUrl || createdVideoBase64
 
     try {
       if (needsVideoCreation) setVideoCreationStatus('Publishing...')
@@ -1145,16 +1174,46 @@ export default function ComposerPage() {
                     </button>
                   </div>
                   {postAsVideo && !completedVideoUrl && (
-                    <p className="text-[10px] text-stone-400">Images will be composited with channel branding and assembled into an MP4 on publish</p>
+                    <div className="flex flex-col gap-1.5">
+                      <button
+                        onClick={handleGenerateReel}
+                        disabled={reelGenerating}
+                        className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {reelGenerating ? (
+                          <><Spinner className="w-3 h-3" /> {videoCreationStatus || 'Generating...'}</>
+                        ) : (
+                          <><span className="text-[10px]">▶</span> Generate Reel</>
+                        )}
+                      </button>
+                      {!reelGenerating && (
+                        <p className="text-[10px] text-stone-400">Generate the video before publishing, or publish directly to create on the fly</p>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
 
-              {/* Download button — shown after video creation completes */}
+              {/* Video preview + download — shown after video creation completes */}
               {completedVideoUrl && (
                 <div className="mt-3 p-3 bg-stone-50 border border-stone-200 rounded-xl">
-                  <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-2">Video Ready — Download</p>
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">✓ Reel Ready</p>
+                    <button
+                      onClick={() => setCompletedVideoUrl(null)}
+                      className="text-[11px] text-stone-400 hover:text-stone-600"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <video
+                    src={completedVideoUrl}
+                    controls
+                    playsInline
+                    className="w-full rounded-lg border border-stone-200 bg-black mb-2"
+                    style={{ maxHeight: '240px' }}
+                  />
+                  <div className="flex gap-2 flex-wrap items-center">
                     <a
                       href={completedVideoUrl}
                       download="video-reel.mp4"
@@ -1163,10 +1222,11 @@ export default function ComposerPage() {
                       ↓ Download MP4
                     </a>
                     <button
-                      onClick={() => setCompletedVideoUrl(null)}
-                      className="ml-auto px-2 py-2 text-[11px] text-stone-400 hover:text-stone-600"
+                      onClick={handleGenerateReel}
+                      disabled={reelGenerating}
+                      className="flex items-center gap-1.5 px-3 py-2 text-[12px] border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors disabled:opacity-50"
                     >
-                      ✕
+                      {reelGenerating ? <><Spinner className="w-3 h-3" /> Regenerating...</> : '↺ Regenerate'}
                     </button>
                   </div>
                 </div>
