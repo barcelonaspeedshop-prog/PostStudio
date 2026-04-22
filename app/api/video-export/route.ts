@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   const tmpDir = `/tmp/carousel_${Date.now()}`
   
   try {
-    const { slides, slideDuration: rawDuration = 5, audioUrl, musicVolume = 20, musicEnabled = true, reelMode = false } = await req.json()
+    const { slides, slideDuration: rawDuration = 5, audioUrl, musicVolume = 20, musicEnabled = true } = await req.json()
     // Enforce minimum 5 seconds per slide
     const slideDuration = Math.max(5, Number(rawDuration) || 5)
     // Per-tile durations — text tiles need longer display time
@@ -90,28 +90,7 @@ export async function POST(req: NextRequest) {
     // Build ffmpeg command
     let ffmpegCmd: string
 
-    // Shared encoder flags
-    const encFlags = `-r 30 -vsync cfr -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -preset fast -crf 23`
-
-    if (reelMode) {
-      // 9:16 Reel (1080×1920): blurred fill background + fitted foreground, no black bars
-      const blurFilter = `[0:v]split[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=20:2[blurred];[fg]scale=1080:1920:force_original_aspect_ratio=decrease[fit];[blurred][fit]overlay=(W-w)/2:(H-h)/2,setsar=1[out]`
-
-      if (audioUrl && musicEnabled !== false) {
-        const audioPath = path.join(tmpDir, 'audio.mp3')
-        if (audioUrl.startsWith('data:')) {
-          const base64Data = audioUrl.replace(/^data:audio\/\w+;base64,/, '')
-          await writeFile(audioPath, Buffer.from(base64Data, 'base64'))
-        } else {
-          await downloadImage(audioUrl, audioPath)
-        }
-        const totalDuration = slides.reduce((sum: number, s: { tileType?: string }) => sum + getTileDuration(s), 0)
-        const vol = Math.max(0, Math.min(100, Number(musicVolume) || 20)) / 100
-        ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -i ${audioPath} -filter_complex "${blurFilter};[1:a]volume=${vol}[aud]" -map "[out]" -map "[aud]" ${encFlags} -c:a aac -b:a 128k -t ${totalDuration} -shortest -movflags +faststart -y ${outputPath}`
-      } else {
-        ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -filter_complex "${blurFilter}" -map "[out]" ${encFlags} -an -movflags +faststart -y ${outputPath}`
-      }
-    } else if (audioUrl && musicEnabled !== false) {
+    if (audioUrl && musicEnabled !== false) {
       const audioPath = path.join(tmpDir, 'audio.mp3')
       if (audioUrl.startsWith('data:')) {
         const base64Data = audioUrl.replace(/^data:audio\/\w+;base64,/, '')
@@ -120,10 +99,11 @@ export async function POST(req: NextRequest) {
         await downloadImage(audioUrl, audioPath)
       }
       const totalDuration = slides.reduce((sum: number, s: { tileType?: string }) => sum + getTileDuration(s), 0)
+      // Clamp volume to 0-100 and convert to ffmpeg volume factor (0.0-1.0)
       const vol = Math.max(0, Math.min(100, Number(musicVolume) || 20)) / 100
-      ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -i ${audioPath} -vf "scale=1080:1350:force_original_aspect_ratio=decrease,pad=1080:1350:(ow-iw)/2:(oh-ih)/2,setsar=1" -af "volume=${vol}" ${encFlags} -c:a aac -b:a 128k -t ${totalDuration} -shortest -movflags +faststart -y ${outputPath}`
+      ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -i ${audioPath} -vf "scale=1080:1350:force_original_aspect_ratio=decrease,pad=1080:1350:(ow-iw)/2:(oh-ih)/2,setsar=1" -af "volume=${vol}" -r 30 -vsync cfr -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -t ${totalDuration} -shortest -movflags +faststart -y ${outputPath}`
     } else {
-      ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -vf "scale=1080:1350:force_original_aspect_ratio=decrease,pad=1080:1350:(ow-iw)/2:(oh-ih)/2,setsar=1" ${encFlags} -an -movflags +faststart -y ${outputPath}`
+      ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -vf "scale=1080:1350:force_original_aspect_ratio=decrease,pad=1080:1350:(ow-iw)/2:(oh-ih)/2,setsar=1" -r 30 -vsync cfr -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -preset fast -crf 23 -an -movflags +faststart -y ${outputPath}`
     }
 
     await execAsync(ffmpegCmd)
