@@ -175,6 +175,19 @@ function SidebarNav({ pathname, pendingCount, curationCount }: { pathname: strin
         )
       })}
       <div className="mx-3 my-1 border-t border-stone-100" />
+      <Link
+        href="/food-research"
+        className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] transition-colors min-h-[44px] ${
+          pathname === '/food-research'
+            ? 'bg-stone-100 text-stone-900 font-medium'
+            : 'text-stone-500 hover:bg-stone-50 hover:text-stone-800'
+        }`}
+      >
+        <svg className="w-[15px] h-[15px] shrink-0" style={{ opacity: pathname === '/food-research' ? 1 : 0.55 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        Food Research
+      </Link>
       <a
         href="https://app.premirafirst.com/food"
         target="_blank"

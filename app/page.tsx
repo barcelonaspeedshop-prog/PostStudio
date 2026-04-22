@@ -541,6 +541,23 @@ export default function ComposerPage() {
     }
   }, [postType]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Pre-fill from Food Research "Create Post" navigation (?postType=...&restaurantName=...&restaurantCity=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const pt = params.get('postType') as PostTypeValue | null
+    const rName = params.get('restaurantName')
+    const rCity = params.get('restaurantCity')
+    if (pt) setPostType(pt)
+    if (rName) setRestaurantName(rName)
+    if (rCity) setRestaurantCity(rCity)
+    if (rName && rCity) {
+      setAiPrompt(`${rName} in ${rCity}`)
+    }
+    if (pt || rName || rCity) {
+      window.history.replaceState({}, '', '/')
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Readiness
   const readiness = Math.min(
     100,
