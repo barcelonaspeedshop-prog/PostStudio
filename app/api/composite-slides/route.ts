@@ -975,7 +975,7 @@ function determineTileType(
 
 export async function POST(req: NextRequest) {
   try {
-    const { slides, channel } = await req.json()
+    const { slides, channel, reelMode = false } = await req.json()
 
     if (!slides || !Array.isArray(slides)) {
       return NextResponse.json({ error: 'slides array is required' }, { status: 400 })
@@ -1009,6 +1009,26 @@ export async function POST(req: NextRequest) {
           additionalLayers.push({ input: resizedMap, top: 0, left: 0 })
           hasMapImage = true
         }
+      } else if (reelMode && slide.image && slide.image.startsWith('data:')) {
+        // Reel mode: fit image fully (no crop) over a blurred fill background
+        const base64Data = slide.image.replace(/^data:image\/\w+;base64,/, '')
+        const imgBuffer = Buffer.from(base64Data, 'base64')
+        const blurredBg = await sharp(imgBuffer)
+          .resize(W, H, { fit: 'cover', position: 'centre' })
+          .blur(28)
+          .jpeg({ quality: 85 })
+          .toBuffer()
+        const fittedFg = await sharp(imgBuffer)
+          .resize(W, H, { fit: 'inside' })
+          .toBuffer()
+        const fgMeta = await sharp(fittedFg).metadata()
+        const fgW = fgMeta.width ?? W
+        const fgH = fgMeta.height ?? H
+        base = sharp(blurredBg).composite([{
+          input: fittedFg,
+          left: Math.round((W - fgW) / 2),
+          top: Math.round((H - fgH) / 2),
+        }])
       } else if (slide.image && slide.image.startsWith('data:')) {
         const base64Data = slide.image.replace(/^data:image\/\w+;base64,/, '')
         const imgBuffer = Buffer.from(base64Data, 'base64')

@@ -124,7 +124,7 @@ async function runVideoReelPipeline(opts: {
   const compRes = await fetch('/api/composite-slides', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ slides, channel }),
+    body: JSON.stringify({ slides, channel, reelMode: true }),
   })
   console.log(`[runVideoReelPipeline] composite-slides response: ${compRes.status}`)
   if (!compRes.ok) {
@@ -156,7 +156,7 @@ async function runVideoReelPipeline(opts: {
   const exportRes = await fetch('/api/video-export', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ slides: exportSlides, slideDuration: 5, audioUrl, musicVolume: 20, musicEnabled: musicOn }),
+    body: JSON.stringify({ slides: exportSlides, slideDuration: 5, audioUrl, musicVolume: 20, musicEnabled: musicOn, reelMode: true }),
   })
   console.log(`[runVideoReelPipeline] video-export response: ${exportRes.status}`)
   if (!exportRes.ok) {
