@@ -88,28 +88,26 @@ function dataUrlToFile(dataUrl: string, filename: string): File {
   return new File([arr], filename, { type: mime })
 }
 
-// Full Video Reel pipeline: composite-slides → story-video/start → jobId
-// Mirrors exactly what the Carousel builder does.
+// Full Video Reel pipeline: composite-slides → video-export → base64 video
+// Uses the same /api/video-export path as the Carousel builder's Export MP4 button.
 async function runVideoReelPipeline(opts: {
   images: File[]
   channel: string
   slideTitle: string
   captionText: string
   musicOn: boolean
-  musicMood: string
   musicFile: File | null
   onStep: (step: string) => void
 }): Promise<string> {
-  const { images, channel, slideTitle, captionText, musicOn, musicMood, musicFile, onStep } = opts
+  const { images, channel, slideTitle, captionText, musicOn, musicFile, onStep } = opts
 
   console.log(`[runVideoReelPipeline] Starting — ${images.length} images, channel=${channel}, musicOn=${musicOn}`)
 
-  // ── Step 1: Resize images client-side, then composite with channel branding ──
-  onStep('Step 1/4: Compositing slides...')
+  // ── Step 1: Resize + composite with channel branding ──
+  onStep('Step 1/3: Compositing slides...')
   const resized = await Promise.all(images.map(resizeImageForSlide))
   console.log(`[runVideoReelPipeline] Resized ${resized.length} images`)
 
-  // Build slide objects — 'story' tileType ensures the photo fills the frame
   const slides = resized.map((image, i) => ({
     num: String(i + 1),
     tag: '',
@@ -135,62 +133,42 @@ async function runVideoReelPipeline(opts: {
   }
   const { frames } = await compRes.json() as { frames: string[] }
   if (!frames?.length) throw new Error('composite-slides returned no frames')
+  console.log(`[runVideoReelPipeline] Got ${frames.length} composited frames`)
 
-  console.log(`[runVideoReelPipeline] Got ${frames.length} composited frames, total size ~${(frames.join('').length / 1024 / 1024).toFixed(1)} MB`)
-
-  // ── Step 2: Convert frames → File objects, send to story-video/start ─────────
-  onStep('Step 2/4: Starting video job...')
-  const frameFiles = frames.map((dataUrl: string, i: number) => dataUrlToFile(dataUrl, `frame_${i}.jpg`))
-  console.log(`[runVideoReelPipeline] Frame files: ${frameFiles.map(f => `${f.name}(${(f.size/1024).toFixed(0)}KB)`).join(', ')}`)
-
-  const formData = new FormData()
-  formData.append('chapters', JSON.stringify([{ id: 1, title: slideTitle || 'Slides' }]))
-  formData.append('channel', channel)
-  formData.append('musicEnabled', musicOn ? 'true' : 'false')
-  if (musicOn) formData.append('musicMood', musicMood)
-  if (musicOn && musicFile) formData.append('music', musicFile)
-  frameFiles.forEach((file: File) => {
-    formData.append('media', file)
-    formData.append('mediaChapterIds', '1')
-  })
-
-  console.log(`[runVideoReelPipeline] Sending FormData to story-video/start (${frameFiles.length} frames)`)
-  const startRes = await fetch('/api/story-video/start', { method: 'POST', body: formData })
-  console.log(`[runVideoReelPipeline] story-video/start response: ${startRes.status}`)
-  if (!startRes.ok) {
-    const err = await startRes.json().catch(() => ({}))
-    throw new Error((err as { error?: string }).error || `Video start failed (HTTP ${startRes.status})`)
+  // ── Step 2: Encode audio if provided ──
+  let audioUrl: string | null = null
+  if (musicOn && musicFile) {
+    audioUrl = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader()
+      r.onload = e => resolve(e.target?.result as string)
+      r.onerror = reject
+      r.readAsDataURL(musicFile)
+    })
+    console.log(`[runVideoReelPipeline] Audio encoded: ${(audioUrl.length / 1024).toFixed(0)} KB`)
   }
-  const { jobId } = await startRes.json() as { jobId: string }
-  console.log(`[runVideoReelPipeline] Video job started: ${jobId}`)
-  return jobId
-}
 
-async function pollVideoJob(jobId: string, onProgress: (p: number) => void): Promise<void> {
-  // 150 × 3 s = 7.5 minutes — enough for large multi-image ffmpeg jobs
-  for (let i = 0; i < 150; i++) {
-    await new Promise(r => setTimeout(r, 3000))
-    const res = await fetch(`/api/story-video/status/${jobId}`)
-    if (!res.ok) throw new Error(`Status check failed (HTTP ${res.status})`)
-    const d = await res.json()
-    onProgress(d.progress ?? 0)
-    if (d.status === 'complete') return
-    if (d.status === 'error') throw new Error(d.error || 'Video creation failed')
-  }
-  throw new Error('Video creation timed out after 7.5 minutes')
-}
-
-async function downloadJobVideo(jobId: string, format: 'youtube' | 'reels'): Promise<string> {
-  const res = await fetch(`/api/story-video/download/${jobId}?format=${format}`)
-  if (!res.ok) throw new Error(`Download failed for format: ${format}`)
-  const blob = await res.blob()
-  return new Promise((resolve, reject) => {
-    const r = new FileReader()
-    r.onload = e => resolve(e.target?.result as string)
-    r.onerror = reject
-    r.readAsDataURL(blob)
+  // ── Step 3: Export via video-export (same as Carousel builder) ──
+  onStep('Step 2/3: Creating video...')
+  const exportSlides = frames.map((image: string, i: number) => ({
+    image, tileType: 'story', num: String(i + 1), tag: '', headline: '', body: '', badge: '', accent: '',
+  }))
+  console.log(`[runVideoReelPipeline] Sending ${exportSlides.length} frames to video-export`)
+  const exportRes = await fetch('/api/video-export', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slides: exportSlides, slideDuration: 5, audioUrl, musicVolume: 20, musicEnabled: musicOn }),
   })
+  console.log(`[runVideoReelPipeline] video-export response: ${exportRes.status}`)
+  if (!exportRes.ok) {
+    const err = await exportRes.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error || `Video export failed (HTTP ${exportRes.status})`)
+  }
+  const { video } = await exportRes.json() as { video: string }
+  if (!video) throw new Error('video-export returned no video')
+  console.log(`[runVideoReelPipeline] Video ready — ${(video.length / 1024 / 1024).toFixed(1)} MB`)
+  return video  // base64 data URL — same format as Carousel's videoUrl
 }
+
 
 // ── Toast + Publish Results ───────────────────────────────────────────────────
 type Toast = { msg: string; type?: 'success' | 'error' }
@@ -510,7 +488,7 @@ export default function ComposerPage() {
   // Video reel toggle
   const [postAsVideo, setPostAsVideo] = useState(false)
   const [videoCreationStatus, setVideoCreationStatus] = useState('')
-  const [completedJobId, setCompletedJobId] = useState<string | null>(null)
+  const [completedVideoUrl, setCompletedVideoUrl] = useState<string | null>(null)
 
   // Load connected platforms on channel change
   useEffect(() => {
@@ -587,7 +565,7 @@ export default function ComposerPage() {
     if (!files) return
     const arr = Array.from(files)
     setMediaFiles((prev) => [...prev, ...arr])
-    setCompletedJobId(null) // stale job id no longer valid when media changes
+    setCompletedVideoUrl(null)
     const media = arr.find((f) => f.type.startsWith('image') || f.type.startsWith('video'))
     if (media) {
       const reader = new FileReader()
@@ -762,70 +740,49 @@ export default function ComposerPage() {
     const needsVideoCreation = postAsVideo && imageFiles.length > 0 && !videoFile
     console.log(`[doPublish] postAsVideo=${postAsVideo} needsVideoCreation=${needsVideoCreation} images=${imageFiles.length} videoFile=${!!videoFile}`)
 
-    // ── STEP 1+2: composite-slides → story-video/start → poll (Video Reel only) ─
-    // This MUST fully complete before any platform publish is attempted.
-    let videoJobId: string | null = null
+    // ── STEP 1: composite-slides → video-export → base64 video (Video Reel only) ─
+    // Uses the same /api/video-export path as Carousel builder's Export MP4 button.
+    let createdVideoBase64: string | null = null
     if (needsVideoCreation) {
       try {
-        // Steps 1+2 happen inside runVideoReelPipeline
-        videoJobId = await runVideoReelPipeline({
+        createdVideoBase64 = await runVideoReelPipeline({
           images: imageFiles,
           channel: selectedChannel,
           slideTitle: title,
           captionText: caption,
           musicOn: musicEnabled,
-          musicMood,
           musicFile,
           onStep: setVideoCreationStatus,
         })
-        // Step 3: poll until ffmpeg is done
-        await pollVideoJob(videoJobId, p => setVideoCreationStatus(`Step 2/4: Creating video... ${p}%`))
-        console.log(`[doPublish] Video job complete: ${videoJobId}`)
-        setCompletedJobId(videoJobId)
-        setVideoCreationStatus('Step 3/4: Downloading formats...')
+        console.log(`[doPublish] Video ready: ${(createdVideoBase64.length / 1024 / 1024).toFixed(1)} MB`)
+        setCompletedVideoUrl(createdVideoBase64)
+        setVideoCreationStatus('Publishing...')
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : 'Video creation failed'
         console.error(`[doPublish] Video pipeline failed:`, msg)
         show(msg, 'error')
         setPublishing(false)
         setVideoCreationStatus('')
-        return  // Hard stop — do NOT fall through to image publishing
+        return
       }
     }
 
-    // Safety net: in Video Reel mode we must have a completed job or an uploaded video.
-    // If neither exists, refuse to publish rather than silently sending images.
-    if (postAsVideo && imageFiles.length > 0 && !videoFile && !videoJobId) {
+    if (postAsVideo && imageFiles.length > 0 && !videoFile && !createdVideoBase64) {
       show('Video Reel: video creation did not complete — cannot publish. Please try again.', 'error')
       setPublishing(false)
       setVideoCreationStatus('')
       return
     }
 
-    // ── STEP 2: Download video formats (lazy, cached) ─────────────────────────
-    const videoFormatCache: Partial<Record<'youtube' | 'reels', string>> = {}
-    const getVideo = async (format: 'youtube' | 'reels'): Promise<string> => {
-      if (!videoFormatCache[format]) {
-        setVideoCreationStatus(`Preparing ${format === 'youtube' ? '16:9 video' : '9:16 reel'}...`)
-        videoFormatCache[format] = await downloadJobVideo(videoJobId!, format)
-        console.log(`[doPublish] Downloaded ${format}: ${(videoFormatCache[format]!.length / 1024 / 1024).toFixed(1)} MB`)
-      }
-      return videoFormatCache[format]!
-    }
+    // Resolve the final video source: uploaded file, or just-created video
+    const getVideo = async (): Promise<string | null> => videoData || createdVideoBase64
 
     try {
-      if (needsVideoCreation) setVideoCreationStatus('Step 4/4: Publishing...')
+      if (needsVideoCreation) setVideoCreationStatus('Publishing...')
 
       // ── YouTube ──────────────────────────────────────────────────────────────
       if (connected.includes('youtube')) {
-        let ytVideo = videoData
-        if (!ytVideo && videoJobId) {
-          try { ytVideo = await getVideo('youtube') }
-          catch (e: unknown) {
-            allResults.push({ platform: 'youtube', success: false, error: `Video download failed: ${e instanceof Error ? e.message : String(e)}` })
-            ytVideo = null
-          }
-        }
+        let ytVideo = await getVideo()
         if (ytVideo) {
           try {
             const ytRes = await fetch('/api/publish/youtube', {
@@ -862,18 +819,9 @@ export default function ComposerPage() {
       // ── Meta + other platforms ───────────────────────────────────────────────
       const otherPlatforms = connected.filter(p => p !== 'youtube')
       if (otherPlatforms.length > 0) {
-        let metaVideo = videoData
-        if (!metaVideo && videoJobId) {
-          try { metaVideo = await getVideo('reels') }
-          catch (e: unknown) {
-            const msg = `Reel download failed: ${e instanceof Error ? e.message : String(e)}`
-            for (const p of otherPlatforms) allResults.push({ platform: p, success: false, error: msg })
-            metaVideo = null
-          }
-        }
+        const metaVideo = await getVideo()
 
-        // CRITICAL: In Video Reel mode, NEVER fall back to sending images.
-        // Only proceed if we have a video, OR we are in Carousel mode.
+        // In Video Reel mode, NEVER fall back to sending images.
         const canPublishMeta = metaVideo || (!postAsVideo && allImages.length >= 0)
         const pendingPlatforms = otherPlatforms.filter(p => !allResults.find(r => r.platform === p))
 
@@ -883,7 +831,6 @@ export default function ComposerPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               content: caption || description || title,
-              // In Video Reel mode: only send video, NEVER images — even as fallback
               imageUrls: (!postAsVideo && !metaVideo && allImages.length > 0) ? allImages : undefined,
               videoBase64: metaVideo || undefined,
               platforms: pendingPlatforms,
@@ -1190,33 +1137,26 @@ export default function ComposerPage() {
                       Video Reel
                     </button>
                   </div>
-                  {postAsVideo && !completedJobId && (
+                  {postAsVideo && !completedVideoUrl && (
                     <p className="text-[10px] text-stone-400">Images will be composited with channel branding and assembled into an MP4 on publish</p>
                   )}
                 </div>
               )}
 
-              {/* Download buttons — shown after video creation completes */}
-              {completedJobId && (
+              {/* Download button — shown after video creation completes */}
+              {completedVideoUrl && (
                 <div className="mt-3 p-3 bg-stone-50 border border-stone-200 rounded-xl">
                   <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-2">Video Ready — Download</p>
                   <div className="flex gap-2 flex-wrap">
                     <a
-                      href={`/api/story-video/download/${completedJobId}?format=reels`}
-                      download="reel-9x16.mp4"
+                      href={completedVideoUrl}
+                      download="video-reel.mp4"
                       className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-700 transition-colors"
                     >
-                      ↓ Reel (9:16)
-                    </a>
-                    <a
-                      href={`/api/story-video/download/${completedJobId}?format=youtube`}
-                      download="video-16x9.mp4"
-                      className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium border border-stone-200 text-stone-700 rounded-lg hover:bg-stone-50 transition-colors"
-                    >
-                      ↓ YouTube (16:9)
+                      ↓ Download MP4
                     </a>
                     <button
-                      onClick={() => setCompletedJobId(null)}
+                      onClick={() => setCompletedVideoUrl(null)}
                       className="ml-auto px-2 py-2 text-[11px] text-stone-400 hover:text-stone-600"
                     >
                       ✕
