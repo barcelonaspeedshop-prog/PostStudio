@@ -8,7 +8,9 @@ export default function FoodLayout({ children }: { children: React.ReactNode }) 
   return (
     <>
       {/* eslint-disable-next-line @next/next/no-css-tags */}
-      <link rel="stylesheet" href="/food/assets/style.css" />
+      {/* precedence ensures this loads after Next.js's "next" tier (globals.css) in React's managed head */}
+      {/* @ts-expect-error precedence is a React 18 prop not yet in @types/react for <link> */}
+      <link rel="stylesheet" href="/food/assets/style.css" precedence="food-styles" />
       {children}
     </>
   )

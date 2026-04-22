@@ -21,6 +21,7 @@ export type Restaurant = {
   hours: HourRow[]
   hoursNote?: string
   bookingUrl?: string
+  menuUrl?: string
   bookingNote: string
   directionsQuery: string
   mapsEmbed: string
@@ -100,6 +101,7 @@ export const restaurants: Restaurant[] = [
     ],
     hoursNote: 'Breakfast served from opening until noon. Queues form early on weekends.',
     bookingUrl: 'https://www.dishoom.com/kensington/',
+    menuUrl: 'https://www.dishoom.com/food-and-drink/menu/',
     bookingNote: 'Dishoom Kensington accepts reservations for dinner. Walk-ins welcome for breakfast and lunch — queue times vary.',
     directionsQuery: 'Dishoom+Kensington+London',
     mapsEmbed: 'Dishoom+Kensington+London',

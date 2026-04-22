@@ -142,20 +142,27 @@ export default function RestaurantPage({ params }: Props) {
         <div className="restaurant-section">
           <h2>Book a Table</h2>
           <p style={{ fontSize: '0.88rem', color: 'var(--muted)', marginBottom: '16px' }}>{r.bookingNote}</p>
-          {r.bookingUrl ? (
-            <a href={r.bookingUrl} target="_blank" rel="noopener noreferrer" className="btn btn--book">
-              Reserve at {r.name} →
-            </a>
-          ) : (
-            <a
-              href={`https://maps.google.com?q=${r.directionsQuery}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn--outline"
-            >
-              Get Directions
-            </a>
-          )}
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            {r.bookingUrl ? (
+              <a href={r.bookingUrl} target="_blank" rel="noopener noreferrer" className="btn btn--book">
+                Reserve at {r.name} →
+              </a>
+            ) : (
+              <a
+                href={`https://maps.google.com?q=${r.directionsQuery}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn--outline"
+              >
+                Get Directions
+              </a>
+            )}
+            {r.menuUrl && (
+              <a href={r.menuUrl} target="_blank" rel="noopener noreferrer" className="btn btn--outline">
+                View Menu →
+              </a>
+            )}
+          </div>
         </div>
 
         {/* MAP */}

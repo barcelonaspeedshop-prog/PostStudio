@@ -25,6 +25,7 @@ export type RestaurantMeta = {
   mapsUrl: string           // Google Maps URL
   phone: string
   website: string
+  menuUrl: string           // direct URL to menu page if available, else empty string
   payment: string           // e.g. "Cash only" / "Cards accepted"
   proTips: string[]         // 3-4 insider tips
   bookingNote: string
@@ -134,6 +135,7 @@ Return ONLY this JSON (plain text only — no HTML tags):
     "mapsUrl": "https://maps.google.com/search?q=restaurant+name+city",
     "phone": "+XX X-XXXX-XXXX or empty string",
     "website": "https://example.com or empty string",
+    "menuUrl": "direct URL to the restaurant's official menu page, or empty string if not found",
     "payment": "Cash only / Cards accepted / Cash or card",
     "proTips": [
       "Arrive before opening to avoid the queue — it fills up fast",
@@ -177,6 +179,7 @@ imageQueries: use actual restaurant name + city + dish/atmosphere for best Serpe
   const mapsUrl = stripHtml(meta.mapsUrl || '')
   const phone = stripHtml(meta.phone || '')
   const website = stripHtml(meta.website || '')
+  const menuUrl = stripHtml(meta.menuUrl || '')
   const payment = stripHtml(meta.payment || '')
   const proTips: string[] = (meta.proTips || []).map((t: string) => stripHtml(t))
   const restName = stripHtml(meta.name || restaurant.name)
@@ -244,6 +247,7 @@ imageQueries: use actual restaurant name + city + dish/atmosphere for best Serpe
     mapsUrl,
     phone,
     website,
+    menuUrl,
     payment,
     proTips,
     bookingNote: stripHtml(meta.bookingNote || ''),
