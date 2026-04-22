@@ -1,15 +1,60 @@
 'use client'
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Sidebar from '@/components/Sidebar'
 import PostPreview from '@/components/PostPreview'
 import { generatePostContent, regenerateField, PostContent } from '@/lib/claude'
 import { PLATFORMS, TONES, FORMATS } from '@/lib/platforms'
 import { CHANNELS as CHANNEL_CONFIGS } from '@/lib/channels'
+import type { RestaurantData } from '@/app/api/restaurant-research/route'
 
 const CHANNEL_NAMES = Object.keys(CHANNEL_CONFIGS)
 
-type Toast = { msg: string; type?: 'success' | 'error' }
+// ── Post Types ──────────────────────────────────────────────────────────────
+type PostTypeValue = 'standard' | 'no-frills' | 'top5' | 'restaurant-feature' | 'car-feature' | 'stats' | 'quiz'
 
+const POST_TYPES: { value: PostTypeValue; label: string; placeholder: string }[] = [
+  {
+    value: 'standard',
+    label: '📰 Standard Post',
+    placeholder: 'Describe your post — e.g. A product launch for our new wireless headphones. Target: music lovers 18–35.',
+  },
+  {
+    value: 'no-frills',
+    label: '🔥 No Frills But Kills',
+    placeholder: 'Restaurant name, city, and why it kills — e.g. Chinchinken in Taito City Tokyo. Legendary Abura Soba, no tourists, pure flavour.',
+  },
+  {
+    value: 'top5',
+    label: '🍽️ Top 5 Eats',
+    placeholder: 'City and what the guide covers — e.g. Top 5 dishes you must eat in Tokyo. From ramen to wagyu.',
+  },
+  {
+    value: 'restaurant-feature',
+    label: '⭐ Restaurant Feature',
+    placeholder: 'Restaurant name, location, and what makes it special — e.g. Dishoom Kensington. Bombay café culture at its finest.',
+  },
+  {
+    value: 'car-feature',
+    label: '🏎️ Car Feature',
+    placeholder: 'Car make, model, and what makes it extraordinary — e.g. 1967 Ferrari 275 GTB/4. The most beautiful car ever made.',
+  },
+  {
+    value: 'stats',
+    label: '📊 Stats Comparison',
+    placeholder: 'Topic and the key stats to compare — e.g. Verstappen vs Hamilton: championship wins, race victories, pole positions.',
+  },
+  {
+    value: 'quiz',
+    label: '❓ Quiz',
+    placeholder: 'Quiz topic — e.g. How well do you know Formula 1? 5 questions about the greatest drivers of all time.',
+  },
+]
+
+const FOOD_POST_TYPES: PostTypeValue[] = ['no-frills', 'top5', 'restaurant-feature']
+const RESTAURANT_RESEARCH_TYPES: PostTypeValue[] = ['no-frills', 'restaurant-feature']
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+type Toast = { msg: string; type?: 'success' | 'error' }
 function useToast() {
   const [toast, setToast] = useState<Toast | null>(null)
   const show = (msg: string, type: Toast['type'] = 'success') => {
@@ -19,6 +64,250 @@ function useToast() {
   return { toast, show }
 }
 
+// ── Post-type-aware content generator ───────────────────────────────────────
+async function generateForPostType(opts: {
+  postType: PostTypeValue
+  aiPrompt: string
+  platforms: string[]
+  tone: string
+  restaurantData: RestaurantData | null
+  channel: string
+}): Promise<PostContent> {
+  const { postType, aiPrompt, platforms, tone, restaurantData, channel } = opts
+  const pStr = platforms.join(', ') || 'Instagram'
+  const isFood = FOOD_POST_TYPES.includes(postType)
+  const foodLink = isFood ? 'premirafirst.com/food' : ''
+
+  if (postType === 'standard') {
+    return generatePostContent(aiPrompt, platforms, tone)
+  }
+
+  // Build a rich context string from researched restaurant data if available
+  const rdContext = restaurantData
+    ? `
+Restaurant data (verified):
+Name: ${restaurantData.name}
+Address: ${restaurantData.address}, ${restaurantData.city}, ${restaurantData.country}
+Cuisine: ${restaurantData.cuisine}
+Opening hours: ${restaurantData.hours}
+Price range: ${restaurantData.priceRange}
+Must order: ${restaurantData.mustOrder.map(d => `${d.dish} — ${d.description}`).join('; ')}
+Maps: ${restaurantData.mapsLink}
+Story: ${restaurantData.story}
+Awards: ${restaurantData.awards || 'None listed'}
+Booking: ${restaurantData.bookingUrl || 'Walk-in / call direct'}
+`
+    : ''
+
+  const templates: Record<PostTypeValue, { system: string; prompt: string }> = {
+    standard: { system: '', prompt: '' }, // handled above
+
+    'no-frills': {
+      system: `You are a food content expert for Omnira Food (${channel}). Write in a dark, premium, editorial tone — bold opinions, vivid descriptions. Always respond with valid JSON only.`,
+      prompt: `Create a "No Frills But Kills" restaurant post for platforms: ${pStr}.
+Tone: ${tone}.
+Brief: ${aiPrompt}
+${rdContext}
+
+Format the description as slide-by-slide structure:
+🔥 HOOK: [One-line attention grabber — make it visceral and compelling]
+
+📖 THE STORY: [2-3 sentences — why this place kills. The atmosphere, the obsession, what makes locals love it]
+
+🍜 MUST ORDER:
+• [Dish 1] — [One sentence. What it is and why it matters]
+• [Dish 2] — [One sentence. What it is and why it matters]
+
+ℹ️ THE INFO:
+📍 [Full address]
+🕐 [Opening hours]
+💰 [Price range]
+🗺️ [Google Maps link]
+
+❓ POLL: [Debate-sparking question about this restaurant or food type]
+
+Return this exact JSON:
+{
+  "title": "RESTAURANT NAME — City",
+  "description": "[full slide structure above]",
+  "caption": "One punchy hook sentence (max 120 chars) — make it hit hard",
+  "tags": ["NoFrillsButKills","OmniraFood","HiddenGem","FoodieTravel","[city]Food","[cuisine]","StreetFood","FoodDiscovery"],
+  "cta": "Full story at ${foodLink} 🍽️"
+}`,
+    },
+
+    'top5': {
+      system: `You are a food guide writer for Omnira Food (${channel}). Authoritative, specific, editorial. Always respond with valid JSON only.`,
+      prompt: `Create a "Top 5 Eats" destination food guide for platforms: ${pStr}.
+Tone: ${tone}.
+Brief: ${aiPrompt}
+${rdContext}
+
+Format the description as:
+🍽️ TOP 5: [City] — [Hook line why this city's food scene matters]
+
+1. [Dish / Place] 📍 [Where exactly] — [1-2 sentences: what it is and why it's unmissable]
+2. [Dish / Place] 📍 [Where exactly] — [1-2 sentences]
+3. [Dish / Place] 📍 [Where exactly] — [1-2 sentences]
+4. [Dish / Place] 📍 [Where exactly] — [1-2 sentences]
+5. [Dish / Place] 📍 [Where exactly] — [1-2 sentences]
+
+❓ POLL: Which would you try first?
+
+Return this exact JSON:
+{
+  "title": "Top 5 Eats: [City]",
+  "description": "[full guide above]",
+  "caption": "5 dishes you can't leave [city] without trying. (max 120 chars)",
+  "tags": ["Top5Eats","OmniraFood","[city]Food","FoodTravel","FoodGuide","MustEat","Foodie","FoodDiscovery"],
+  "cta": "Full guide at ${foodLink} 🍽️"
+}`,
+    },
+
+    'restaurant-feature': {
+      system: `You are a restaurant critic and food writer for Omnira Food (${channel}). Write with editorial authority and warmth. Always respond with valid JSON only.`,
+      prompt: `Create a full restaurant feature post for platforms: ${pStr}.
+Tone: ${tone}.
+Brief: ${aiPrompt}
+${rdContext}
+
+Format the description as:
+⭐ [RESTAURANT NAME]
+[City] · [Cuisine] · [Price range]
+
+[2-3 sentence opening — the atmosphere, the feeling of being there, what makes it different]
+
+🍽️ MUST ORDER:
+• [Dish 1] — [Description]
+• [Dish 2] — [Description]
+• [Dish 3] — [Description]
+
+🕐 HOURS: [Schedule]
+📍 [Address]
+💰 [Price range]
+[Awards/recognition if any]
+
+BOOK: [booking URL or method]
+📲 Full profile: ${foodLink}
+
+Return this exact JSON:
+{
+  "title": "[Restaurant Name] — [City]",
+  "description": "[full feature above]",
+  "caption": "One sentence that captures why this restaurant matters (max 130 chars)",
+  "tags": ["OmniraFood","RestaurantFeature","[city]Food","[cuisine]","FoodCritic","Foodie","DiningGuide","MustVisit"],
+  "cta": "Full profile at ${foodLink}/restaurant/${restaurantData?.slug || '[slug]'} 🍽️"
+}`,
+    },
+
+    'car-feature': {
+      system: `You are an automotive writer for ${channel}. Write with passion, technical authority and editorial style. Always respond with valid JSON only.`,
+      prompt: `Create a car feature post for platforms: ${pStr}.
+Tone: ${tone}.
+Brief: ${aiPrompt}
+
+Format the description as:
+🏎️ [CAR NAME / MODEL]
+
+[Hook: one line that captures the essence of this car — visceral, specific]
+
+[2-3 sentences: the history, the significance, what makes this machine special]
+
+⚡ KEY SPECS:
+• [Spec 1]
+• [Spec 2]
+• [Spec 3]
+
+🏆 WHY IT MATTERS: [One sentence verdict]
+
+Return this exact JSON:
+{
+  "title": "[Make Model Year]",
+  "description": "[full feature above]",
+  "caption": "One electric sentence about this car (max 120 chars)",
+  "tags": ["${channel.replace(/\s+/g,'').replace(/&/g,'')}","CarFeature","Automotive","ClassicCar","Supercar","CarEnthusiast","GentlemenOfFuel","MotorSport"],
+  "cta": "What do you think? Drop your take below 👇"
+}`,
+    },
+
+    'stats': {
+      system: `You are a sports/data journalist for ${channel}. Write fact-first, analytical but accessible. Always respond with valid JSON only.`,
+      prompt: `Create a stats comparison post for platforms: ${pStr}.
+Tone: ${tone}.
+Brief: ${aiPrompt}
+
+Format the description as:
+📊 [COMPARISON TITLE]
+
+[Hook: the debate this stat settles or opens up]
+
+[SUBJECT A] vs [SUBJECT B]:
+
+[Stat 1]: [Value A] vs [Value B] → [Brief context]
+[Stat 2]: [Value A] vs [Value B] → [Brief context]
+[Stat 3]: [Value A] vs [Value B] → [Brief context]
+[Stat 4]: [Value A] vs [Value B] → [Brief context]
+
+📌 VERDICT: [One sentence that frames the debate without closing it]
+
+❓ POLL: [The debate question]
+
+Return this exact JSON:
+{
+  "title": "[Subject A] vs [Subject B]: The Stats",
+  "description": "[full comparison above]",
+  "caption": "The numbers settle the debate — or do they? (max 120 chars)",
+  "tags": ["Stats","Comparison","${channel.replace(/\s+/g,'').replace(/&/g,'')}","DataViz","SportsFacts","Debate","Analysis","Numbers"],
+  "cta": "Your verdict below 👇 #debate"
+}`,
+    },
+
+    'quiz': {
+      system: `You are a quiz writer for ${channel}. Write engaging, genuinely challenging questions. Always respond with valid JSON only.`,
+      prompt: `Create a quiz post for platforms: ${pStr}.
+Tone: ${tone}.
+Brief: ${aiPrompt}
+
+Format the description as:
+❓ QUIZ: [Title]
+
+Q1. [Question]
+A) [Option]  B) [Option]  C) [Option]  D) [Option]
+✅ Answer: [X] — [Brief explanation why]
+
+Q2. [Question]
+A) [Option]  B) [Option]  C) [Option]  D) [Option]
+✅ Answer: [X] — [Brief explanation]
+
+Q3. [Question]
+A) [Option]  B) [Option]  C) [Option]  D) [Option]
+✅ Answer: [X] — [Brief explanation]
+
+🏆 SCORING: 3/3 = Legend | 2/3 = Know your stuff | 1/3 = Study up
+
+Return this exact JSON:
+{
+  "title": "Quiz: [Topic]",
+  "description": "[full quiz above]",
+  "caption": "Think you know [topic]? Test yourself 👇 (max 110 chars)",
+  "tags": ["Quiz","${channel.replace(/\s+/g,'').replace(/&/g,'')}","Trivia","Test","Challenge","FanQuiz","Knowledge","HowWellDoYouKnow"],
+  "cta": "Drop your score below! 👇"
+}`,
+    },
+  }
+
+  const cfg = templates[postType]
+  const res = await fetch('/api/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: cfg.prompt, system: cfg.system, max_tokens: 1500 }),
+  })
+  const data = await res.json()
+  if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`)
+  return JSON.parse(data.text.replace(/```json|```/g, '').trim()) as PostContent
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
 export default function ComposerPage() {
   const { toast, show } = useToast()
 
@@ -26,6 +315,15 @@ export default function ComposerPage() {
   const [selectedChannel, setSelectedChannel] = useState(CHANNEL_NAMES[0])
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([])
   const [statusLoading, setStatusLoading] = useState(false)
+
+  // Post type
+  const [postType, setPostType] = useState<PostTypeValue>('standard')
+
+  // Restaurant research
+  const [restaurantName, setRestaurantName] = useState('')
+  const [restaurantCity, setRestaurantCity] = useState('')
+  const [restaurantData, setRestaurantData] = useState<RestaurantData | null>(null)
+  const [researching, setResearching] = useState(false)
 
   // AI prompt
   const [aiPrompt, setAiPrompt] = useState('')
@@ -52,7 +350,13 @@ export default function ComposerPage() {
   const [mediaFiles, setMediaFiles] = useState<File[]>([])
   const [mediaSrc, setMediaSrc] = useState<string | null>(null)
 
-  // Load connected platform status whenever the channel changes
+  // Music
+  const [musicEnabled, setMusicEnabled] = useState(false)
+  const [musicMood, setMusicMood] = useState<'calm' | 'energy'>('energy')
+  const [musicFile, setMusicFile] = useState<File | null>(null)
+  const musicInputRef = useRef<HTMLInputElement>(null)
+
+  // Load connected platforms on channel change
   useEffect(() => {
     let cancelled = false
     const load = async () => {
@@ -72,7 +376,6 @@ export default function ComposerPage() {
         setConnectedPlatforms(connected)
         setSelPlatforms(prev => prev.filter(p => connected.includes(p)))
       } catch {
-        // non-fatal — show all platforms if status check fails
         setConnectedPlatforms([])
       } finally {
         if (!cancelled) setStatusLoading(false)
@@ -81,6 +384,14 @@ export default function ComposerPage() {
     load()
     return () => { cancelled = true }
   }, [selectedChannel])
+
+  // Auto-select food-relevant channel when switching to a food post type
+  useEffect(() => {
+    if (FOOD_POST_TYPES.includes(postType) && !selectedChannel.toLowerCase().includes('food')) {
+      const foodChannel = CHANNEL_NAMES.find(c => c.toLowerCase().includes('food'))
+      if (foodChannel) setSelectedChannel(foodChannel)
+    }
+  }, [postType]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Readiness
   const readiness = Math.min(
@@ -103,13 +414,18 @@ export default function ComposerPage() {
     if (!files) return
     const arr = Array.from(files)
     setMediaFiles((prev) => [...prev, ...arr])
-    // Read the first media file (image, video, or audio) as a data URL for preview and publish
-    const media = arr.find((f) => f.type.startsWith('image') || f.type.startsWith('video') || f.type.startsWith('audio'))
+    const media = arr.find((f) => f.type.startsWith('image') || f.type.startsWith('video'))
     if (media) {
       const reader = new FileReader()
       reader.onload = (e) => setMediaSrc(e.target?.result as string)
       reader.readAsDataURL(media)
     }
+  }
+
+  const handleMusicFile = (files: FileList | null) => {
+    if (!files || !files[0]) return
+    setMusicFile(files[0])
+    setMusicEnabled(true)
   }
 
   const addTag = () => {
@@ -121,20 +437,62 @@ export default function ComposerPage() {
 
   const removeTag = (i: number) => setTags((prev) => prev.filter((_, idx) => idx !== i))
 
-  const applyContent = (content: Partial<PostContent>) => {
+  const applyContent = useCallback((content: Partial<PostContent>) => {
     if (content.title !== undefined) setTitle(content.title)
     if (content.description !== undefined) setDescription(content.description)
-    if (content.caption !== undefined) setCaption(content.caption)
     if (content.cta !== undefined) setCta(content.cta)
     if (content.tags !== undefined) setTags((prev) => [...new Set([...prev, ...content.tags!])])
+    if (content.caption !== undefined) {
+      // Auto-append food site link for food post types
+      let cap = content.caption
+      if (FOOD_POST_TYPES.includes(postType) && !cap.includes('premirafirst.com/food')) {
+        cap = cap + '\n\nFull info → premirafirst.com/food 🍽️'
+      }
+      setCaption(cap)
+    }
+  }, [postType])
+
+  // Research restaurant
+  const handleResearch = async () => {
+    if (!restaurantName.trim()) { show('Enter a restaurant name', 'error'); return }
+    if (!restaurantCity.trim()) { show('Enter a city', 'error'); return }
+    setResearching(true)
+    setAiStatus('Researching restaurant...')
+    try {
+      const res = await fetch('/api/restaurant-research', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurantName: restaurantName.trim(), city: restaurantCity.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) throw new Error(data.error || 'Research failed')
+      setRestaurantData(data.restaurant)
+      // Pre-fill prompt with restaurant summary
+      setAiPrompt(`${data.restaurant.name} in ${data.restaurant.city}. ${data.restaurant.story}`)
+      show(`Found ${data.restaurant.name} — data pre-filled!`)
+    } catch (e: unknown) {
+      show(e instanceof Error ? e.message : 'Research failed', 'error')
+    } finally {
+      setResearching(false)
+      setAiStatus('')
+    }
   }
 
+  // Generate content
   const handleGenerateAll = async () => {
-    if (!aiPrompt.trim()) { show('Enter a description first', 'error'); return }
+    const promptToUse = aiPrompt.trim()
+    if (!promptToUse) { show('Enter a description first', 'error'); return }
     setGenerating(true)
-    setAiStatus('Generating your full post content...')
+    setAiStatus('Generating content...')
     try {
-      const content = await generatePostContent(aiPrompt, selPlatforms, tone)
+      const content = await generateForPostType({
+        postType,
+        aiPrompt: promptToUse,
+        platforms: selPlatforms,
+        tone,
+        restaurantData,
+        channel: selectedChannel,
+      })
       applyContent(content)
       show('Content generated!')
     } catch (e: unknown) {
@@ -159,7 +517,13 @@ export default function ComposerPage() {
         setTags((prev) => [...new Set([...prev, ...(result as string[])])])
       } else if (field === 'title') setTitle(result as string)
       else if (field === 'description') setDescription(result as string)
-      else if (field === 'caption') setCaption(result as string)
+      else if (field === 'caption') {
+        let cap = result as string
+        if (FOOD_POST_TYPES.includes(postType) && !cap.includes('premirafirst.com/food')) {
+          cap = cap + '\n\nFull info → premirafirst.com/food 🍽️'
+        }
+        setCaption(cap)
+      }
       else if (field === 'cta') setCta(result as string)
       show('Done!')
     } catch (e: unknown) {
@@ -169,10 +533,11 @@ export default function ComposerPage() {
     }
   }
 
+  // Bug fix: use already-selected channel + auto-fallback to all connected platforms
   const doPublish = async (platforms: string[]) => {
     const connected = platforms.filter(p => connectedPlatforms.includes(p))
     if (!connected.length) {
-      show('No connected platforms selected — connect them on the Accounts page first', 'error')
+      show('No connected platforms for this channel — connect on the Accounts page first', 'error')
       return
     }
     setPublishing(true)
@@ -206,12 +571,21 @@ export default function ComposerPage() {
     }
   }
 
+  // Fix: auto-use connected platforms if none are explicitly selected
   const publishAll = () => {
-    if (!selPlatforms.length) { show('Select at least one platform', 'error'); return }
-    doPublish(selPlatforms)
+    const toPublish = selPlatforms.length > 0 ? selPlatforms : connectedPlatforms
+    if (!toPublish.length) {
+      show('No connected platforms for this channel — connect on the Accounts page first', 'error')
+      return
+    }
+    doPublish(toPublish)
   }
 
   const publishTo = (p: string) => doPublish([p])
+
+  const currentPostType = POST_TYPES.find(pt => pt.value === postType)!
+  const isFood = FOOD_POST_TYPES.includes(postType)
+  const needsRestaurant = RESTAURANT_RESEARCH_TYPES.includes(postType)
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -245,7 +619,7 @@ export default function ComposerPage() {
             {/* Channel selector */}
             <div className="bg-white border border-stone-100 rounded-xl p-4">
               <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-3">Channel</p>
-              <div className="relative">
+              <div className="relative mb-3">
                 <span
                   className="absolute left-3 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full shrink-0 pointer-events-none"
                   style={{ background: CHANNEL_CONFIGS[selectedChannel]?.primary ?? '#888' }}
@@ -263,6 +637,27 @@ export default function ComposerPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </div>
+
+              {/* Post Type dropdown */}
+              <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-2">Post type</p>
+              <div className="relative">
+                <select
+                  value={postType}
+                  onChange={e => {
+                    setPostType(e.target.value as PostTypeValue)
+                    setRestaurantData(null)
+                  }}
+                  className="w-full pl-3 pr-4 py-2.5 text-[13px] border border-stone-200 rounded-lg bg-white text-stone-900 focus:outline-none focus:border-stone-400 appearance-none cursor-pointer"
+                >
+                  {POST_TYPES.map(pt => (
+                    <option key={pt.value} value={pt.value}>{pt.label}</option>
+                  ))}
+                </select>
+                <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+
               {!statusLoading && connectedPlatforms.length === 0 && (
                 <p className="text-[11px] text-amber-600 mt-2">
                   No platforms connected for this channel —{' '}
@@ -276,15 +671,95 @@ export default function ComposerPage() {
               )}
             </div>
 
+            {/* Restaurant Research — shown for No Frills / Restaurant Feature post types */}
+            {needsRestaurant && (
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                <p className="text-[10px] font-medium text-amber-700 uppercase tracking-widest mb-1">
+                  🔍 Restaurant Auto-Research
+                </p>
+                <p className="text-[11px] text-amber-600 mb-3">
+                  Enter the restaurant and city — AI will find hours, address, price range, must-order dishes, and Maps link automatically.
+                </p>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    value={restaurantName}
+                    onChange={e => setRestaurantName(e.target.value)}
+                    placeholder="Restaurant name"
+                    className="flex-1 text-[13px] border border-amber-200 rounded-lg px-3 py-2.5 min-h-[44px] bg-white focus:outline-none focus:border-amber-400 text-stone-900 placeholder:text-stone-400"
+                  />
+                  <input
+                    value={restaurantCity}
+                    onChange={e => setRestaurantCity(e.target.value)}
+                    placeholder="City"
+                    className="w-32 text-[13px] border border-amber-200 rounded-lg px-3 py-2.5 min-h-[44px] bg-white focus:outline-none focus:border-amber-400 text-stone-900 placeholder:text-stone-400"
+                  />
+                </div>
+                <button
+                  onClick={handleResearch}
+                  disabled={researching}
+                  className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] bg-amber-600 text-white text-[12px] font-medium rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50"
+                >
+                  {researching ? (
+                    <><Spinner /> Researching...</>
+                  ) : (
+                    <><span>🔍</span> Research restaurant</>
+                  )}
+                </button>
+
+                {restaurantData && (
+                  <div className="mt-3 p-3 bg-white border border-amber-200 rounded-lg text-[11px] text-stone-700 space-y-1">
+                    <p className="font-semibold text-stone-900 text-[12px]">✓ {restaurantData.name}</p>
+                    <p>📍 {restaurantData.address}</p>
+                    <p>🕐 {restaurantData.hours}</p>
+                    <p>💰 {restaurantData.priceRange}</p>
+                    <p>🍽️ {restaurantData.mustOrder.map(d => d.dish).join(' · ')}</p>
+                    {restaurantData.awards && <p>🏆 {restaurantData.awards}</p>}
+                    <button
+                      onClick={() => setRestaurantData(null)}
+                      className="text-[10px] text-stone-400 hover:text-stone-600 mt-1"
+                    >
+                      Clear research data
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Top 5 city research — shown for Top 5 post type */}
+            {postType === 'top5' && (
+              <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                <p className="text-[10px] font-medium text-amber-700 uppercase tracking-widest mb-1">
+                  🗺️ Top 5 City
+                </p>
+                <p className="text-[11px] text-amber-600 mb-3">
+                  Enter the city for the food guide. The AI will generate the top 5 dishes and places.
+                </p>
+                <input
+                  value={restaurantCity}
+                  onChange={e => setRestaurantCity(e.target.value)}
+                  placeholder="City (e.g. Tokyo, Barcelona, New York)"
+                  className="w-full text-[13px] border border-amber-200 rounded-lg px-3 py-2.5 min-h-[44px] bg-white focus:outline-none focus:border-amber-400 text-stone-900 placeholder:text-stone-400"
+                />
+              </div>
+            )}
+
             {/* AI Prompt Card */}
             <div className="bg-stone-50 border border-stone-100 rounded-xl p-4">
-              <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-2">AI content generator</p>
-              <p className="text-[12px] text-stone-500 mb-3">Describe your post — AI fills in the title, description, caption, tags, and CTA.</p>
+              <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-1">AI Content Generator</p>
+              <p className="text-[11px] text-stone-400 mb-3">{currentPostType.label} — {
+                postType === 'standard' ? 'fills title, description, caption, tags & CTA' :
+                postType === 'no-frills' ? 'generates hook, story, must order, info slides & poll' :
+                postType === 'top5' ? 'generates 5 destination dishes + poll slide' :
+                postType === 'restaurant-feature' ? 'generates full restaurant profile with booking link' :
+                postType === 'car-feature' ? 'generates editorial car feature with specs' :
+                postType === 'stats' ? 'generates stats comparison with verdict & poll' :
+                'generates quiz questions with answers'
+              }</p>
               <textarea
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}
                 rows={3}
-                placeholder="e.g. A product launch video for our new wireless headphones. Target: music lovers 18–35. Key message: studio-quality sound at an affordable price."
+                placeholder={currentPostType.placeholder}
                 className="w-full text-[16px] md:text-[13px] border border-stone-200 rounded-lg p-3 md:p-2.5 resize-none bg-white focus:outline-none focus:border-stone-400 text-stone-900 placeholder:text-stone-400"
               />
               <div className="flex items-center gap-2 mt-2.5 flex-wrap">
@@ -305,17 +780,11 @@ export default function ComposerPage() {
                 </div>
                 <button
                   onClick={handleGenerateAll}
-                  disabled={generating}
+                  disabled={generating || researching}
                   className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] bg-stone-900 text-white text-[14px] md:text-[12px] font-medium rounded-lg hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                 >
                   {generating ? (
-                    <>
-                      <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
-                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-                      </svg>
-                      Generating...
-                    </>
+                    <><Spinner /> Generating...</>
                   ) : (
                     <><span className="text-[10px]">✦</span> Generate all</>
                   )}
@@ -323,11 +792,7 @@ export default function ComposerPage() {
               </div>
               {aiStatus && (
                 <p className="text-[11px] text-stone-500 mt-2 flex items-center gap-1.5">
-                  <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
-                    <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-                  </svg>
-                  {aiStatus}
+                  <Spinner className="w-3 h-3" /> {aiStatus}
                 </p>
               )}
             </div>
@@ -341,12 +806,12 @@ export default function ComposerPage() {
                 onDragLeave={(e) => e.currentTarget.classList.remove('bg-stone-50')}
                 onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files) }}
               >
-                <input type="file" multiple accept="video/mp4,.mp4,video/quicktime,.mov,video/webm,.webm,image/jpeg,.jpg,.jpeg,image/png,.png,image/webp,.webp,audio/mpeg,.mp3,audio/wav,.wav,audio/aac,.aac" className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+                <input type="file" multiple accept="video/mp4,.mp4,video/quicktime,.mov,video/webm,.webm,image/jpeg,.jpg,.jpeg,image/png,.png,image/webp,.webp" className="hidden" onChange={(e) => handleFiles(e.target.files)} />
                 <svg className="w-7 h-7 mx-auto mb-2 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
-                <p className="text-[13px] text-stone-500">Drop video, images or music</p>
-                <p className="text-[11px] text-stone-400 mt-0.5">MP4, MOV, JPG, PNG, MP3, WAV</p>
+                <p className="text-[13px] text-stone-500">Drop video or images</p>
+                <p className="text-[11px] text-stone-400 mt-0.5">MP4, MOV, JPG, PNG, WebP</p>
               </label>
               {mediaFiles.length > 0 && (
                 <div className="grid grid-cols-4 gap-1.5 mt-3">
@@ -354,10 +819,8 @@ export default function ComposerPage() {
                     <div key={i} className="aspect-square rounded-lg bg-stone-100 border border-stone-200 relative flex items-center justify-center overflow-hidden">
                       {f.type.startsWith('image') ? (
                         <img src={URL.createObjectURL(f)} alt="" className="w-full h-full object-cover" />
-                      ) : f.type.startsWith('video') ? (
-                        <video src={URL.createObjectURL(f)} className="w-full h-full object-cover" muted playsInline />
                       ) : (
-                        <span className="text-[9px] font-medium text-stone-500">AUD</span>
+                        <video src={URL.createObjectURL(f)} className="w-full h-full object-cover" muted playsInline />
                       )}
                       <button
                         onClick={() => setMediaFiles((prev) => prev.filter((_, idx) => idx !== i))}
@@ -366,6 +829,75 @@ export default function ComposerPage() {
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+
+            {/* Music */}
+            <div className="bg-white border border-stone-100 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Background Music</p>
+                <button
+                  onClick={() => setMusicEnabled(v => !v)}
+                  className={`relative w-9 h-5 rounded-full transition-colors ${musicEnabled ? 'bg-stone-800' : 'bg-stone-200'}`}
+                  aria-label="Toggle music"
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${musicEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+
+              {musicEnabled && (
+                <div className="space-y-3">
+                  {/* Mood selector */}
+                  <div>
+                    <p className="text-[10px] text-stone-400 mb-1.5">Mood</p>
+                    <div className="flex gap-2">
+                      {(['calm', 'energy'] as const).map((mood) => (
+                        <button
+                          key={mood}
+                          onClick={() => setMusicMood(mood)}
+                          className={`flex-1 py-2 text-[12px] rounded-lg border transition-all capitalize ${
+                            musicMood === mood
+                              ? 'bg-stone-100 border-stone-300 text-stone-900 font-medium'
+                              : 'border-stone-200 text-stone-500 hover:bg-stone-50'
+                          }`}
+                        >
+                          {mood === 'calm' ? '🎵 Calm' : '⚡ Energy'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Upload track */}
+                  <div>
+                    <p className="text-[10px] text-stone-400 mb-1.5">Track</p>
+                    {musicFile ? (
+                      <div className="flex items-center gap-2 p-2.5 bg-stone-50 border border-stone-200 rounded-lg">
+                        <span className="text-[16px]">🎵</span>
+                        <span className="flex-1 text-[11px] text-stone-700 truncate">{musicFile.name}</span>
+                        <button onClick={() => setMusicFile(null)} className="text-[10px] text-stone-400 hover:text-stone-700">×</button>
+                      </div>
+                    ) : (
+                      <label className="flex items-center gap-2 p-2.5 border border-dashed border-stone-300 rounded-lg cursor-pointer hover:bg-stone-50 transition-colors">
+                        <input
+                          ref={musicInputRef}
+                          type="file"
+                          accept="audio/mpeg,.mp3,audio/wav,.wav,audio/aac,.aac"
+                          className="hidden"
+                          onChange={(e) => handleMusicFile(e.target.files)}
+                        />
+                        <span className="text-[16px]">♪</span>
+                        <span className="text-[11px] text-stone-500">Upload track (MP3, WAV, AAC)</span>
+                      </label>
+                    )}
+                    <p className="text-[10px] text-stone-400 mt-1">
+                      {musicMood === 'calm' ? 'Calm mood: ambient, lo-fi, gentle backgrounds' : 'Energy mood: upbeat, driving, high-energy tracks'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {!musicEnabled && (
+                <p className="text-[11px] text-stone-400">Toggle on to add a background track or set a music mood for this post.</p>
               )}
             </div>
 
@@ -396,6 +928,9 @@ export default function ComposerPage() {
                   )
                 })}
               </div>
+              {!statusLoading && connectedPlatforms.length > 0 && selPlatforms.length === 0 && (
+                <p className="text-[10px] text-stone-400 mt-2">No platforms toggled — Publish will use all connected platforms.</p>
+              )}
             </div>
 
             {/* Title */}
@@ -410,13 +945,17 @@ export default function ComposerPage() {
             </Field>
 
             {/* Description */}
-            <Field label="Description">
+            <Field label="Description / slide content">
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                rows={4}
-                placeholder="Full post description..."
-                className="w-full text-[16px] md:text-[13px] border border-stone-200 rounded-lg px-3 py-2.5 resize-none bg-white focus:outline-none focus:border-stone-400 text-stone-900 placeholder:text-stone-400"
+                rows={postType === 'standard' ? 4 : 8}
+                placeholder={
+                  postType === 'no-frills' ? '🔥 HOOK:\n📖 THE STORY:\n🍜 MUST ORDER:\nℹ️ INFO:' :
+                  postType === 'top5' ? '1. Dish · Place\n2. Dish · Place\n...' :
+                  'Full post description...'
+                }
+                className="w-full text-[16px] md:text-[13px] border border-stone-200 rounded-lg px-3 py-2.5 resize-none bg-white focus:outline-none focus:border-stone-400 text-stone-900 placeholder:text-stone-400 font-mono text-[12px]"
               />
               <div className="flex items-center justify-between mt-1.5">
                 <AIStrip
@@ -442,6 +981,14 @@ export default function ComposerPage() {
                 <AIStrip onRegen={() => handleRegenField('caption')} label="Regenerate" loading={aiStatus.includes('caption')} />
                 <span className="text-[10px] text-stone-400">{caption.length} / 2200</span>
               </div>
+              {isFood && !caption.includes('premirafirst.com/food') && caption.length > 0 && (
+                <button
+                  onClick={() => setCaption(c => c + '\n\nFull info → premirafirst.com/food 🍽️')}
+                  className="mt-1.5 text-[10px] text-amber-600 hover:text-amber-800 flex items-center gap-1"
+                >
+                  + Add food site link
+                </button>
+              )}
             </Field>
 
             {/* Tags */}
@@ -472,7 +1019,7 @@ export default function ComposerPage() {
               <input
                 value={cta}
                 onChange={(e) => setCta(e.target.value)}
-                placeholder="e.g. Link in bio! Shop now at..."
+                placeholder={isFood ? 'Full restaurant info at premirafirst.com/food 🍽️' : 'e.g. Link in bio! Shop now at...'}
                 className="w-full text-[16px] md:text-[13px] border border-stone-200 rounded-lg px-3 py-2.5 min-h-[44px] bg-white focus:outline-none focus:border-stone-400 text-stone-900 placeholder:text-stone-400"
               />
               <AIStrip onRegen={() => handleRegenField('cta')} label="Generate CTA" loading={aiStatus.includes('cta')} />
@@ -502,7 +1049,7 @@ export default function ComposerPage() {
             <div className="bg-white border border-stone-100 rounded-xl p-4">
               <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-3">When to publish</p>
               <div className="flex flex-wrap gap-2 mb-3">
-                {['now', 'schedule', 'ai'].map((t) => (
+                {(['now', 'schedule', 'ai'] as const).map((t) => (
                   <button
                     key={t}
                     onClick={() => setTiming(t)}
@@ -536,7 +1083,7 @@ export default function ComposerPage() {
             title={title}
             caption={caption}
             mediaSrc={mediaSrc}
-            selectedPlatforms={selPlatforms}
+            selectedPlatforms={selPlatforms.length > 0 ? selPlatforms : connectedPlatforms}
             tags={tags}
             readiness={readiness}
             onPublishAll={publishAll}
@@ -548,9 +1095,7 @@ export default function ComposerPage() {
       {/* Toast */}
       {toast && (
         <div className={`fixed bottom-5 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-lg text-[12px] font-medium shadow-sm z-50 transition-all ${
-          toast.type === 'error'
-            ? 'bg-red-600 text-white'
-            : 'bg-stone-900 text-white'
+          toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-stone-900 text-white'
         }`}>
           {toast.msg}
         </div>
@@ -559,6 +1104,7 @@ export default function ComposerPage() {
   )
 }
 
+// ── Shared sub-components ────────────────────────────────────────────────────
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="bg-white border border-stone-100 rounded-xl p-4">
@@ -595,5 +1141,14 @@ function AIStrip({
         </button>
       ))}
     </div>
+  )
+}
+
+function Spinner({ className = 'w-3.5 h-3.5' }: { className?: string }) {
+  return (
+    <svg className={`${className} animate-spin`} viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+    </svg>
   )
 }
