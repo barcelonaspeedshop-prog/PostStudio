@@ -485,8 +485,10 @@ export default function ComposerPage() {
   const [generatingThumb, setGeneratingThumb] = useState(false)
   const thumbnailInputRef = useRef<HTMLInputElement>(null)
 
-  // Video reel toggle
+  // Video reel toggle — ref mirrors state so doPublish never reads a stale closure value
   const [postAsVideo, setPostAsVideo] = useState(false)
+  const postAsVideoRef = useRef(false)
+  const setPostAsVideoAndRef = (v: boolean) => { postAsVideoRef.current = v; setPostAsVideo(v) }
   const [videoCreationStatus, setVideoCreationStatus] = useState('')
   const [completedVideoUrl, setCompletedVideoUrl] = useState<string | null>(null)
 
@@ -714,6 +716,10 @@ export default function ComposerPage() {
 
   // Publish handler — routes YouTube through its own API, others through /api/publish
   const doPublish = async (platforms: string[]) => {
+    // Read from ref — guaranteed current even if closure is stale
+    const isVideoReel = postAsVideoRef.current
+    console.log(`[doPublish] ENTRY — postAsVideo(state)=${postAsVideo} postAsVideo(ref)=${isVideoReel} mediaFiles=${mediaFiles.length} platforms=${platforms.join(',')} connectedPlatforms=${connectedPlatforms.join(',')}`)
+
     const connected = platforms.filter(p => connectedPlatforms.includes(p))
     if (!connected.length) {
       show('No connected platforms for this channel — connect on the Accounts page first', 'error')
@@ -730,6 +736,7 @@ export default function ComposerPage() {
     // ── Resolve media ─────────────────────────────────────────────────────────
     const videoFile = mediaFiles.find(f => f.type.startsWith('video/'))
     const imageFiles = mediaFiles.filter(f => f.type.startsWith('image/'))
+    console.log(`[doPublish] mediaFiles types: ${mediaFiles.map(f => f.type || '(empty)').join(', ')}`)
     const videoData: string | null = videoFile
       ? (mediaSrc?.startsWith('data:video/') ? mediaSrc : await readAsDataURL(videoFile))
       : null
@@ -737,8 +744,8 @@ export default function ComposerPage() {
       ? await Promise.all(imageFiles.map(readAsDataURL))
       : (mediaSrc?.startsWith('data:image/') ? [mediaSrc] : [])
 
-    const needsVideoCreation = postAsVideo && imageFiles.length > 0 && !videoFile
-    console.log(`[doPublish] postAsVideo=${postAsVideo} needsVideoCreation=${needsVideoCreation} images=${imageFiles.length} videoFile=${!!videoFile}`)
+    const needsVideoCreation = isVideoReel && imageFiles.length > 0 && !videoFile
+    console.log(`[doPublish] isVideoReel=${isVideoReel} needsVideoCreation=${needsVideoCreation} images=${imageFiles.length} videoFile=${!!videoFile}`)
 
     // ── STEP 1: composite-slides → video-export → base64 video (Video Reel only) ─
     // Uses the same /api/video-export path as Carousel builder's Export MP4 button.
@@ -767,7 +774,7 @@ export default function ComposerPage() {
       }
     }
 
-    if (postAsVideo && imageFiles.length > 0 && !videoFile && !createdVideoBase64) {
+    if (isVideoReel && imageFiles.length > 0 && !videoFile && !createdVideoBase64) {
       show('Video Reel: video creation did not complete — cannot publish. Please try again.', 'error')
       setPublishing(false)
       setVideoCreationStatus('')
@@ -809,7 +816,7 @@ export default function ComposerPage() {
         } else if (!allResults.find(r => r.platform === 'youtube')) {
           allResults.push({
             platform: 'youtube', success: false, skipped: true,
-            reason: postAsVideo
+            reason: isVideoReel
               ? 'Video Reel: no video ready — select Video Reel mode and upload images or a video file.'
               : 'No video attached — YouTube requires a video file.',
           })
@@ -822,7 +829,7 @@ export default function ComposerPage() {
         const metaVideo = await getVideo()
 
         // In Video Reel mode, NEVER fall back to sending images.
-        const canPublishMeta = metaVideo || (!postAsVideo && allImages.length >= 0)
+        const canPublishMeta = metaVideo || (!isVideoReel && allImages.length >= 0)
         const pendingPlatforms = otherPlatforms.filter(p => !allResults.find(r => r.platform === p))
 
         if (canPublishMeta && pendingPlatforms.length > 0) {
@@ -831,7 +838,7 @@ export default function ComposerPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               content: caption || description || title,
-              imageUrls: (!postAsVideo && !metaVideo && allImages.length > 0) ? allImages : undefined,
+              imageUrls: (!isVideoReel && !metaVideo && allImages.length > 0) ? allImages : undefined,
               videoBase64: metaVideo || undefined,
               platforms: pendingPlatforms,
               channel: selectedChannel,
@@ -840,7 +847,7 @@ export default function ComposerPage() {
           })
           const data = await res.json()
           if (Array.isArray(data.results)) allResults.push(...data.results)
-        } else if (postAsVideo && !metaVideo) {
+        } else if (isVideoReel && !metaVideo) {
           for (const p of pendingPlatforms) {
             allResults.push({ platform: p, success: false, error: 'Video Reel: no video available to publish.' })
           }
@@ -1125,13 +1132,13 @@ export default function ComposerPage() {
                   <p className="text-[11px] text-stone-500 shrink-0">Post as:</p>
                   <div className="flex rounded-lg border border-stone-200 overflow-hidden text-[11px] font-medium">
                     <button
-                      onClick={() => setPostAsVideo(false)}
+                      onClick={() => setPostAsVideoAndRef(false)}
                       className={`px-3 py-1.5 transition-colors ${!postAsVideo ? 'bg-stone-900 text-white' : 'text-stone-500 hover:bg-stone-50'}`}
                     >
                       Carousel
                     </button>
                     <button
-                      onClick={() => setPostAsVideo(true)}
+                      onClick={() => setPostAsVideoAndRef(true)}
                       className={`px-3 py-1.5 transition-colors border-l border-stone-200 ${postAsVideo ? 'bg-stone-900 text-white' : 'text-stone-500 hover:bg-stone-50'}`}
                     >
                       Video Reel
