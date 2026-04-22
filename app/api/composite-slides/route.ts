@@ -25,7 +25,7 @@ type SlideInput = {
   badge: string
   accent: string
   image?: string
-  tileType?: 'hook' | 'brand' | 'story' | 'story-text' | 'cta' | 'poll' | 'food-image' | 'food-must-order' | 'food-info' | 'food-pro-tips'
+  tileType?: 'hook' | 'brand' | 'story' | 'story-text' | 'cta' | 'poll' | 'food-image' | 'food-must-order' | 'food-info' | 'food-pro-tips' | 'food-magazine'
   channel?: string
   chartData?: ChartData
   pollOptions?: string[]
@@ -803,6 +803,68 @@ function buildFoodProTipsSvg(slide: SlideInput, primary: string, bg: string, cha
   return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`
 }
 
+// ── Tile: FOOD-MAGAZINE ─────────────────────────────────────────────────────
+// Full-bleed image. Dark gradient bottom 45%. Text stack at bottom (bottom-up):
+// tag (accent 22px) → headline (56px bold) → 140px accent divider → body (32px white 78%).
+function buildFoodMagazineSvg(slide: SlideInput, primary: string): string {
+  const [pr, pg, pb] = hexToRgb(primary)
+  const pad = 64
+
+  const hedFontSize = 56
+  const hedLineH = Math.round(hedFontSize * 1.21) // 68
+  const bodyFontSize = 32
+  const bodyLineH = Math.round(bodyFontSize * 1.375) // 44
+  const maxW = W - pad * 2
+
+  const hedLines = wrapText(slide.headline, Math.floor(maxW / (hedFontSize * 0.55))).slice(0, 2)
+  const bodyLines = wrapText(slide.body, Math.floor(maxW / (bodyFontSize * 0.58))).slice(0, 3)
+
+  // Bottom-up anchoring
+  const tagY = H - pad  // tag baseline
+  const hedLastY = tagY - 62  // last headline baseline
+  const hedFirstY = hedLastY - (hedLines.length - 1) * hedLineH
+  const dividerY = hedFirstY - 32
+  const bodyLastY = dividerY - 32
+  const bodyFirstY = bodyLastY - (bodyLines.length - 1) * bodyLineH
+
+  const defs = `<defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="black" stop-opacity="0"/>
+      <stop offset="55%" stop-color="black" stop-opacity="0"/>
+      <stop offset="100%" stop-color="black" stop-opacity="0.92"/>
+    </linearGradient>
+    <linearGradient id="topfade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="black" stop-opacity="0.45"/>
+      <stop offset="18%" stop-color="black" stop-opacity="0"/>
+    </linearGradient>
+  </defs>`
+
+  let svg = defs
+  svg += `<rect width="${W}" height="${H}" fill="url(#grad)"/>`
+  svg += `<rect width="${W}" height="220" fill="url(#topfade)"/>`
+
+  // Slide number top-right
+  svg += `<text x="${W - pad}" y="88" font-family="${FONT_STACK}" font-size="28" fill="white" fill-opacity="0.22" text-anchor="end">${escapeXml(slide.num)}</text>`
+
+  // Body (32px white 78%)
+  bodyLines.forEach((line, i) => {
+    svg += `<text x="${pad}" y="${bodyFirstY + i * bodyLineH}" font-family="${FONT_STACK}" font-size="${bodyFontSize}" fill="white" fill-opacity="0.78">${escapeXml(line)}</text>`
+  })
+
+  // Divider 140px × 2px accent
+  svg += `<rect x="${pad}" y="${dividerY - 1}" width="140" height="2" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.95"/>`
+
+  // Headline 56px bold white
+  hedLines.forEach((line, i) => {
+    svg += `<text x="${pad}" y="${hedFirstY + i * hedLineH}" font-family="${FONT_STACK}" font-size="${hedFontSize}" font-weight="700" fill="white" fill-opacity="1">${escapeXml(line)}</text>`
+  })
+
+  // Tag label accent 22px, letter-spacing 4, uppercase
+  svg += `<text x="${pad}" y="${tagY}" font-family="${FONT_STACK}" font-size="22" font-weight="600" fill="rgb(${pr},${pg},${pb})" fill-opacity="1" letter-spacing="4">${escapeXml((slide.tag || '').toUpperCase())}</text>`
+
+  return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`
+}
+
 function determineTileType(
   slide: SlideInput,
   index: number,
@@ -833,6 +895,7 @@ export async function POST(req: NextRequest) {
 
       // Solid-bg tiles: never use image
       if (tileType === 'brand' || tileType === 'story-text' || tileType === 'poll' || tileType === 'food-must-order' || tileType === 'food-info' || tileType === 'food-pro-tips') {
+        // food-magazine is intentionally excluded — it requires a full-bleed image
         base = sharp({
           create: { width: W, height: H, channels: 3, background: { r: bgr, g: bgg, b: bgb } },
         })
@@ -863,6 +926,7 @@ export async function POST(req: NextRequest) {
           case 'food-must-order': return buildFoodMustOrderSvg(slide, ch.primary, ch.bg, ch.name)
           case 'food-info': return buildFoodInfoSvg(slide, ch.primary, ch.bg, ch.name)
           case 'food-pro-tips': return buildFoodProTipsSvg(slide, ch.primary, ch.bg, ch.name)
+          case 'food-magazine': return buildFoodMagazineSvg(slide, ch.primary)
           default: return buildStoryTextSvg(slide, ch.primary, ch.bg)
         }
       })()

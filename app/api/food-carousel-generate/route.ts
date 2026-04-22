@@ -39,7 +39,7 @@ type SlideResult = {
   body: string
   badge: string
   accent: string
-  tileType: 'food-image' | 'food-must-order' | 'food-info' | 'food-pro-tips' | 'story-text' | 'story'
+  tileType: 'food-image' | 'food-must-order' | 'food-info' | 'food-pro-tips' | 'story-text' | 'story' | 'food-magazine'
   foodDishes?: { name: string; description: string; price?: string }[]
   foodInfoItems?: FoodInfoItem[]
   foodRestaurantName?: string
@@ -110,7 +110,11 @@ Return ONLY this JSON (plain text only — no HTML tags):
   ],
   "imageQueries": [
     "RESTAURANT_NAME CITY food dish photography",
-    "RESTAURANT_NAME CITY interior atmosphere"
+    "RESTAURANT_NAME CITY interior atmosphere",
+    "RESTAURANT_NAME CITY signature dish close-up food",
+    "RESTAURANT_NAME CITY street exterior neighbourhood",
+    "RESTAURANT_NAME CITY dining atmosphere lifestyle",
+    "RESTAURANT_NAME CITY food restaurant"
   ],
   "restaurantMeta": {
     "name": "exact restaurant name",
@@ -197,21 +201,21 @@ imageQueries: use actual restaurant name + city + dish/atmosphere for best Serpe
     if (i === 1) return { ...s, tileType: 'story', tag: 'THE STORY' }
     if (i === 2) return {
       ...s,
-      tileType: 'story-text',
+      tileType: 'food-magazine' as const,
       tag: 'MUST ORDER',
       headline: mustOrderList[0]?.name || s.headline,
       body: mustOrderBody || s.body,
     }
     if (i === 3) return {
       ...s,
-      tileType: 'story-text',
+      tileType: 'food-magazine' as const,
       tag: 'FIND US',
       headline: restName,
       body: infoBody || s.body,
     }
     if (i === 4) return {
       ...s,
-      tileType: 'story-text',
+      tileType: 'food-magazine' as const,
       tag: 'PRO TIPS',
       headline: 'Insider Tips',
       body: tipsBody || s.body,
