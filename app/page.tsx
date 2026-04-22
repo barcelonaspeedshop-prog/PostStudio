@@ -78,15 +78,17 @@ async function startVideoJob(
 }
 
 async function pollVideoJob(jobId: string, onProgress: (p: number) => void): Promise<void> {
-  for (let i = 0; i < 90; i++) {
+  // 150 × 3 s = 7.5 minutes — enough for large multi-image ffmpeg jobs
+  for (let i = 0; i < 150; i++) {
     await new Promise(r => setTimeout(r, 3000))
     const res = await fetch(`/api/story-video/status/${jobId}`)
+    if (!res.ok) throw new Error(`Status check failed (HTTP ${res.status})`)
     const d = await res.json()
     onProgress(d.progress ?? 0)
     if (d.status === 'complete') return
     if (d.status === 'error') throw new Error(d.error || 'Video creation failed')
   }
-  throw new Error('Video creation timed out')
+  throw new Error('Video creation timed out after 7.5 minutes')
 }
 
 async function downloadJobVideo(jobId: string, format: 'youtube' | 'reels'): Promise<string> {
@@ -639,44 +641,56 @@ export default function ComposerPage() {
     const readAsDataURL = (file: File): Promise<string> =>
       new Promise(resolve => { const r = new FileReader(); r.onload = e => resolve(e.target?.result as string); r.readAsDataURL(file) })
 
-    // ── Resolve media from mediaFiles (source of truth) ──────────────────────
+    // ── Resolve media ─────────────────────────────────────────────────────────
     const videoFile = mediaFiles.find(f => f.type.startsWith('video/'))
     const imageFiles = mediaFiles.filter(f => f.type.startsWith('image/'))
-
     const videoData: string | null = videoFile
       ? (mediaSrc?.startsWith('data:video/') ? mediaSrc : await readAsDataURL(videoFile))
       : null
-
     const allImages: string[] = imageFiles.length > 0
       ? await Promise.all(imageFiles.map(readAsDataURL))
       : (mediaSrc?.startsWith('data:image/') ? [mediaSrc] : [])
 
-    console.log(
-      `[doPublish] postAsVideo=${postAsVideo} videoFile=${!!videoFile} imageFiles=${imageFiles.length} allImages=${allImages.length}`,
-    )
+    const needsVideoCreation = postAsVideo && imageFiles.length > 0 && !videoFile
+    console.log(`[doPublish] postAsVideo=${postAsVideo} needsVideoCreation=${needsVideoCreation} images=${imageFiles.length} videoFile=${!!videoFile}`)
 
-    // ── Auto-create video from images if "Video Reel" mode ───────────────────
+    // ── STEP 1: Create video from images (Video Reel mode only) ──────────────
+    // This MUST complete before any platform publish is attempted.
     let videoJobId: string | null = null
-    if (postAsVideo && imageFiles.length > 0 && !videoFile) {
+    if (needsVideoCreation) {
       try {
         setVideoCreationStatus('Creating video reel...')
         videoJobId = await startVideoJob(imageFiles, selectedChannel, musicEnabled, musicMood, musicFile, title)
+        console.log(`[doPublish] Video job started: ${videoJobId}`)
         await pollVideoJob(videoJobId, p => setVideoCreationStatus(`Creating video... ${p}%`))
+        console.log(`[doPublish] Video job complete: ${videoJobId}`)
         setVideoCreationStatus('Video ready — publishing...')
       } catch (e: unknown) {
-        show(e instanceof Error ? e.message : 'Video creation failed', 'error')
+        const msg = e instanceof Error ? e.message : 'Video creation failed'
+        console.error(`[doPublish] Video creation failed:`, msg)
+        show(msg, 'error')
         setPublishing(false)
         setVideoCreationStatus('')
-        return
+        return  // Hard stop — do NOT fall through to image publishing
       }
     }
 
-    // Cache downloaded video blobs to avoid fetching the same format twice
+    // Safety net: in Video Reel mode we must have a completed job or an uploaded video.
+    // If neither exists, refuse to publish rather than silently sending images.
+    if (postAsVideo && imageFiles.length > 0 && !videoFile && !videoJobId) {
+      show('Video Reel: video creation did not complete — cannot publish. Please try again.', 'error')
+      setPublishing(false)
+      setVideoCreationStatus('')
+      return
+    }
+
+    // ── STEP 2: Download video formats (lazy, cached) ─────────────────────────
     const videoFormatCache: Partial<Record<'youtube' | 'reels', string>> = {}
     const getVideo = async (format: 'youtube' | 'reels'): Promise<string> => {
       if (!videoFormatCache[format]) {
-        setVideoCreationStatus(`Preparing ${format === 'youtube' ? '16:9' : '9:16 reel'}...`)
+        setVideoCreationStatus(`Preparing ${format === 'youtube' ? '16:9 video' : '9:16 reel'}...`)
         videoFormatCache[format] = await downloadJobVideo(videoJobId!, format)
+        console.log(`[doPublish] Downloaded ${format}: ${(videoFormatCache[format]!.length / 1024 / 1024).toFixed(1)} MB`)
       }
       return videoFormatCache[format]!
     }
@@ -685,8 +699,13 @@ export default function ComposerPage() {
       // ── YouTube ──────────────────────────────────────────────────────────────
       if (connected.includes('youtube')) {
         let ytVideo = videoData
-        if (!ytVideo && videoJobId) ytVideo = await getVideo('youtube')
-
+        if (!ytVideo && videoJobId) {
+          try { ytVideo = await getVideo('youtube') }
+          catch (e: unknown) {
+            allResults.push({ platform: 'youtube', success: false, error: `Video download failed: ${e instanceof Error ? e.message : String(e)}` })
+            ytVideo = null
+          }
+        }
         if (ytVideo) {
           try {
             const ytRes = await fetch('/api/publish/youtube', {
@@ -710,39 +729,59 @@ export default function ComposerPage() {
           } catch (e: unknown) {
             allResults.push({ platform: 'youtube', success: false, error: e instanceof Error ? e.message : 'YouTube upload failed' })
           }
-        } else {
-          allResults.push({ platform: 'youtube', success: false, skipped: true, reason: 'No video attached — YouTube requires a video file.' })
+        } else if (!allResults.find(r => r.platform === 'youtube')) {
+          allResults.push({
+            platform: 'youtube', success: false, skipped: true,
+            reason: postAsVideo
+              ? 'Video Reel: no video ready — select Video Reel mode and upload images or a video file.'
+              : 'No video attached — YouTube requires a video file.',
+          })
         }
       }
 
       // ── Meta + other platforms ───────────────────────────────────────────────
       const otherPlatforms = connected.filter(p => p !== 'youtube')
       if (otherPlatforms.length > 0) {
-        // For video reel mode: download 9:16 reel for Instagram/Facebook
         let metaVideo = videoData
-        if (!metaVideo && videoJobId) metaVideo = await getVideo('reels')
+        if (!metaVideo && videoJobId) {
+          try { metaVideo = await getVideo('reels') }
+          catch (e: unknown) {
+            const msg = `Reel download failed: ${e instanceof Error ? e.message : String(e)}`
+            for (const p of otherPlatforms) allResults.push({ platform: p, success: false, error: msg })
+            metaVideo = null
+          }
+        }
 
-        const res = await fetch('/api/publish', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content: caption || description || title,
-            imageUrls: !metaVideo && allImages.length > 0 ? allImages : undefined,
-            videoBase64: metaVideo || undefined,
-            platforms: otherPlatforms,
-            channel: selectedChannel,
-            thumbnailBase64: thumbnailSrc || undefined,
-          }),
-        })
-        const data = await res.json()
-        if (Array.isArray(data.results)) allResults.push(...data.results)
+        // CRITICAL: In Video Reel mode, NEVER fall back to sending images.
+        // Only proceed if we have a video, OR we are in Carousel mode.
+        const canPublishMeta = metaVideo || (!postAsVideo && allImages.length >= 0)
+        const pendingPlatforms = otherPlatforms.filter(p => !allResults.find(r => r.platform === p))
+
+        if (canPublishMeta && pendingPlatforms.length > 0) {
+          const res = await fetch('/api/publish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content: caption || description || title,
+              // In Video Reel mode: only send video, NEVER images — even as fallback
+              imageUrls: (!postAsVideo && !metaVideo && allImages.length > 0) ? allImages : undefined,
+              videoBase64: metaVideo || undefined,
+              platforms: pendingPlatforms,
+              channel: selectedChannel,
+              thumbnailBase64: thumbnailSrc || undefined,
+            }),
+          })
+          const data = await res.json()
+          if (Array.isArray(data.results)) allResults.push(...data.results)
+        } else if (postAsVideo && !metaVideo) {
+          for (const p of pendingPlatforms) {
+            allResults.push({ platform: p, success: false, error: 'Video Reel: no video available to publish.' })
+          }
+        }
       }
 
-      if (allResults.length > 0) {
-        showResults(allResults)
-      } else {
-        show('No platforms published — check connection status', 'error')
-      }
+      if (allResults.length > 0) showResults(allResults)
+      else show('No platforms published — check connection status', 'error')
     } catch (e: unknown) {
       show(e instanceof Error ? e.message : 'Publish failed', 'error')
     } finally {
@@ -1361,15 +1400,15 @@ export default function ComposerPage() {
             {publishResults.map(r => (
               <div key={r.platform} className="flex items-start gap-2.5">
                 <span className="text-[14px] leading-none mt-0.5">
-                  {r.success ? '✅' : r.skipped ? '⚪' : '❌'}
+                  {r.success ? '✅' : r.skipped ? '⚠️' : '❌'}
                 </span>
                 <div>
                   <p className="text-[12px] font-medium capitalize">{r.platform}</p>
-                  <p className="text-[10px] text-stone-400">
+                  <p className={`text-[10px] ${r.success ? 'text-stone-400' : r.skipped ? 'text-amber-400' : 'text-red-400'}`}>
                     {r.success
                       ? `Published${r.id ? ` · ${r.id.slice(0, 16)}` : ''}`
                       : r.skipped
-                      ? (r.reason || 'Skipped')
+                      ? (r.reason || 'Not published')
                       : (r.error || 'Failed')}
                   </p>
                 </div>
