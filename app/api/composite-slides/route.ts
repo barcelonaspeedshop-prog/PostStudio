@@ -25,7 +25,7 @@ type SlideInput = {
   badge: string
   accent: string
   image?: string
-  tileType?: 'hook' | 'brand' | 'story' | 'story-text' | 'cta' | 'poll' | 'food-image' | 'food-must-order' | 'food-info' | 'food-pro-tips' | 'food-magazine'
+  tileType?: 'hook' | 'brand' | 'story' | 'story-text' | 'cta' | 'poll' | 'food-image' | 'food-must-order' | 'food-info' | 'food-pro-tips' | 'food-magazine' | 'thumbnail' | 'find-us-map'
   channel?: string
   chartData?: ChartData
   pollOptions?: string[]
@@ -156,7 +156,7 @@ function buildHookSvg(slide: SlideInput, primary: string, channelName: string): 
   let y = H - pad
   y -= bodyH
   const bodyY = y
-  y -= 32
+  if (bodyLines.length > 0) y -= 32
   const dividerY = y
   y -= hedH + 24
   const hedY = y
@@ -197,13 +197,13 @@ function buildHookSvg(slide: SlideInput, primary: string, channelName: string): 
     svg += `<text x="${pad}" y="${hedY + hedLineH + i * hedLineH}" font-family="${FONT_STACK}" font-size="${hedFontSize}" font-weight="500" fill="white" fill-opacity="1">${escapeXml(line)}</text>`
   })
 
-  // Divider 200px
-  svg += `<rect x="${pad}" y="${dividerY}" width="200" height="2" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.9"/>`
-
-  // Body 36px white 70%
-  bodyLines.forEach((line, i) => {
-    svg += `<text x="${pad}" y="${bodyY + 38 + i * bodyLineH}" font-family="${FONT_STACK}" font-size="36" fill="white" fill-opacity="0.7">${escapeXml(line)}</text>`
-  })
+  // Divider 200px (skip when no body)
+  if (bodyLines.length > 0) {
+    svg += `<rect x="${pad}" y="${dividerY}" width="200" height="2" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.9"/>`
+    bodyLines.forEach((line, i) => {
+      svg += `<text x="${pad}" y="${bodyY + 38 + i * bodyLineH}" font-family="${FONT_STACK}" font-size="36" fill="white" fill-opacity="0.7">${escapeXml(line)}</text>`
+    })
+  }
 
   return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`
 }
@@ -450,8 +450,8 @@ function buildCtaSvg(
   svg += `<rect x="${pad}" y="52" width="${badgeW}" height="48" rx="6" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.92"/>`
   svg += `<text x="${pad + 20}" y="85" font-family="${FONT_STACK}" font-size="22" font-weight="700" fill="white" fill-opacity="1" letter-spacing="2">${badgeName}</text>`
 
-  // "OUR VERDICT" label
-  svg += `<text x="${pad}" y="${verdictY}" font-family="${FONT_STACK}" font-size="24" font-weight="500" fill="rgb(${pr},${pg},${pb})" fill-opacity="1" letter-spacing="3">OUR VERDICT</text>`
+  // Tag label (e.g. "OUR VERDICT" or "FOLLOW FOR MORE")
+  svg += `<text x="${pad}" y="${verdictY}" font-family="${FONT_STACK}" font-size="24" font-weight="500" fill="rgb(${pr},${pg},${pb})" fill-opacity="1" letter-spacing="3">${escapeXml((slide.tag || 'OUR VERDICT').toUpperCase())}</text>`
 
   // Headline dynamic font size
   hedLines.forEach((line, i) => {
@@ -865,6 +865,102 @@ function buildFoodMagazineSvg(slide: SlideInput, primary: string): string {
   return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`
 }
 
+// ── Tile: THUMBNAIL ─────────────────────────────────────────────────────────
+// Full-bleed cover image. Subtle vignette overlay. Channel badge top-left.
+// When no image: dark bg with centred upload prompt.
+function buildThumbnailSvg(slide: SlideInput, primary: string, channelName: string, hasImage: boolean): string {
+  const [pr, pg, pb] = hexToRgb(primary)
+  const pad = 72
+
+  let svg = ''
+
+  if (!hasImage) {
+    // Centred upload prompt
+    const cx = W / 2
+    const cy = H / 2
+    svg += `<rect x="${cx - 4}" y="${cy - 80}" width="8" height="160" rx="4" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.35"/>`
+    svg += `<rect x="${cx - 80}" y="${cy - 4}" width="160" height="8" rx="4" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.35"/>`
+    svg += `<text x="${cx}" y="${cy + 120}" font-family="${FONT_STACK}" font-size="22" fill="white" fill-opacity="0.3" text-anchor="middle" letter-spacing="3">UPLOAD COVER IMAGE</text>`
+  }
+
+  // Subtle corner vignette
+  svg += `<defs><radialGradient id="vignette" cx="50%" cy="50%" r="70%"><stop offset="60%" stop-color="black" stop-opacity="0"/><stop offset="100%" stop-color="black" stop-opacity="0.5"/></radialGradient></defs>`
+  svg += `<rect width="${W}" height="${H}" fill="url(#vignette)"/>`
+
+  // Channel badge top-left
+  const badgeName = escapeXml(channelName.toUpperCase())
+  const badgeW = Math.min(badgeName.length * 14 + 48, 650)
+  svg += `<rect x="${pad}" y="52" width="${badgeW}" height="48" rx="6" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.92"/>`
+  svg += `<text x="${pad + 20}" y="85" font-family="${FONT_STACK}" font-size="22" font-weight="700" fill="white" fill-opacity="1" letter-spacing="2">${badgeName}</text>`
+
+  return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`
+}
+
+// ── Tile: FIND-US-MAP ────────────────────────────────────────────────────────
+// Top 580px: real map image (composited externally) or dark SVG placeholder.
+// Bottom 770px: dark info panel — tag, restaurant name, divider, address/hours/price.
+function buildFindUsMapSvg(slide: SlideInput, primary: string, hasMapImage: boolean): string {
+  const [pr, pg, pb] = hexToRgb(primary)
+  const pad = 72
+  const mapH = 580
+
+  let svg = ''
+
+  if (!hasMapImage) {
+    // Dark map placeholder
+    svg += `<rect width="${W}" height="${mapH}" fill="#101520"/>`
+    // Grid lines
+    for (let gx = 0; gx <= W; gx += 108) {
+      svg += `<line x1="${gx}" y1="0" x2="${gx}" y2="${mapH}" stroke="rgb(${pr},${pg},${pb})" stroke-opacity="0.07" stroke-width="1"/>`
+    }
+    for (let gy = 0; gy <= mapH; gy += 96) {
+      svg += `<line x1="0" y1="${gy}" x2="${W}" y2="${gy}" stroke="rgb(${pr},${pg},${pb})" stroke-opacity="0.07" stroke-width="1"/>`
+    }
+    // Road lines
+    svg += `<line x1="0" y1="${mapH / 2}" x2="${W}" y2="${mapH / 2}" stroke="rgb(${pr},${pg},${pb})" stroke-opacity="0.18" stroke-width="2"/>`
+    svg += `<line x1="${W / 2}" y1="0" x2="${W / 2}" y2="${mapH}" stroke="rgb(${pr},${pg},${pb})" stroke-opacity="0.18" stroke-width="2"/>`
+    // Location pin
+    const pinX = W / 2
+    const pinBodyY = mapH / 2 - 60
+    svg += `<circle cx="${pinX}" cy="${pinBodyY}" r="30" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.85"/>`
+    svg += `<polygon points="${pinX - 10},${pinBodyY + 24} ${pinX + 10},${pinBodyY + 24} ${pinX},${pinBodyY + 52}" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.85"/>`
+    svg += `<text x="${pinX}" y="${pinBodyY + 88}" font-family="${FONT_STACK}" font-size="18" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.45" text-anchor="middle" letter-spacing="3">MAP UNAVAILABLE</text>`
+  }
+
+  // Dark info panel bottom
+  svg += `<rect x="0" y="${mapH}" width="${W}" height="${H - mapH}" fill="#0d0d0d" fill-opacity="0.97"/>`
+  svg += `<rect x="0" y="${mapH}" width="${W}" height="3" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.7"/>`
+
+  let y = mapH + 56
+
+  // Tag "FIND US"
+  svg += `<text x="${pad}" y="${y}" font-family="${FONT_STACK}" font-size="22" font-weight="600" fill="rgb(${pr},${pg},${pb})" fill-opacity="1" letter-spacing="4">${escapeXml((slide.tag || 'FIND US').toUpperCase())}</text>`
+  y += 56
+
+  // Restaurant name (headline) 50px bold
+  const nameFontSize = 50
+  const nameLineH = Math.round(nameFontSize * 1.12)
+  const nameLines = wrapText(slide.headline, Math.floor((W - pad * 2) / (nameFontSize * 0.55))).slice(0, 2)
+  nameLines.forEach((line, i) => {
+    svg += `<text x="${pad}" y="${y + i * nameLineH}" font-family="${FONT_STACK}" font-size="${nameFontSize}" font-weight="700" fill="white" fill-opacity="1">${escapeXml(line)}</text>`
+  })
+  y += nameLines.length * nameLineH + 22
+
+  // Divider 140px
+  svg += `<rect x="${pad}" y="${y}" width="140" height="2" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.8"/>`
+  y += 30
+
+  // Body text (address · hours · price · payment) wrapped at 28px
+  const bodyFontSize = 27
+  const bodyLineH = Math.round(bodyFontSize * 1.48)
+  const bodyLines = wrapText(slide.body, Math.floor((W - pad * 2) / (bodyFontSize * 0.57))).slice(0, 8)
+  bodyLines.forEach((line, i) => {
+    svg += `<text x="${pad}" y="${y + i * bodyLineH}" font-family="${FONT_STACK}" font-size="${bodyFontSize}" fill="white" fill-opacity="0.82">${escapeXml(line)}</text>`
+  })
+
+  return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`
+}
+
 function determineTileType(
   slide: SlideInput,
   index: number,
@@ -892,13 +988,27 @@ export async function POST(req: NextRequest) {
       const [bgr, bgg, bgb] = hexToRgb(ch.bg)
 
       let base: sharp.Sharp
+      const additionalLayers: sharp.OverlayOptions[] = []
+      let hasMapImage = false
 
       // Solid-bg tiles: never use image
       if (tileType === 'brand' || tileType === 'story-text' || tileType === 'poll' || tileType === 'food-must-order' || tileType === 'food-info' || tileType === 'food-pro-tips') {
-        // food-magazine is intentionally excluded — it requires a full-bleed image
+        // food-magazine, thumbnail, find-us-map are intentionally excluded — they use images
         base = sharp({
           create: { width: W, height: H, channels: 3, background: { r: bgr, g: bgg, b: bgb } },
         })
+      } else if (tileType === 'find-us-map') {
+        // find-us-map: dark base; map image (if present) composited into top 580px only
+        base = sharp({
+          create: { width: W, height: H, channels: 3, background: { r: 13, g: 13, b: 13 } },
+        })
+        if (slide.image && slide.image.startsWith('data:')) {
+          const base64Data = slide.image.replace(/^data:image\/\w+;base64,/, '')
+          const mapBuf = Buffer.from(base64Data, 'base64')
+          const resizedMap = await sharp(mapBuf).resize(W, 580, { fit: 'cover', position: 'centre' }).toBuffer()
+          additionalLayers.push({ input: resizedMap, top: 0, left: 0 })
+          hasMapImage = true
+        }
       } else if (slide.image && slide.image.startsWith('data:')) {
         const base64Data = slide.image.replace(/^data:image\/\w+;base64,/, '')
         const imgBuffer = Buffer.from(base64Data, 'base64')
@@ -914,6 +1024,8 @@ export async function POST(req: NextRequest) {
         })
       }
 
+      const hasImage = !!(slide.image && slide.image.startsWith('data:'))
+
       const svgOverlay = (() => {
         switch (tileType) {
           case 'hook': return buildHookSvg(slide, ch.primary, ch.name)
@@ -927,12 +1039,14 @@ export async function POST(req: NextRequest) {
           case 'food-info': return buildFoodInfoSvg(slide, ch.primary, ch.bg, ch.name)
           case 'food-pro-tips': return buildFoodProTipsSvg(slide, ch.primary, ch.bg, ch.name)
           case 'food-magazine': return buildFoodMagazineSvg(slide, ch.primary)
+          case 'thumbnail': return buildThumbnailSvg(slide, ch.primary, ch.name, hasImage)
+          case 'find-us-map': return buildFindUsMapSvg(slide, ch.primary, hasMapImage)
           default: return buildStoryTextSvg(slide, ch.primary, ch.bg)
         }
       })()
 
       const result = await base
-        .composite([{ input: Buffer.from(svgOverlay), top: 0, left: 0 }])
+        .composite([...additionalLayers, { input: Buffer.from(svgOverlay), top: 0, left: 0 }])
         .jpeg({ quality: 92 })
         .toBuffer()
 

@@ -27,11 +27,9 @@ export type RestaurantMeta = {
   website: string
   menuUrl: string           // direct URL to menu page if available, else empty string
   payment: string           // e.g. "Cash only" / "Cards accepted"
-  proTips: string[]         // 3-4 insider tips
+  proTips: string[]         // 3 insider tips
   bookingNote: string
 }
-
-type FoodInfoItem = { icon: string; label: string; value: string }
 
 type SlideResult = {
   num: string
@@ -40,30 +38,16 @@ type SlideResult = {
   body: string
   badge: string
   accent: string
-  tileType: 'food-image' | 'food-must-order' | 'food-info' | 'food-pro-tips' | 'story-text' | 'story' | 'food-magazine'
-  foodDishes?: { name: string; description: string; price?: string }[]
-  foodInfoItems?: FoodInfoItem[]
-  foodRestaurantName?: string
-  foodProTips?: string[]
+  image?: string
+  tileType: 'hook' | 'story' | 'story-text' | 'cta' | 'thumbnail' | 'find-us-map' | 'food-image' | 'food-magazine'
 }
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim()
 }
 
-// Strip all HTML tags (including <cite index="N">) while preserving text content
 function stripHtml(text: string): string {
   return (text || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
-}
-
-function cleanSlide(s: SlideResult): SlideResult {
-  return {
-    ...s,
-    tag: stripHtml(s.tag),
-    headline: stripHtml(s.headline),
-    body: stripHtml(s.body),
-    badge: stripHtml(s.badge),
-  }
 }
 
 async function researchAndBuildNoFrills(
@@ -71,52 +55,34 @@ async function researchAndBuildNoFrills(
 ): Promise<{ slides: SlideResult[]; imageQueries: string[]; restaurantMeta: RestaurantMeta }> {
   const response = await client.messages.create({
     model: 'claude-sonnet-4-20250514',
-    max_tokens: 4000,
-    system: `You are a food content creator for Omnira Food. You write compelling carousel posts about hidden gem restaurants.
-Use web search to find accurate, real information about the restaurant before writing.
-Always respond with valid JSON only — no markdown, no backticks, no preamble. Never include HTML tags like <cite> in your response.`,
+    max_tokens: 3000,
+    system: `You are a food content creator for Omnira Food. Research restaurants thoroughly using web search.
+Always respond with valid JSON only — no markdown, no backticks, no preamble. Never include HTML tags like <cite>.`,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tools: [{ type: 'web_search_20250305', name: 'web_search' }] as any,
     messages: [{
       role: 'user',
       content: `Research "${restaurant.name}" in ${restaurant.city} thoroughly using web search. Find ALL of:
-- Restaurant story, history, what makes it special to locals
-- Complete address including street, neighbourhood
-- Full opening hours (each day if possible, or clear range)
-- Price range with currency context (e.g. "¥800-1200 — about €5-8 per dish")
-- 2-3 must-order dishes with descriptions AND individual prices
+- What makes it special and why locals love it (for 3 punchy 4-6 word image captions)
+- Complete street address including neighbourhood
+- Full opening hours (each day or a clear range)
+- Price range with context (e.g. "¥800-1200 — about €5-8 per dish")
+- 2-3 must-order dishes with name, price, one-line description each
 - Google Maps search URL: https://maps.google.com/search?q=RESTAURANT+NAME+CITY
 - Phone number if available
 - Website URL if available
+- Direct menu URL if available on the website
 - Payment: cash only / cards accepted / both
-- 3-4 genuine insider pro tips a traveler actually needs (best time to visit, what to order, etiquette, secrets)
+- 3 insider pro tips specific to this restaurant
+- Booking note (walk-ins only, reservations etc.)
 
-Create a 6-slide "No Frills But Kills" carousel with these slides:
-- Slide 1: Punchy hook headline (3-5 words). Tag will be set to "NO FRILLS BUT KILLS"
-- Slide 2: The story — background, history, why locals love it. Tag will be set to "THE STORY"
-- Slide 3: Will be auto-generated from must-order dishes data
-- Slide 4: Will be auto-generated from practical info data
-- Slide 5: Will be auto-generated from pro tips data
-- Slide 6 (CTA): "Would you eat here?" or similar audience question
-
-Return ONLY this JSON (plain text only — no HTML tags):
+Return ONLY this JSON (plain text, no HTML tags):
 {
-  "slides": [
-    { "num": "01", "tag": "SHORT TAG IN CAPS", "headline": "Punchy 3-5 word hook", "body": "2-3 sentence description max 30 words.", "badge": "NO FRILLS BUT KILLS", "accent": "amber" },
-    { "num": "02", "tag": "THE STORY", "headline": "Background headline 4-6 words", "body": "2-3 sentences on history and local love. Max 30 words.", "badge": "NO FRILLS BUT KILLS", "accent": "amber" },
-    { "num": "03", "tag": "MUST ORDER", "headline": "Must Order", "body": "See must-order dishes below.", "badge": "SIGNATURE DISHES", "accent": "amber" },
-    { "num": "04", "tag": "FIND US", "headline": "The Details", "body": "Practical info.", "badge": "PRACTICAL INFO", "accent": "amber" },
-    { "num": "05", "tag": "PRO TIPS", "headline": "Pro Tips", "body": "Insider knowledge.", "badge": "INSIDER", "accent": "amber" },
-    { "num": "06", "tag": "WOULD YOU?", "headline": "Would you eat here?", "body": "Tag a friend who needs to know about this place. Follow for more hidden gems.", "badge": "NO FRILLS BUT KILLS", "accent": "amber" }
-  ],
-  "imageQueries": [
-    "RESTAURANT_NAME CITY food dish photography",
-    "RESTAURANT_NAME CITY interior atmosphere",
-    "RESTAURANT_NAME CITY signature dish close-up food",
-    "RESTAURANT_NAME CITY street exterior neighbourhood",
-    "RESTAURANT_NAME CITY dining atmosphere lifestyle",
-    "RESTAURANT_NAME CITY food restaurant"
-  ],
+  "hookHeadlines": {
+    "h2": "4-6 word punchy hook about this restaurant",
+    "h4": "4-6 word headline about the signature dish or food",
+    "h6": "4-6 word headline about the vibe or experience"
+  },
   "restaurantMeta": {
     "name": "exact restaurant name",
     "city": "${restaurant.city}",
@@ -130,25 +96,21 @@ Return ONLY this JSON (plain text only — no HTML tags):
       { "name": "dish name", "description": "one sentence why it is unmissable", "price": "¥1000" }
     ],
     "hoursNote": "e.g. Mon-Sat 11:30am-3pm, 6pm-10pm. Closed Sun.",
-    "address": "street address",
+    "address": "full street address",
     "neighbourhood": "neighbourhood or district",
     "mapsUrl": "https://maps.google.com/search?q=restaurant+name+city",
     "phone": "+XX X-XXXX-XXXX or empty string",
     "website": "https://example.com or empty string",
-    "menuUrl": "direct URL to the restaurant's official menu page, or empty string if not found",
+    "menuUrl": "direct URL to the restaurant official menu page, or empty string if not found",
     "payment": "Cash only / Cards accepted / Cash or card",
     "proTips": [
-      "Arrive before opening to avoid the queue — it fills up fast",
-      "Order the [dish] on your first visit — it's what they're known for",
-      "Cash only — bring enough before you go",
-      "The daily special is not on the menu — ask the staff"
+      "specific insider tip 1 for this restaurant",
+      "specific insider tip 2 for this restaurant",
+      "specific insider tip 3 for this restaurant"
     ],
-    "bookingNote": "Walk-ins only / Book via website"
+    "bookingNote": "Walk-ins only / Book via website / Reservations recommended"
   }
-}
-
-Accent colours: "amber" for warmth/general, "red" for bold/spicy, "teal" for seafood, "green" for vegetarian.
-imageQueries: use actual restaurant name + city + dish/atmosphere for best Serper results.`,
+}`,
     }],
   })
 
@@ -162,8 +124,9 @@ imageQueries: use actual restaurant name + city + dish/atmosphere for best Serpe
   if (!jsonMatch) throw new Error('No JSON found in response')
   const parsed = JSON.parse(jsonMatch)
 
-  // Build structured data from restaurantMeta fields
   const meta = parsed.restaurantMeta || {}
+  const hookHeadlines = parsed.hookHeadlines || {}
+
   const mustOrderList: { name: string; description: string; price: string }[] = (meta.mustOrder || []).map(
     (d: { name: string; description: string; price?: string }) => ({
       name: stripHtml(d.name || ''),
@@ -171,6 +134,7 @@ imageQueries: use actual restaurant name + city + dish/atmosphere for best Serpe
       price: stripHtml(d.price || ''),
     })
   )
+
   const priceRange = stripHtml(meta.priceRange || '')
   const priceContext = stripHtml(meta.priceContext || '')
   const address = stripHtml(meta.address || '')
@@ -184,54 +148,79 @@ imageQueries: use actual restaurant name + city + dish/atmosphere for best Serpe
   const proTips: string[] = (meta.proTips || []).map((t: string) => stripHtml(t))
   const restName = stripHtml(meta.name || restaurant.name)
 
-  // Build body text for the text-only slides from structured research data
+  // Tile 3: must-order body — "Name — Price — Desc. Name2 — Price2 — Desc2."
   const mustOrderBody = mustOrderList.length > 0
     ? mustOrderList.map(d => [d.name, d.price, d.description].filter(Boolean).join(' — ')).join('. ')
     : ''
 
+  // Tile 5: find-us body — address · hours · price · payment
   const fullAddress = [address, neighbourhood].filter(Boolean).join(', ')
-  const priceDisplay = [priceRange, priceContext].filter(Boolean).join(' — ')
-  const mapsDisplay = mapsUrl || `maps.google.com/?q=${encodeURIComponent(restName + '+' + restaurant.city)}`
-  const infoBody = [fullAddress, hoursNote, priceDisplay, payment, mapsDisplay]
-    .filter(Boolean).join(' · ')
+  const priceDisplay = [priceRange, priceContext].filter(Boolean).join(' · ')
+  const findUsBody = [fullAddress, hoursNote, priceDisplay, payment].filter(Boolean).join(' · ')
 
-  const tipsBody = proTips.length > 0
-    ? proTips.slice(0, 3).join('. ')
-    : ''
+  // Tile 7: pro tips body
+  const tipsBody = proTips.length > 0 ? proTips.slice(0, 3).join('. ') : ''
 
-  const rawSlides: SlideResult[] = (parsed.slides || []).map((s: SlideResult, i: number) => {
-    if (i === 0) return { ...s, tileType: 'hook' }
-    if (i === 1) return { ...s, tileType: 'story', tag: 'THE STORY' }
-    if (i === 2) return {
-      ...s,
-      tileType: 'food-magazine' as const,
-      tag: 'MUST ORDER',
-      headline: mustOrderList[0]?.name || s.headline,
-      body: mustOrderBody || s.body,
-    }
-    if (i === 3) return {
-      ...s,
-      tileType: 'food-magazine' as const,
-      tag: 'FIND US',
-      headline: restName,
-      body: infoBody || s.body,
-    }
-    if (i === 4) return {
-      ...s,
-      tileType: 'food-magazine' as const,
-      tag: 'PRO TIPS',
-      headline: 'Insider Tips',
-      body: tipsBody || s.body,
-    }
-    // Slide 5: CTA
-    return { ...s, tileType: 'cta' }
-  })
+  // Try Google Maps Static API for tile 5
+  let findUsMapImage: string | undefined
+  const GMAPS_KEY = process.env.GOOGLE_MAPS_API_KEY
+  if (GMAPS_KEY && (fullAddress || restName)) {
+    try {
+      const q = encodeURIComponent(`${fullAddress || restName}, ${restaurant.city}`)
+      const mapUrl =
+        `https://maps.googleapis.com/maps/api/staticmap` +
+        `?center=${q}&zoom=15&size=540x290&scale=2&maptype=roadmap` +
+        `&style=feature:all|element:geometry|color:0x0d1520` +
+        `&style=feature:road|element:geometry|color:0x2d3748` +
+        `&style=feature:road.arterial|element:geometry|color:0xea580c` +
+        `&style=feature:poi|visibility:off` +
+        `&style=feature:transit|visibility:off` +
+        `&style=feature:water|element:geometry|color:0x0a0f1e` +
+        `&markers=color:0xFF8C00|${q}` +
+        `&key=${GMAPS_KEY}`
+      const mapRes = await fetch(mapUrl, { signal: AbortSignal.timeout(8000) })
+      if (mapRes.ok) {
+        const mapBuf = await mapRes.arrayBuffer()
+        findUsMapImage = `data:image/png;base64,${Buffer.from(mapBuf).toString('base64')}`
+      }
+    } catch { /* fall through to SVG placeholder */ }
+  }
 
-  const slides = rawSlides.map(cleanSlide)
-  const imageQueries: string[] = (parsed.imageQueries || []).map((q: string) => stripHtml(q))
+  const accent = 'amber'
+
+  // Fixed 8-slide structure
+  const slides: SlideResult[] = [
+    // 1: THUMBNAIL — no text, image placeholder
+    { num: '01', tag: '', headline: '', body: '', badge: '', accent, tileType: 'thumbnail' },
+
+    // 2: IMAGE HOOK
+    { num: '02', tag: '', headline: stripHtml(hookHeadlines.h2 || restName), body: '', badge: '', accent, tileType: 'hook' },
+
+    // 3: MUST ORDER INFO (dark bg, no image)
+    { num: '03', tag: 'MUST ORDER', headline: mustOrderList[0]?.name || 'Must Order', body: mustOrderBody, badge: 'SIGNATURE DISHES', accent, tileType: 'story-text' },
+
+    // 4: IMAGE HOOK
+    { num: '04', tag: '', headline: stripHtml(hookHeadlines.h4 || (mustOrderList[0]?.name || restName)), body: '', badge: '', accent, tileType: 'hook' },
+
+    // 5: FIND US MAP
+    {
+      num: '05', tag: 'FIND US', headline: restName, body: findUsBody,
+      badge: '', accent, tileType: 'find-us-map',
+      ...(findUsMapImage ? { image: findUsMapImage } : {}),
+    },
+
+    // 6: IMAGE HOOK
+    { num: '06', tag: '', headline: stripHtml(hookHeadlines.h6 || restName), body: '', badge: '', accent, tileType: 'hook' },
+
+    // 7: PRO TIPS INFO (dark bg, no image)
+    { num: '07', tag: 'PRO TIPS', headline: 'Insider Tips', body: tipsBody, badge: 'INSIDER', accent, tileType: 'story-text' },
+
+    // 8: OUTRO
+    { num: '08', tag: 'FOLLOW FOR MORE', headline: 'Follow for more hidden gems', body: '', badge: '', accent, tileType: 'cta' },
+  ]
 
   const restaurantMeta: RestaurantMeta = {
-    slug: slugify(meta.name || restaurant.name),
+    slug: slugify(restName),
     name: restName,
     city: stripHtml(meta.city || restaurant.city),
     country: stripHtml(meta.country || ''),
@@ -253,7 +242,8 @@ imageQueries: use actual restaurant name + city + dish/atmosphere for best Serpe
     bookingNote: stripHtml(meta.bookingNote || ''),
   }
 
-  return { slides, imageQueries, restaurantMeta }
+  // No Serper auto-fetch — image tiles use manual upload
+  return { slides, imageQueries: [], restaurantMeta }
 }
 
 async function researchRestaurantForSlide(
@@ -309,7 +299,6 @@ Return ONLY this JSON (plain text, no HTML):
   const parsed = JSON.parse(jsonMatch)
 
   const rawSlide: SlideResult = { ...parsed.slide, tileType: 'story' }
-  const slide = cleanSlide(rawSlide)
   const imageQuery = stripHtml(parsed.imageQuery || `${restaurant.name} ${restaurant.city} food`)
 
   const meta = parsed.restaurantMeta || {}
@@ -340,7 +329,7 @@ Return ONLY this JSON (plain text, no HTML):
     bookingNote: stripHtml(meta.bookingNote || ''),
   }
 
-  return { slide, imageQuery, restaurantMeta }
+  return { slide: rawSlide, imageQuery, restaurantMeta }
 }
 
 export async function POST(req: NextRequest) {
