@@ -54,27 +54,108 @@ const FOOD_POST_TYPES: PostTypeValue[] = ['no-frills', 'top5', 'restaurant-featu
 const RESTAURANT_RESEARCH_TYPES: PostTypeValue[] = ['no-frills', 'restaurant-feature']
 
 // ── Video creation helpers ──────────────────────────────────────────────────
-async function startVideoJob(
-  images: File[],
-  channel: string,
-  musicOn: boolean,
-  mood: string,
-  musicTrack: File | null,
-  slideTitle: string,
-): Promise<string> {
+
+// Resize an image File to max 1080px wide using canvas (keeps base64 payload small)
+function resizeImageForSlide(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const MAX_W = 1080
+      const scale = img.width > MAX_W ? MAX_W / img.width : 1
+      const w = Math.round(img.width * scale)
+      const h = Math.round(img.height * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, w, h)
+      URL.revokeObjectURL(url)
+      resolve(canvas.toDataURL('image/jpeg', 0.85))
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(`Failed to load ${file.name}`)) }
+    img.src = url
+  })
+}
+
+// Convert a base64 data URL to a File object (for FormData upload)
+function dataUrlToFile(dataUrl: string, filename: string): File {
+  const [header, b64] = dataUrl.split(',')
+  const mime = header.match(/:(.*?);/)?.[1] || 'image/jpeg'
+  const bytes = atob(b64)
+  const arr = new Uint8Array(bytes.length)
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
+  return new File([arr], filename, { type: mime })
+}
+
+// Full Video Reel pipeline: composite-slides → story-video/start → jobId
+// Mirrors exactly what the Carousel builder does.
+async function runVideoReelPipeline(opts: {
+  images: File[]
+  channel: string
+  slideTitle: string
+  captionText: string
+  musicOn: boolean
+  musicMood: string
+  musicFile: File | null
+  onStep: (step: string) => void
+}): Promise<string> {
+  const { images, channel, slideTitle, captionText, musicOn, musicMood, musicFile, onStep } = opts
+
+  // ── Step 1: Resize images client-side, then composite with channel branding ──
+  onStep('Step 1/4: Compositing slides...')
+  const resized = await Promise.all(images.map(resizeImageForSlide))
+
+  // Build slide objects — 'story' tileType ensures the photo fills the frame
+  const slides = resized.map((image, i) => ({
+    num: String(i + 1),
+    tag: '',
+    headline: i === 0 ? (slideTitle || '').slice(0, 60) : '',
+    body: i === 0 ? (captionText || '').split('\n')[0]?.slice(0, 120) || '' : '',
+    badge: '',
+    accent: '',
+    image,
+    tileType: 'story' as const,
+    channel,
+  }))
+
+  const compRes = await fetch('/api/composite-slides', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slides, channel }),
+  })
+  if (!compRes.ok) {
+    const err = await compRes.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error || `Slide compositing failed (HTTP ${compRes.status})`)
+  }
+  const { frames } = await compRes.json() as { frames: string[] }
+  if (!frames?.length) throw new Error('composite-slides returned no frames')
+
+  console.log(`[runVideoReelPipeline] Got ${frames.length} composited frames from composite-slides`)
+
+  // ── Step 2: Convert frames → File objects, send to story-video/start ─────────
+  onStep('Step 2/4: Starting video job...')
+  const frameFiles = frames.map((dataUrl: string, i: number) => dataUrlToFile(dataUrl, `frame_${i}.jpg`))
+
   const formData = new FormData()
   formData.append('chapters', JSON.stringify([{ id: 1, title: slideTitle || 'Slides' }]))
   formData.append('channel', channel)
   formData.append('musicEnabled', musicOn ? 'true' : 'false')
-  if (musicOn) formData.append('musicMood', mood)
-  if (musicOn && musicTrack) formData.append('music', musicTrack)
-  images.forEach(img => {
-    formData.append('media', img)
+  if (musicOn) formData.append('musicMood', musicMood)
+  if (musicOn && musicFile) formData.append('music', musicFile)
+  frameFiles.forEach((file: File) => {
+    formData.append('media', file)
     formData.append('mediaChapterIds', '1')
   })
-  const res = await fetch('/api/story-video/start', { method: 'POST', body: formData })
-  if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Video start failed') }
-  return (await res.json()).jobId
+
+  const startRes = await fetch('/api/story-video/start', { method: 'POST', body: formData })
+  if (!startRes.ok) {
+    const err = await startRes.json().catch(() => ({}))
+    throw new Error((err as { error?: string }).error || `Video start failed (HTTP ${startRes.status})`)
+  }
+  const { jobId } = await startRes.json() as { jobId: string }
+  console.log(`[runVideoReelPipeline] Video job started: ${jobId}`)
+  return jobId
 }
 
 async function pollVideoJob(jobId: string, onProgress: (p: number) => void): Promise<void> {
@@ -421,6 +502,7 @@ export default function ComposerPage() {
   // Video reel toggle
   const [postAsVideo, setPostAsVideo] = useState(false)
   const [videoCreationStatus, setVideoCreationStatus] = useState('')
+  const [completedJobId, setCompletedJobId] = useState<string | null>(null)
 
   // Load connected platforms on channel change
   useEffect(() => {
@@ -480,6 +562,7 @@ export default function ComposerPage() {
     if (!files) return
     const arr = Array.from(files)
     setMediaFiles((prev) => [...prev, ...arr])
+    setCompletedJobId(null) // stale job id no longer valid when media changes
     const media = arr.find((f) => f.type.startsWith('image') || f.type.startsWith('video'))
     if (media) {
       const reader = new FileReader()
@@ -654,20 +737,30 @@ export default function ComposerPage() {
     const needsVideoCreation = postAsVideo && imageFiles.length > 0 && !videoFile
     console.log(`[doPublish] postAsVideo=${postAsVideo} needsVideoCreation=${needsVideoCreation} images=${imageFiles.length} videoFile=${!!videoFile}`)
 
-    // ── STEP 1: Create video from images (Video Reel mode only) ──────────────
-    // This MUST complete before any platform publish is attempted.
+    // ── STEP 1+2: composite-slides → story-video/start → poll (Video Reel only) ─
+    // This MUST fully complete before any platform publish is attempted.
     let videoJobId: string | null = null
     if (needsVideoCreation) {
       try {
-        setVideoCreationStatus('Creating video reel...')
-        videoJobId = await startVideoJob(imageFiles, selectedChannel, musicEnabled, musicMood, musicFile, title)
-        console.log(`[doPublish] Video job started: ${videoJobId}`)
-        await pollVideoJob(videoJobId, p => setVideoCreationStatus(`Creating video... ${p}%`))
+        // Steps 1+2 happen inside runVideoReelPipeline
+        videoJobId = await runVideoReelPipeline({
+          images: imageFiles,
+          channel: selectedChannel,
+          slideTitle: title,
+          captionText: caption,
+          musicOn: musicEnabled,
+          musicMood,
+          musicFile,
+          onStep: setVideoCreationStatus,
+        })
+        // Step 3: poll until ffmpeg is done
+        await pollVideoJob(videoJobId, p => setVideoCreationStatus(`Step 2/4: Creating video... ${p}%`))
         console.log(`[doPublish] Video job complete: ${videoJobId}`)
-        setVideoCreationStatus('Video ready — publishing...')
+        setCompletedJobId(videoJobId)
+        setVideoCreationStatus('Step 3/4: Downloading formats...')
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : 'Video creation failed'
-        console.error(`[doPublish] Video creation failed:`, msg)
+        console.error(`[doPublish] Video pipeline failed:`, msg)
         show(msg, 'error')
         setPublishing(false)
         setVideoCreationStatus('')
@@ -696,6 +789,8 @@ export default function ComposerPage() {
     }
 
     try {
+      if (needsVideoCreation) setVideoCreationStatus('Step 4/4: Publishing...')
+
       // ── YouTube ──────────────────────────────────────────────────────────────
       if (connected.includes('youtube')) {
         let ytVideo = videoData
@@ -1070,9 +1165,38 @@ export default function ComposerPage() {
                       Video Reel
                     </button>
                   </div>
-                  {postAsVideo && (
-                    <p className="text-[10px] text-stone-400">Images will be assembled into an MP4 reel on publish</p>
+                  {postAsVideo && !completedJobId && (
+                    <p className="text-[10px] text-stone-400">Images will be composited with channel branding and assembled into an MP4 on publish</p>
                   )}
+                </div>
+              )}
+
+              {/* Download buttons — shown after video creation completes */}
+              {completedJobId && (
+                <div className="mt-3 p-3 bg-stone-50 border border-stone-200 rounded-xl">
+                  <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-2">Video Ready — Download</p>
+                  <div className="flex gap-2 flex-wrap">
+                    <a
+                      href={`/api/story-video/download/${completedJobId}?format=reels`}
+                      download="reel-9x16.mp4"
+                      className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-700 transition-colors"
+                    >
+                      ↓ Reel (9:16)
+                    </a>
+                    <a
+                      href={`/api/story-video/download/${completedJobId}?format=youtube`}
+                      download="video-16x9.mp4"
+                      className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium border border-stone-200 text-stone-700 rounded-lg hover:bg-stone-50 transition-colors"
+                    >
+                      ↓ YouTube (16:9)
+                    </a>
+                    <button
+                      onClick={() => setCompletedJobId(null)}
+                      className="ml-auto px-2 py-2 text-[11px] text-stone-400 hover:text-stone-600"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
