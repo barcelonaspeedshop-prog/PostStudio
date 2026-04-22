@@ -174,6 +174,21 @@ function SidebarNav({ pathname, pendingCount, curationCount }: { pathname: strin
           </Link>
         )
       })}
+      <div className="mx-3 my-1 border-t border-stone-100" />
+      <a
+        href="https://app.premirafirst.com/food"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] transition-colors min-h-[44px] text-stone-500 hover:bg-stone-50 hover:text-stone-800"
+      >
+        <svg className="w-[15px] h-[15px] shrink-0" style={{ opacity: 0.55 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        </svg>
+        Food Site
+        <svg className="w-3 h-3 ml-auto shrink-0 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+        </svg>
+      </a>
     </nav>
   )
 }

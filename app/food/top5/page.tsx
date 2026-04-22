@@ -38,7 +38,7 @@ export default function Top5Page() {
 
       {/* HERO */}
       <section className="hero">
-        <div className="hero-bg grad-top5" style={{ backgroundImage: "url('/food/assets/top5-banner.jpg')" }} />
+        <div className="hero-bg" style={{ background: "url('/food/assets/top5-hero.png') center/cover no-repeat, linear-gradient(135deg,#0d0d0d 0%,#060d12 50%,#000d18 100%)" }} />
         <div className="hero-overlay" />
         <div className="hero-content">
           <span className="hero-eyebrow">Series</span>

@@ -23,7 +23,7 @@ export default function NoFrillsPage() {
 
       {/* HERO */}
       <section className="hero">
-        <div className="hero-bg grad-nfbk" style={{ backgroundImage: "url('/food/assets/nfbk-banner.jpg')" }} />
+        <div className="hero-bg" style={{ background: "url('/food/assets/no-frills-hero.png') center/cover no-repeat, linear-gradient(135deg,#0d0d0d 0%,#1a0505 50%,#240800 100%)" }} />
         <div className="hero-overlay" />
         <div className="hero-content">
           <span className="hero-eyebrow">Series</span>

@@ -23,7 +23,7 @@ export default function FoodHome() {
 
       {/* HERO */}
       <section className="hero hero--tall">
-        <div className="hero-bg grad-food-hero" style={{ backgroundImage: "url('/food/assets/banner.jpg')" }} />
+        <div className="hero-bg" style={{ background: "url('/food/assets/food-banner.png') center/cover no-repeat, linear-gradient(135deg,#000 0%,#1a0e04 50%,#0d0802 100%)" }} />
         <div className="hero-overlay" />
         <div className="hero-content">
           <span className="hero-eyebrow">Omnira Food</span>

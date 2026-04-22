@@ -28,6 +28,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
+const GRAD: Record<string, string> = {
+  'grad-tokyo':  'linear-gradient(135deg,#0d0d0d 0%,#1a1208 40%,#2a1c00 100%)',
+  'grad-london': 'linear-gradient(135deg,#0d0d0d 0%,#0d1218 40%,#081424 100%)',
+  'grad-navarra':'linear-gradient(135deg,#0d0d0d 0%,#120d08 40%,#241800 100%)',
+}
+
 const FBIcon = () => (
   <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
     <path d="M24 12.073C24 5.404 18.627 0 12 0S0 5.404 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.235 2.686.235v2.97h-1.514c-1.491 0-1.956.93-1.956 1.886v2.268h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z" />
@@ -53,7 +59,7 @@ export default function RestaurantPage({ params }: Props) {
 
       {/* HERO */}
       <section className="hero restaurant-hero">
-        <div className={`hero-bg ${r.gradClass}`} style={{ backgroundImage: `url('/food/assets/${r.slug}-hero.jpg')` }} />
+        <div className="hero-bg" style={{ background: `url('/food/assets/${r.slug}-hero.jpg') center/cover no-repeat, ${GRAD[r.gradClass] ?? GRAD['grad-tokyo']}` }} />
         <div className="hero-overlay" />
         <div className="hero-content">
           <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
