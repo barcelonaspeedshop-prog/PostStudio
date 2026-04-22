@@ -583,18 +583,27 @@ export default function ComposerPage() {
 
     const allResults: PlatformResult[] = []
 
-    // Resolve media: detect video vs image
-    const videoFile = mediaFiles.find(f => f.type.startsWith('video/'))
-    const isVideoSrc = mediaSrc?.startsWith('data:video/')
-    const isImageSrc = mediaSrc?.startsWith('data:image/')
-
     const readAsDataURL = (file: File): Promise<string> =>
       new Promise(resolve => { const r = new FileReader(); r.onload = e => resolve(e.target?.result as string); r.readAsDataURL(file) })
 
-    const videoData = isVideoSrc ? mediaSrc
-      : (videoFile && !isImageSrc ? await readAsDataURL(videoFile) : null)
+    // ── Resolve media from mediaFiles (source of truth) ──────────────────────
+    // Video: find the first video file regardless of what mediaSrc holds
+    const videoFile = mediaFiles.find(f => f.type.startsWith('video/'))
+    const imageFiles = mediaFiles.filter(f => f.type.startsWith('image/'))
 
-    const imageData = !videoData && (isImageSrc ? mediaSrc : null)
+    // Use already-read mediaSrc if it's a video, otherwise read the video File
+    const videoData: string | null = videoFile
+      ? (mediaSrc?.startsWith('data:video/') ? mediaSrc : await readAsDataURL(videoFile))
+      : null
+
+    // Read ALL image files so carousel gets every selected image
+    const allImages: string[] = imageFiles.length > 0
+      ? await Promise.all(imageFiles.map(readAsDataURL))
+      : (mediaSrc?.startsWith('data:image/') ? [mediaSrc] : [])
+
+    console.log(
+      `[doPublish] videoFile=${!!videoFile} imageFiles=${imageFiles.length} allImages=${allImages.length} videoData=${!!videoData} mediaSrc=${mediaSrc?.slice(0, 30) ?? 'null'}`,
+    )
 
     try {
       // ── YouTube ──────────────────────────────────────────────────────────────
@@ -635,7 +644,8 @@ export default function ComposerPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             content: caption || description || title,
-            imageUrls: imageData ? [imageData] : undefined,
+            // Send ALL images so carousel uses every selected file
+            imageUrls: allImages.length > 0 ? allImages : undefined,
             videoBase64: videoData || undefined,
             platforms: otherPlatforms,
             channel: selectedChannel,

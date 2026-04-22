@@ -185,9 +185,17 @@ export async function POST(req: NextRequest) {
               }
 
               if (!published) {
-                // Resolve all slide images to accessible public URLs
+                // Resolve all images to accessible public URLs.
+                // Prefer explicit imageUrls from New Post, fall back to slide images from Carousel.
+                const fbImages: string[] =
+                  Array.isArray(imageUrls) && imageUrls.length > 0
+                    ? (imageUrls as string[])
+                    : slideImages
+
+                console.log(`[publish] Facebook: resolving ${fbImages.length} images for "${channel}"`)
+
                 const resolvedUrls: string[] = []
-                for (const img of slideImages) {
+                for (const img of fbImages) {
                   const saved = await saveBase64ToTempFile(img)
                   if (saved) {
                     tempFiles.push(saved.filePath)
