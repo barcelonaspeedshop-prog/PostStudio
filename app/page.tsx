@@ -102,9 +102,12 @@ async function runVideoReelPipeline(opts: {
 }): Promise<string> {
   const { images, channel, slideTitle, captionText, musicOn, musicMood, musicFile, onStep } = opts
 
+  console.log(`[runVideoReelPipeline] Starting — ${images.length} images, channel=${channel}, musicOn=${musicOn}`)
+
   // ── Step 1: Resize images client-side, then composite with channel branding ──
   onStep('Step 1/4: Compositing slides...')
   const resized = await Promise.all(images.map(resizeImageForSlide))
+  console.log(`[runVideoReelPipeline] Resized ${resized.length} images`)
 
   // Build slide objects — 'story' tileType ensures the photo fills the frame
   const slides = resized.map((image, i) => ({
@@ -119,11 +122,13 @@ async function runVideoReelPipeline(opts: {
     channel,
   }))
 
+  console.log(`[runVideoReelPipeline] Sending ${slides.length} slides to composite-slides`)
   const compRes = await fetch('/api/composite-slides', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ slides, channel }),
   })
+  console.log(`[runVideoReelPipeline] composite-slides response: ${compRes.status}`)
   if (!compRes.ok) {
     const err = await compRes.json().catch(() => ({}))
     throw new Error((err as { error?: string }).error || `Slide compositing failed (HTTP ${compRes.status})`)
@@ -131,11 +136,12 @@ async function runVideoReelPipeline(opts: {
   const { frames } = await compRes.json() as { frames: string[] }
   if (!frames?.length) throw new Error('composite-slides returned no frames')
 
-  console.log(`[runVideoReelPipeline] Got ${frames.length} composited frames from composite-slides`)
+  console.log(`[runVideoReelPipeline] Got ${frames.length} composited frames, total size ~${(frames.join('').length / 1024 / 1024).toFixed(1)} MB`)
 
   // ── Step 2: Convert frames → File objects, send to story-video/start ─────────
   onStep('Step 2/4: Starting video job...')
   const frameFiles = frames.map((dataUrl: string, i: number) => dataUrlToFile(dataUrl, `frame_${i}.jpg`))
+  console.log(`[runVideoReelPipeline] Frame files: ${frameFiles.map(f => `${f.name}(${(f.size/1024).toFixed(0)}KB)`).join(', ')}`)
 
   const formData = new FormData()
   formData.append('chapters', JSON.stringify([{ id: 1, title: slideTitle || 'Slides' }]))
@@ -148,7 +154,9 @@ async function runVideoReelPipeline(opts: {
     formData.append('mediaChapterIds', '1')
   })
 
+  console.log(`[runVideoReelPipeline] Sending FormData to story-video/start (${frameFiles.length} frames)`)
   const startRes = await fetch('/api/story-video/start', { method: 'POST', body: formData })
+  console.log(`[runVideoReelPipeline] story-video/start response: ${startRes.status}`)
   if (!startRes.ok) {
     const err = await startRes.json().catch(() => ({}))
     throw new Error((err as { error?: string }).error || `Video start failed (HTTP ${startRes.status})`)

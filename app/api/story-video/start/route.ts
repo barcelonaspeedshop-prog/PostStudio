@@ -268,11 +268,13 @@ async function assembleInBackground(
             // Image duration: audio-driven or default 5s (minimum 2s to avoid ffmpeg errors)
             const imgDur = Math.max(perImageDur, 2)
             const frames = Math.max(Math.round(imgDur * 24), 48)
-            // Use lavfi color source + overlay instead of -loop flag (which fails on long durations)
+            console.log(`[story-video] Image clip ch${chId}[${j}]: dur=${imgDur.toFixed(2)}s frames=${frames} path=${m.path}`)
+            // Use lavfi color source + overlay with subtle Ken Burns.
+            // Scale to 2x target (not 8000) to avoid OOM on the VPS — zoom is only 0.0005/frame.
             await runFfmpeg([
               '-f', 'lavfi', '-i', `color=black:size=${W}x${H}:rate=24`,
               '-i', m.path,
-              '-filter_complex', `[1:v]scale=8000:-1,zoompan=z='zoom+0.0005':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${W}x${H}:fps=24,setsar=1[zoomed];[0:v][zoomed]overlay=shortest=1`,
+              '-filter_complex', `[1:v]scale=${W * 2}:-1,zoompan=z='zoom+0.0005':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${W}x${H}:fps=24,setsar=1[zoomed];[0:v][zoomed]overlay=shortest=1`,
               '-t', String(imgDur),
               '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'veryfast', '-crf', '23',
               '-y', clipPath,
@@ -502,10 +504,13 @@ export async function POST(req: NextRequest) {
     if (!chaptersRaw) return NextResponse.json({ error: 'chapters is required' }, { status: 400 })
 
     const chapters: ChapterInfo[] = JSON.parse(chaptersRaw)
+    console.log(`[story-video/start] chapters=${JSON.stringify(chapters)}`)
 
     // Stream media files to disk
     const mediaFiles = formData.getAll('media') as File[]
     const mediaChapterIds = formData.getAll('mediaChapterIds') as string[]
+    console.log(`[story-video/start] received ${mediaFiles.length} media files, ${mediaChapterIds.length} chapterIds`)
+    mediaFiles.forEach((f, i) => console.log(`  media[${i}]: name=${f.name} type=${f.type} size=${(f.size/1024).toFixed(1)}KB chapterId=${mediaChapterIds[i]}`))
     const mediaByChapter: Record<number, MediaItem[]> = {}
     const counters: Record<number, number> = {}
 
@@ -590,6 +595,8 @@ export async function POST(req: NextRequest) {
     const channelName = (formData.get('channel') as string | null) || undefined
 
     const job = createJob()
+    const mediaSummary = Object.entries(mediaByChapter).map(([ch, items]) => `ch${ch}:${items.length}files`).join(', ')
+    console.log(`[story-video/start] spawning job ${job.id} — media: ${mediaSummary || 'none'}, music: ${musicPath ? 'yes' : 'no'}, channel: ${channelName}`)
     assembleInBackground(job.id, chapters, mediaByChapter, audioByChapter, musicPath, musicVolume, tmpDir, channelName)
     return NextResponse.json({ jobId: job.id })
   } catch (err: unknown) {
