@@ -67,6 +67,11 @@ export default function LongFormPage() {
   const [showScript, setShowScript] = useState(false)
   const [showPromptsAccordion, setShowPromptsAccordion] = useState(false)
 
+  // ─── Food Guide state ───
+  const [foodCity, setFoodCity] = useState('')
+  const [foodRestaurantInputs, setFoodRestaurantInputs] = useState(['', '', '', '', ''])
+  const [foodGuideBuilding, setFoodGuideBuilding] = useState(false)
+
   // ─── Core state ───
   const [topic, setTopic] = useState('')
   const [channel, setChannel] = useState(CHANNELS[0])
@@ -795,6 +800,219 @@ export default function LongFormPage() {
     }
   }
 
+  // ─── Food Guide Build pipeline ───
+  const runFoodGuideBuild = async () => {
+    if (!foodCity.trim()) return
+    const restaurants = foodRestaurantInputs.filter(r => r.trim())
+
+    setFoodGuideBuilding(true)
+    setBuildPhase('script')
+    setBuildMessage('Researching restaurants in ' + foodCity + '…')
+    setBuildSubProgress(null)
+    setBuildError(null)
+    setScript(null)
+    setChapterMedia({})
+    setChapterAudio({})
+    setVoiceoverStatus({})
+    setVideoUrl(null)
+    setCurrentJobId(null)
+    setDalleImages({})
+    setImagePrompts({})
+    setClips([])
+
+    try {
+      // ── Step 1: Generate script via food-longform-generate ──
+      const scriptRes = await fetch('/api/food-longform-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ city: foodCity.trim(), restaurants, channel }),
+      })
+      const scriptData = await scriptRes.json()
+      if (!scriptRes.ok) throw new Error(scriptData.error || 'Script generation failed')
+
+      const generatedScript: Script = scriptData.script
+      const imageQueries: Record<number, string> = scriptData.imageQueries || {}
+
+      setScript(generatedScript)
+      setTopic(`Top 5 Food Guide — ${foodCity}`)
+      setBuildMessage(`"${generatedScript.title}"`)
+
+      // Store image queries as single-item arrays to match imagePrompts format
+      const promptMap: Record<number, string[]> = {}
+      for (const [id, query] of Object.entries(imageQueries)) {
+        promptMap[Number(id)] = [query as string]
+      }
+      setImagePrompts(promptMap)
+
+      // ── Step 2: Find images via Serper + fetch-image ──
+      setBuildPhase('images')
+      setBuildMessage('Finding restaurant photos…')
+      const localMedia: Record<number, File[]> = {}
+
+      const chaptersWithQueries = generatedScript.chapters.filter(ch => imageQueries[ch.id])
+      for (let i = 0; i < chaptersWithQueries.length; i++) {
+        const ch = chaptersWithQueries[i]
+        setBuildSubProgress({ done: i, total: chaptersWithQueries.length })
+        setBuildMessage(`Finding photo ${i + 1} of ${chaptersWithQueries.length}…`)
+
+        const query = imageQueries[ch.id]
+        let imageDataUrl: string | null = null
+
+        try {
+          // Serper image search
+          const searchRes = await fetch('/api/search-images', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query, count: 6 }),
+          })
+          if (searchRes.ok) {
+            const searchData = await searchRes.json()
+            const urls: { url: string }[] = searchData.images || []
+
+            for (const { url } of urls.slice(0, 5)) {
+              try {
+                const proxyRes = await fetch('/api/fetch-image', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ url }),
+                })
+                if (!proxyRes.ok) continue
+                const proxyData = await proxyRes.json()
+                if (proxyData.base64) {
+                  imageDataUrl = proxyData.base64
+                  break
+                }
+              } catch { /* try next url */ }
+            }
+          }
+        } catch (e) {
+          console.warn(`[food-guide] Serper failed for ch${ch.id}:`, e)
+        }
+
+        // Fall back to Pexels if Serper didn't find anything
+        if (!imageDataUrl) {
+          try {
+            const pexelsRes = await fetch('/api/story-pexels', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ prompt: query, title: ch.title, channel, chapterId: ch.id }),
+            })
+            if (pexelsRes.ok) {
+              const pexelsData = await pexelsRes.json()
+              imageDataUrl = pexelsData.imageDataUrl
+            }
+          } catch { /* pexels failed */ }
+        }
+
+        if (imageDataUrl) {
+          const ext = imageDataUrl.startsWith('data:image/png') ? 'png' : 'jpg'
+          const file = new File(
+            [Uint8Array.from(atob(imageDataUrl.split(',')[1]), c => c.charCodeAt(0))],
+            `img_ch${ch.id}.${ext}`,
+            { type: ext === 'png' ? 'image/png' : 'image/jpeg' }
+          )
+          localMedia[ch.id] = [file]
+          setDalleImages(prev => ({ ...prev, [ch.id]: imageDataUrl! }))
+          setChapterMedia(prev => ({ ...prev, [ch.id]: [file] }))
+        }
+      }
+      setBuildSubProgress({ done: chaptersWithQueries.length, total: chaptersWithQueries.length })
+      setBuildMessage(`${Object.keys(localMedia).length} images sourced`)
+
+      // ── Step 3: Voiceover ──
+      setBuildPhase('voiceover')
+      for (let i = 0; i < generatedScript.chapters.length; i++) {
+        const ch = generatedScript.chapters[i]
+        setBuildSubProgress({ done: i, total: generatedScript.chapters.length })
+        setBuildMessage(`Recording voiceover ${i + 1} of ${generatedScript.chapters.length}`)
+        setVoiceoverStatus(prev => ({ ...prev, [ch.id]: 'generating' }))
+        try {
+          const voiceRes = await fetch('/api/story-voiceover', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: ch.narration, voiceId: selectedVoice }),
+          })
+          const voiceData = await voiceRes.json()
+          if (!voiceRes.ok) throw new Error(voiceData.error)
+          setChapterAudio(prev => ({ ...prev, [ch.id]: voiceData.audio }))
+          setVoiceoverStatus(prev => ({ ...prev, [ch.id]: 'ready' }))
+        } catch (e) {
+          console.warn(`Voiceover failed for chapter ${ch.id}:`, e)
+          setVoiceoverStatus(prev => { const n = { ...prev }; delete n[ch.id]; return n })
+        }
+      }
+      setBuildSubProgress({ done: generatedScript.chapters.length, total: generatedScript.chapters.length })
+
+      // ── Step 4: Assembly ──
+      setBuildPhase('assembly')
+      setBuildMessage('Assembling video…')
+      setBuildSubProgress(null)
+
+      const formData = new FormData()
+      formData.append('chapters', JSON.stringify(generatedScript.chapters.map(ch => ({
+        id: ch.id, narration: ch.narration, title: ch.title,
+      }))))
+
+      for (const [chIdStr, files] of Object.entries(localMedia)) {
+        for (const file of files) {
+          formData.append('media', file, `ch${chIdStr}_${file.name}`)
+          formData.append('mediaChapterIds', chIdStr)
+        }
+      }
+      const latestAudio = await new Promise<Record<number, string>>(resolve => {
+        setChapterAudio(prev => { resolve(prev); return prev })
+      })
+      for (const [chIdStr, dataUrl] of Object.entries(latestAudio)) {
+        const base64 = dataUrl.split(',')[1]
+        const mime = dataUrl.split(';')[0].split(':')[1] || 'audio/mpeg'
+        const binary = atob(base64)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+        const ext = mime.includes('wav') ? 'wav' : 'mp3'
+        formData.append('audio', new Blob([bytes], { type: mime }), `ch${chIdStr}_voiceover.${ext}`)
+        formData.append('audioChapterIds', chIdStr)
+      }
+      formData.append('musicMood', musicMood)
+      formData.append('musicVolume', '0.15')
+      formData.append('musicEnabled', String(musicEnabled))
+      formData.append('channel', channel)
+
+      const startRes = await fetch('/api/story-video/start', { method: 'POST', body: formData })
+      const startData = await startRes.json()
+      if (!startRes.ok) throw new Error(startData.error)
+
+      setCurrentJobId(startData.jobId)
+      setBuildMessage('Rendering video…')
+
+      const result = await new Promise<{ downloadUrl: string; duration: number }>((resolve, reject) => {
+        const poll = async () => {
+          try {
+            const res = await fetch(`/api/story-video/status/${startData.jobId}`)
+            const data = await res.json()
+            if (data.status === 'complete') { resolve(data); return }
+            if (data.status === 'error') { reject(new Error(data.error || 'Assembly failed')); return }
+            if (data.progress) setBuildMessage(data.progress)
+            setTimeout(poll, 3000)
+          } catch (e) { reject(e) }
+        }
+        poll()
+      })
+
+      setVideoUrl(result.downloadUrl)
+      setBuildPhase('complete')
+      setBuildMessage(`${Math.round(result.duration)}s · ready to download`)
+      sessionStorage.setItem('longform_video', JSON.stringify({ jobId: startData.jobId, videoUrl: result.downloadUrl }))
+      openPublishPanel()
+
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Build failed'
+      setBuildError(msg)
+      setBuildPhase('error')
+    } finally {
+      setFoodGuideBuilding(false)
+    }
+  }
+
   // ─── Thumbnail ───
   const generateThumbnail = async () => {
     if (!script) return
@@ -1163,6 +1381,58 @@ export default function LongFormPage() {
                         rows={3}
                       />
                     </div>
+
+                    {/* Top 5 Food Guide — Omnira Food only */}
+                    {channel === 'Omnira Food' && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col gap-3">
+                        <div>
+                          <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-widest mb-0.5">🍽️ Top 5 Food Guide</p>
+                          <p className="text-[11px] text-amber-600">AI researches restaurants, writes scripts, finds photos — one click.</p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wider block mb-1">City</label>
+                          <input
+                            type="text"
+                            value={foodCity}
+                            onChange={e => setFoodCity(e.target.value)}
+                            placeholder="e.g. Tokyo, London, Barcelona…"
+                            className="w-full text-[14px] border border-amber-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-1 focus:ring-amber-400 placeholder:text-stone-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-medium text-stone-500 uppercase tracking-wider block mb-1">
+                            Restaurants <span className="normal-case font-normal text-stone-400">(optional — AI picks if blank)</span>
+                          </label>
+                          <div className="flex flex-col gap-1.5">
+                            {foodRestaurantInputs.map((r, i) => (
+                              <input
+                                key={i}
+                                type="text"
+                                value={r}
+                                onChange={e => setFoodRestaurantInputs(prev => prev.map((x, j) => j === i ? e.target.value : x))}
+                                placeholder={`Restaurant ${i + 1}`}
+                                className="w-full text-[13px] border border-amber-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-amber-400 placeholder:text-stone-400"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <button
+                          onClick={runFoodGuideBuild}
+                          disabled={!foodCity.trim() || foodGuideBuilding || isBuilding}
+                          className="w-full flex items-center justify-center gap-2 py-2.5 bg-amber-600 text-white text-[13px] font-medium rounded-xl hover:bg-amber-700 disabled:opacity-40 transition-colors"
+                        >
+                          {foodGuideBuilding ? (
+                            <>
+                              <Spinner className="w-3.5 h-3.5" />
+                              Building food guide…
+                            </>
+                          ) : 'Build Top 5 Food Guide →'}
+                        </button>
+                        <div className="border-t border-amber-200 pt-2">
+                          <p className="text-[10px] text-amber-600 text-center">— or use the topic field above for any other story —</p>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Voice */}
                     <div>

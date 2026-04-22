@@ -76,6 +76,12 @@ export default function CarouselPage() {
   const [slideCount, setSlideCount] = useState(6)
   const [slides, setSlides] = useState<Slide[]>([])
   const [generating, setGenerating] = useState(false)
+
+  // Food Guide Builder state
+  const [foodMode, setFoodMode] = useState<'no-frills' | 'top5'>('no-frills')
+  const [foodRestaurants, setFoodRestaurants] = useState([{ name: '', city: '' }, { name: '', city: '' }, { name: '', city: '' }, { name: '', city: '' }, { name: '', city: '' }])
+  const [buildingFood, setBuildingFood] = useState(false)
+  const [foodBuildStatus, setFoodBuildStatus] = useState('')
   const [selectedSlide, setSelectedSlide] = useState<number | null>(null)
   const [generatingVideo, setGeneratingVideo] = useState(false)
   const [slideDuration, setSlideDuration] = useState(3)
@@ -645,6 +651,94 @@ export default function CarouselPage() {
     showToast('Draft cleared')
   }
 
+  const buildFoodCarousel = async () => {
+    const valid = foodMode === 'no-frills'
+      ? foodRestaurants.slice(0, 1).filter(r => r.name.trim() && r.city.trim())
+      : foodRestaurants.filter(r => r.name.trim() && r.city.trim()).slice(0, 5)
+
+    if (!valid.length) {
+      showToast('Enter at least one restaurant name and city', 'error')
+      return
+    }
+
+    setBuildingFood(true)
+    setFoodBuildStatus('Researching restaurants with web search…')
+    setSlides([])
+    setSelectedSlide(null)
+
+    try {
+      // Step 1: Generate slides via Claude web search
+      const genRes = await fetch('/api/food-carousel-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: foodMode, restaurants: valid, channel }),
+      })
+      const genData = await genRes.json()
+      if (!genRes.ok) throw new Error(genData.error || 'Slide generation failed')
+
+      const rawSlides: Slide[] = genData.slides.map((s: Slide) => ({ ...s, image: undefined }))
+      setSlides(rawSlides)
+      setSelectedSlide(0)
+      setTopic(foodMode === 'no-frills'
+        ? `${valid[0].name} — ${valid[0].city} (No Frills But Kills)`
+        : `Top ${valid.length} Eats — ${valid.map(r => r.city).filter((c, i, a) => a.indexOf(c) === i).join(', ')}`)
+
+      const imageQueries: string[] = genData.imageQueries || []
+
+      // Step 2: Auto-fetch images via Serper + proxy
+      setFoodBuildStatus(`Finding food photos (0/${rawSlides.length})…`)
+      const updatedSlides = [...rawSlides]
+
+      await Promise.all(
+        rawSlides.map(async (_, idx) => {
+          const query = imageQueries[idx]
+          if (!query) return
+
+          try {
+            // Search Serper for image URLs
+            const searchRes = await fetch('/api/search-images', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query, count: 5 }),
+            })
+            if (!searchRes.ok) return
+            const searchData = await searchRes.json()
+            const urls: { url: string }[] = searchData.images || []
+
+            // Try each URL until one proxies successfully
+            for (const { url } of urls.slice(0, 5)) {
+              try {
+                const proxyRes = await fetch('/api/fetch-image', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ url }),
+                })
+                if (!proxyRes.ok) continue
+                const proxyData = await proxyRes.json()
+                if (proxyData.base64) {
+                  updatedSlides[idx] = { ...updatedSlides[idx], image: proxyData.base64 }
+                  setSlides(prev => {
+                    const next = [...prev]
+                    next[idx] = { ...next[idx], image: proxyData.base64 }
+                    return next
+                  })
+                  break
+                }
+              } catch { /* try next */ }
+            }
+          } catch { /* image fetch failed — slide stays text-only */ }
+        })
+      )
+
+      showToast(`${rawSlides.length} slides built${imageQueries.length ? ' with images' : ''}!`)
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Error building food carousel', 'error')
+    } finally {
+      setBuildingFood(false)
+      setFoodBuildStatus('')
+    }
+  }
+
   const reorderSlide = (fromIndex: number, direction: 'up' | 'down') => {
     const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1
     if (toIndex < 0 || toIndex >= slides.length) return
@@ -793,6 +887,70 @@ export default function CarouselPage() {
         <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
           {/* Left panel — controls */}
           <div className={`w-full md:w-72 border-r border-stone-100 overflow-y-auto p-4 md:p-5 flex flex-col gap-4 shrink-0 ${mobilePanel === 'controls' ? 'flex' : 'hidden md:flex'}`}>
+
+            {/* Food Guide Builder — Omnira Food only */}
+            {channel === 'Omnira Food' && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col gap-3">
+                <p className="text-[10px] font-medium text-amber-700 uppercase tracking-widest">🍽️ Food Guide Builder</p>
+
+                {/* Mode toggle */}
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={() => setFoodMode('no-frills')}
+                    className={`py-2 rounded-lg text-[11px] font-medium border transition-all ${foodMode === 'no-frills' ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'}`}
+                  >🔥 No Frills</button>
+                  <button
+                    onClick={() => setFoodMode('top5')}
+                    className={`py-2 rounded-lg text-[11px] font-medium border transition-all ${foodMode === 'top5' ? 'bg-stone-900 text-white border-stone-900' : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'}`}
+                  >🍽️ Top 5</button>
+                </div>
+
+                {/* Restaurant inputs */}
+                <div className="flex flex-col gap-2">
+                  {(foodMode === 'no-frills' ? foodRestaurants.slice(0, 1) : foodRestaurants).map((r, i) => (
+                    <div key={i} className="flex flex-col gap-1">
+                      {foodMode === 'top5' && (
+                        <p className="text-[9px] font-medium text-amber-600 uppercase tracking-wider">Restaurant {i + 1}</p>
+                      )}
+                      <input
+                        type="text"
+                        value={r.name}
+                        onChange={e => setFoodRestaurants(prev => prev.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
+                        placeholder="Restaurant name"
+                        className="w-full text-[13px] border border-amber-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:border-amber-400 placeholder:text-stone-400"
+                      />
+                      <input
+                        type="text"
+                        value={r.city}
+                        onChange={e => setFoodRestaurants(prev => prev.map((x, j) => j === i ? { ...x, city: e.target.value } : x))}
+                        placeholder="City"
+                        className="w-full text-[13px] border border-amber-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:border-amber-400 placeholder:text-stone-400"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {foodBuildStatus && (
+                  <p className="text-[11px] text-amber-700 animate-pulse">{foodBuildStatus}</p>
+                )}
+
+                <button
+                  onClick={buildFoodCarousel}
+                  disabled={buildingFood}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-amber-600 text-white text-[13px] font-medium rounded-xl hover:bg-amber-700 transition-colors disabled:opacity-50"
+                >
+                  {buildingFood ? (
+                    <>
+                      <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                      </svg>
+                      Building…
+                    </>
+                  ) : 'Research & Build Carousel →'}
+                </button>
+              </div>
+            )}
 
             {/* Load today's news */}
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col gap-2.5">
