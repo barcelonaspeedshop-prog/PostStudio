@@ -20,7 +20,7 @@ const CATEGORY_IDS: Record<string, string> = {
 
 export async function POST(req: NextRequest) {
   try {
-    const { videoBase64, title, description, tags, channelName } = await req.json()
+    const { videoBase64, title, description, tags, channelName, thumbnailBase64 } = await req.json()
 
     if (!videoBase64) {
       return NextResponse.json({ error: 'videoBase64 is required' }, { status: 400 })
@@ -74,8 +74,28 @@ export async function POST(req: NextRequest) {
 
     console.log(`[youtube-publish] Success: ${videoUrl}`)
 
+    // Set thumbnail if provided
+    if (thumbnailBase64 && videoId) {
+      try {
+        const b64 = thumbnailBase64.replace(/^data:image\/\w+;base64,/, '')
+        const buf = Buffer.from(b64, 'base64')
+        const { Readable: NodeReadable } = await import('stream')
+        const thumbStream = new NodeReadable()
+        thumbStream.push(buf)
+        thumbStream.push(null)
+        await youtube.thumbnails.set({
+          videoId,
+          media: { mimeType: 'image/jpeg', body: thumbStream },
+        })
+        console.log(`[youtube-publish] Thumbnail set for ${videoId}`)
+      } catch (thumbErr) {
+        console.warn(`[youtube-publish] Thumbnail upload failed (non-fatal):`, thumbErr instanceof Error ? thumbErr.message : thumbErr)
+      }
+    }
+
     return NextResponse.json({
       videoId,
+      id: videoId,
       url:   videoUrl,
       title: res.data.snippet?.title,
     })

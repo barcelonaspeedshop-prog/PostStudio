@@ -53,15 +53,22 @@ const POST_TYPES: { value: PostTypeValue; label: string; placeholder: string }[]
 const FOOD_POST_TYPES: PostTypeValue[] = ['no-frills', 'top5', 'restaurant-feature']
 const RESTAURANT_RESEARCH_TYPES: PostTypeValue[] = ['no-frills', 'restaurant-feature']
 
-// ── Toast ────────────────────────────────────────────────────────────────────
+// ── Toast + Publish Results ───────────────────────────────────────────────────
 type Toast = { msg: string; type?: 'success' | 'error' }
+type PlatformResult = { platform: string; success: boolean; id?: string; error?: string; skipped?: boolean; reason?: string }
+
 function useToast() {
   const [toast, setToast] = useState<Toast | null>(null)
+  const [publishResults, setPublishResults] = useState<PlatformResult[] | null>(null)
   const show = (msg: string, type: Toast['type'] = 'success') => {
     setToast({ msg, type })
-    setTimeout(() => setToast(null), 2800)
+    setTimeout(() => setToast(null), 3500)
   }
-  return { toast, show }
+  const showResults = (results: PlatformResult[]) => {
+    setPublishResults(results)
+    setTimeout(() => setPublishResults(null), 6000)
+  }
+  return { toast, show, publishResults, showResults }
 }
 
 // ── Post-type-aware content generator ───────────────────────────────────────
@@ -309,7 +316,7 @@ Return this exact JSON:
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function ComposerPage() {
-  const { toast, show } = useToast()
+  const { toast, show, publishResults, showResults } = useToast()
 
   // Channel
   const [selectedChannel, setSelectedChannel] = useState(CHANNEL_NAMES[0])
@@ -355,6 +362,11 @@ export default function ComposerPage() {
   const [musicMood, setMusicMood] = useState<'calm' | 'energy'>('energy')
   const [musicFile, setMusicFile] = useState<File | null>(null)
   const musicInputRef = useRef<HTMLInputElement>(null)
+
+  // Thumbnail
+  const [thumbnailSrc, setThumbnailSrc] = useState<string | null>(null)
+  const [generatingThumb, setGeneratingThumb] = useState(false)
+  const thumbnailInputRef = useRef<HTMLInputElement>(null)
 
   // Load connected platforms on channel change
   useEffect(() => {
@@ -533,6 +545,33 @@ export default function ComposerPage() {
     }
   }
 
+  // Generate thumbnail
+  const handleGenerateThumbnail = async () => {
+    if (!title && !caption) { show('Add a title first', 'error'); return }
+    setGeneratingThumb(true)
+    try {
+      const heroImage = mediaSrc?.startsWith('data:image/') ? mediaSrc : undefined
+      const res = await fetch('/api/generate-thumbnail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel: selectedChannel,
+          title: title || caption.split('\n')[0]?.slice(0, 80) || 'Untitled',
+          accentWord: tags[0] || '',
+          heroImageBase64: heroImage,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) throw new Error(data.error || 'Thumbnail generation failed')
+      setThumbnailSrc(data.thumbnailBase64)
+      show('Thumbnail generated!')
+    } catch (e: unknown) {
+      show(e instanceof Error ? e.message : 'Failed to generate thumbnail', 'error')
+    } finally {
+      setGeneratingThumb(false)
+    }
+  }
+
   // Publish handler — routes YouTube through its own API, others through /api/publish
   const doPublish = async (platforms: string[]) => {
     const connected = platforms.filter(p => connectedPlatforms.includes(p))
@@ -542,18 +581,24 @@ export default function ComposerPage() {
     }
     setPublishing(true)
 
-    type PlatformResult = { platform: string; success: boolean; id?: string; error?: string; skipped?: boolean; reason?: string }
     const allResults: PlatformResult[] = []
+
+    // Resolve media: detect video vs image
+    const videoFile = mediaFiles.find(f => f.type.startsWith('video/'))
+    const isVideoSrc = mediaSrc?.startsWith('data:video/')
+    const isImageSrc = mediaSrc?.startsWith('data:image/')
+
+    const readAsDataURL = (file: File): Promise<string> =>
+      new Promise(resolve => { const r = new FileReader(); r.onload = e => resolve(e.target?.result as string); r.readAsDataURL(file) })
+
+    const videoData = isVideoSrc ? mediaSrc
+      : (videoFile && !isImageSrc ? await readAsDataURL(videoFile) : null)
+
+    const imageData = !videoData && (isImageSrc ? mediaSrc : null)
 
     try {
       // ── YouTube ──────────────────────────────────────────────────────────────
       if (connected.includes('youtube')) {
-        const videoFile = mediaFiles.find(f => f.type.startsWith('video/'))
-        const videoSrc = mediaSrc?.startsWith('data:video/') ? mediaSrc : null
-        const videoData = videoSrc || (videoFile ? await new Promise<string>(resolve => {
-          const r = new FileReader(); r.onload = e => resolve(e.target?.result as string); r.readAsDataURL(videoFile)
-        }) : null)
-
         if (videoData) {
           try {
             const ytRes = await fetch('/api/publish/youtube', {
@@ -565,11 +610,12 @@ export default function ComposerPage() {
                 description: [description, caption].filter(Boolean).join('\n\n').slice(0, 5000),
                 tags: tags.slice(0, 30),
                 channelName: selectedChannel,
+                thumbnailBase64: thumbnailSrc || undefined,
               }),
             })
             const ytData = await ytRes.json()
-            if (ytRes.ok && ytData.id) {
-              allResults.push({ platform: 'youtube', success: true, id: ytData.id })
+            if (ytRes.ok && (ytData.id || ytData.videoId)) {
+              allResults.push({ platform: 'youtube', success: true, id: ytData.id || ytData.videoId })
             } else {
               allResults.push({ platform: 'youtube', success: false, error: ytData.error || 'YouTube upload failed' })
             }
@@ -577,7 +623,7 @@ export default function ComposerPage() {
             allResults.push({ platform: 'youtube', success: false, error: e instanceof Error ? e.message : 'YouTube upload failed' })
           }
         } else {
-          allResults.push({ platform: 'youtube', success: false, skipped: true, reason: 'YouTube requires a video — upload a video file or use the Carousel builder to create a YouTube video post.' })
+          allResults.push({ platform: 'youtube', success: false, skipped: true, reason: 'No video attached — YouTube requires a video file.' })
         }
       }
 
@@ -589,25 +635,20 @@ export default function ComposerPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             content: caption || description || title,
-            imageUrls: mediaSrc ? [mediaSrc] : undefined,
+            imageUrls: imageData ? [imageData] : undefined,
+            videoBase64: videoData || undefined,
             platforms: otherPlatforms,
             channel: selectedChannel,
+            thumbnailBase64: thumbnailSrc || undefined,
           }),
         })
         const data = await res.json()
         if (Array.isArray(data.results)) allResults.push(...data.results)
       }
 
-      const succeeded = allResults.filter(r => r.success).length
-      const errors = allResults.filter(r => !r.success && !r.skipped).map(r => r.error).filter(Boolean)
-      const skipped = allResults.filter(r => r.skipped)
-
-      if (succeeded > 0) {
-        show(`Published to ${succeeded} platform${succeeded !== 1 ? 's' : ''}!`)
-      } else if (errors.length) {
-        show(errors[0] || 'Publish failed', 'error')
-      } else if (skipped.length) {
-        show(skipped[0].reason || 'No platforms published', 'error')
+      // Show per-platform results
+      if (allResults.length > 0) {
+        showResults(allResults)
       } else {
         show('No platforms published — check connection status', 'error')
       }
@@ -879,6 +920,50 @@ export default function ComposerPage() {
               )}
             </div>
 
+            {/* Thumbnail */}
+            <div className="bg-white border border-stone-100 rounded-xl p-4">
+              <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-3">Thumbnail</p>
+              <div className="flex gap-2 mb-3">
+                <label className="flex items-center gap-1.5 px-3 py-2 text-[12px] border border-stone-200 rounded-lg cursor-pointer hover:bg-stone-50 transition-colors">
+                  <input
+                    ref={thumbnailInputRef}
+                    type="file"
+                    accept="image/jpeg,.jpg,.jpeg,image/png,.png"
+                    className="hidden"
+                    onChange={e => {
+                      const f = e.target.files?.[0]
+                      if (!f) return
+                      const reader = new FileReader()
+                      reader.onload = ev => setThumbnailSrc(ev.target?.result as string)
+                      reader.readAsDataURL(f)
+                    }}
+                  />
+                  <svg className="w-3.5 h-3.5 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Add Thumbnail
+                </label>
+                <button
+                  onClick={handleGenerateThumbnail}
+                  disabled={generatingThumb}
+                  className="flex items-center gap-1.5 px-3 py-2 text-[12px] border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors disabled:opacity-50"
+                >
+                  {generatingThumb ? <><Spinner className="w-3 h-3" /> Generating...</> : <><span className="text-[10px]">✦</span> Generate Thumbnail</>}
+                </button>
+              </div>
+              {thumbnailSrc ? (
+                <div className="relative">
+                  <img src={thumbnailSrc} alt="Thumbnail preview" className="w-full rounded-lg border border-stone-200 object-cover" style={{ maxHeight: '160px' }} />
+                  <button
+                    onClick={() => setThumbnailSrc(null)}
+                    className="absolute top-1.5 right-1.5 w-5 h-5 bg-stone-900/70 text-white rounded-full text-[10px] flex items-center justify-center hover:bg-stone-900"
+                  >×</button>
+                </div>
+              ) : (
+                <p className="text-[11px] text-stone-400">Used as the YouTube thumbnail and video cover image for Instagram/Facebook.</p>
+              )}
+            </div>
+
             {/* Music */}
             <div className="bg-white border border-stone-100 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
@@ -1145,6 +1230,34 @@ export default function ComposerPage() {
           toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-stone-900 text-white'
         }`}>
           {toast.msg}
+        </div>
+      )}
+
+      {/* Publish Results Panel */}
+      {publishResults && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-stone-900 text-white rounded-xl shadow-lg z-50 min-w-[260px] overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-stone-700">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-stone-400">Publish Results</p>
+          </div>
+          <div className="px-4 py-3 flex flex-col gap-2">
+            {publishResults.map(r => (
+              <div key={r.platform} className="flex items-start gap-2.5">
+                <span className="text-[14px] leading-none mt-0.5">
+                  {r.success ? '✅' : r.skipped ? '⚪' : '❌'}
+                </span>
+                <div>
+                  <p className="text-[12px] font-medium capitalize">{r.platform}</p>
+                  <p className="text-[10px] text-stone-400">
+                    {r.success
+                      ? `Published${r.id ? ` · ${r.id.slice(0, 16)}` : ''}`
+                      : r.skipped
+                      ? (r.reason || 'Skipped')
+                      : (r.error || 'Failed')}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

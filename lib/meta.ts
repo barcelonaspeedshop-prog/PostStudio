@@ -297,6 +297,29 @@ export async function publishCarouselToInstagram(
   }
 }
 
+// ── Instagram single photo ───────────────────────────────────────────────────
+
+/**
+ * Publish a single photo post to Instagram.
+ * imageUrl must be a publicly accessible HTTPS URL.
+ */
+export async function publishPhotoToInstagram(
+  channelName: string,
+  imageUrl: string,
+  caption: string,
+): Promise<{ id: string }> {
+  const cfg = await getChannelConfig(channelName)
+  if (!cfg) throw new Error(`No Meta credentials configured for channel: ${channelName}`)
+  const { instagramAccountId: igId, pageAccessToken: token } = cfg
+  if (!igId) throw new Error(`Instagram Account ID not configured for channel: ${channelName}`)
+
+  const container = await graphPost(`/${igId}/media`, { image_url: imageUrl, caption }, token)
+  const containerId = container.id as string
+  await waitForContainer(containerId, token, 12, 5000)
+  const published = await graphPost(`/${igId}/media_publish`, { creation_id: containerId }, token)
+  return { id: published.id as string }
+}
+
 // ── Instagram Reel (video) ───────────────────────────────────────────────────
 
 /**

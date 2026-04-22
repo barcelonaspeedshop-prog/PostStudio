@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
   publishCarouselToInstagram,
+  publishPhotoToInstagram,
   publishVideoToInstagram,
   publishToFacebook,
   publishAlbumToFacebook,
@@ -93,28 +94,55 @@ export async function POST(req: NextRequest) {
               break
             }
 
-            // Carousel: prefer explicit imageUrls, fall back to slide.image base64 fields.
-            // publishCarouselToInstagram handles both public URLs and base64 internally.
-            const carouselImages: string[] =
-              Array.isArray(imageUrls) && imageUrls.length >= 2
-                ? (imageUrls as string[])
-                : slideImages
+            const tempFiles: string[] = []
+            try {
+              // Carousel: prefer explicit imageUrls (≥2), fall back to slide images
+              const carouselImages: string[] =
+                Array.isArray(imageUrls) && imageUrls.length >= 2
+                  ? (imageUrls as string[])
+                  : slideImages
 
-            if (carouselImages.length >= 2) {
-              const r = await publishCarouselToInstagram(channel, carouselImages, caption)
-              results.push({ platform, success: true, id: r.id })
-            } else if (mediaUrl && isPublicUrl(mediaUrl)) {
-              // Single video → publish as Reel
-              const r = await publishVideoToInstagram(channel, mediaUrl, caption)
-              results.push({ platform, success: true, id: r.id })
-            } else {
-              results.push({
-                platform,
-                success: false,
-                skipped: true,
-                reason:
-                  'Instagram carousel requires at least 2 slide images. No valid images found in the request.',
-              })
+              if (carouselImages.length >= 2) {
+                const r = await publishCarouselToInstagram(channel, carouselImages, caption)
+                results.push({ platform, success: true, id: r.id })
+              } else if (videoBase64 && typeof videoBase64 === 'string' && videoBase64.length > 100) {
+                // Base64 video from New Post → save to temp, publish as Reel
+                const saved = await saveVideoToTempFile(videoBase64)
+                if (saved) {
+                  tempFiles.push(saved.filePath)
+                  const r = await publishVideoToInstagram(channel, saved.publicUrl, caption)
+                  results.push({ platform, success: true, id: r.id })
+                } else {
+                  results.push({ platform, success: false, error: 'Failed to prepare video for Instagram' })
+                }
+              } else if (mediaUrl && isPublicUrl(mediaUrl)) {
+                // Public URL video → Reel
+                const r = await publishVideoToInstagram(channel, mediaUrl, caption)
+                results.push({ platform, success: true, id: r.id })
+              } else {
+                // Single image: use imageUrls[0] or slideImages[0]
+                const singleImage = (Array.isArray(imageUrls) && imageUrls[0]) || slideImages[0]
+                if (singleImage) {
+                  const saved = await saveBase64ToTempFile(singleImage)
+                  if (saved) {
+                    tempFiles.push(saved.filePath)
+                    const r = await publishPhotoToInstagram(channel, saved.publicUrl, caption)
+                    results.push({ platform, success: true, id: r.id })
+                  } else {
+                    results.push({ platform, success: false, error: 'Failed to prepare image for Instagram' })
+                  }
+                } else {
+                  // Text-only — Instagram requires media, publish as text fallback via caption only
+                  results.push({
+                    platform,
+                    success: false,
+                    skipped: true,
+                    reason: 'Instagram requires at least one image or video. Add media to publish.',
+                  })
+                }
+              }
+            } finally {
+              await Promise.all(tempFiles.map(deleteTempFile))
             }
           } catch (e: unknown) {
             results.push({ platform, success: false, error: e instanceof Error ? e.message : String(e) })
