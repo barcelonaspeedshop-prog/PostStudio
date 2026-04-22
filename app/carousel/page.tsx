@@ -10,7 +10,10 @@ type Slide = {
   badge: string
   accent: string
   image?: string // base64 data URL
-  tileType?: 'story' | 'story-text' | 'hook' | 'brand' | 'cta' | 'poll'
+  tileType?: 'story' | 'story-text' | 'hook' | 'brand' | 'cta' | 'poll' | 'food-image' | 'food-must-order' | 'food-info'
+  foodMustOrder?: { name: string; description: string; priceRange?: string }
+  foodInfoItems?: Array<{ icon: string; label: string; value: string }>
+  foodRestaurantName?: string
 }
 
 const CHANNELS = [

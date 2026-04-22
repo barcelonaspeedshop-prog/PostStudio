@@ -23,6 +23,8 @@ export type RestaurantMeta = {
   bookingNote: string
 }
 
+type FoodInfoItem = { icon: string; label: string; value: string }
+
 type SlideResult = {
   num: string
   tag: string
@@ -30,7 +32,10 @@ type SlideResult = {
   body: string
   badge: string
   accent: string
-  tileType: 'story' | 'story-text'
+  tileType: 'food-image' | 'food-must-order' | 'food-info' | 'story-text' | 'story'
+  foodMustOrder?: { name: string; description: string; priceRange?: string }
+  foodInfoItems?: FoodInfoItem[]
+  foodRestaurantName?: string
 }
 
 function slugify(name: string): string {
@@ -130,16 +135,62 @@ imageQueries: use actual restaurant name + city + dish/vibe for best photo resul
   if (!jsonMatch) throw new Error('No JSON found in response')
   const parsed = JSON.parse(jsonMatch)
 
-  // Assign tileType: hook + story slides get 'story' (image overlay), info slides get 'story-text'
-  const rawSlides: SlideResult[] = (parsed.slides || []).map((s: SlideResult, i: number) => ({
-    ...s,
-    tileType: i < 2 ? 'story' : 'story-text',
-  }))
+  // Assign food-specific tile types and structured fields from restaurantMeta
+  const meta = parsed.restaurantMeta || {}
+  const mustOrderList: { name: string; description: string }[] = (meta.mustOrder || []).map(
+    (d: { name: string; description: string }) => ({
+      name: stripHtml(d.name || ''),
+      description: stripHtml(d.description || ''),
+    })
+  )
+  const priceRange = stripHtml(meta.priceRange || '')
+  const address = stripHtml(meta.address || meta.city || '')
+  const hoursNote = stripHtml(meta.hoursNote || '')
+  const restName = stripHtml(meta.name || restaurant.name)
+
+  const rawSlides: SlideResult[] = (parsed.slides || []).map((s: SlideResult, i: number) => {
+    if (i === 0 || i === 1) {
+      // Hook + story: full-bleed image tile with headline only
+      return { ...s, tileType: 'food-image' }
+    }
+    if (i === 2 && mustOrderList[0]) {
+      // Must Order #1
+      return {
+        ...s,
+        tileType: 'food-must-order',
+        foodMustOrder: { name: mustOrderList[0].name, description: mustOrderList[0].description, priceRange },
+      }
+    }
+    if (i === 3 && (mustOrderList[1] || mustOrderList[0])) {
+      // Must Order #2
+      const dish = mustOrderList[1] || mustOrderList[0]
+      return {
+        ...s,
+        tileType: 'food-must-order',
+        foodMustOrder: { name: dish.name, description: dish.description, priceRange },
+      }
+    }
+    if (i === 4) {
+      // Practical info slide
+      const infoItems: FoodInfoItem[] = []
+      if (address) infoItems.push({ icon: 'A', label: 'ADDRESS', value: address })
+      if (hoursNote) infoItems.push({ icon: 'H', label: 'HOURS', value: hoursNote })
+      if (priceRange) infoItems.push({ icon: 'P', label: 'PRICE RANGE', value: priceRange })
+      infoItems.push({ icon: 'M', label: 'FIND ON MAPS', value: `Search "${restName}"` })
+      return {
+        ...s,
+        tileType: 'food-info',
+        foodRestaurantName: restName,
+        foodInfoItems: infoItems,
+      }
+    }
+    // Slide 5 (CTA): solid text tile with call-to-action question
+    return { ...s, tileType: 'story-text' }
+  })
 
   const slides = rawSlides.map(cleanSlide)
   const imageQueries: string[] = (parsed.imageQueries || []).map((q: string) => stripHtml(q))
 
-  const meta = parsed.restaurantMeta || {}
   const restaurantMeta: RestaurantMeta = {
     slug: slugify(meta.name || restaurant.name),
     name: stripHtml(meta.name || restaurant.name),

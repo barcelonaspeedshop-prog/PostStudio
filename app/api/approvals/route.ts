@@ -20,7 +20,7 @@ export type ApprovalItem = {
   channel: string
   headline: string
   topic: string
-  slides: Array<{ num: string; tag: string; headline: string; body: string; badge: string; accent: string; image?: string; imageOptions?: string[] }>
+  slides: Array<{ num: string; tag: string; headline: string; body: string; badge: string; accent: string; image?: string; imageOptions?: string[]; tileType?: string; foodMustOrder?: { name: string; description: string; priceRange?: string }; foodInfoItems?: Array<{ icon: string; label: string; value: string }>; foodRestaurantName?: string }>
   videoBase64?: string
   platforms: string[]
   ytTitle?: string
@@ -270,6 +270,37 @@ export async function PATCH(req: NextRequest) {
     if (item.hashtags && item.hashtags.length > 0) caption = `${caption}\n\n${item.hashtags.join(' ')}`
 
     type PlatformResult = { platform: string; success: boolean; error?: string; url?: string }
+
+    // Composite slides into branded frames before publishing — ensures Instagram/Facebook
+    // receive the rendered tile designs (overlays, text, solid bg tiles) not raw Serper images.
+    try {
+      const compositeRes = await fetch(`${baseUrl}/api/composite-slides`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slides: item.slides, channel: item.channel }),
+      })
+      if (compositeRes.ok) {
+        const compositeData = await compositeRes.json() as { frames?: string[] }
+        if (Array.isArray(compositeData.frames)) {
+          item.slides = item.slides.map((s, i) => ({
+            ...s,
+            image: compositeData.frames![i] || s.image,
+          }))
+        }
+      } else {
+        console.warn(`[approvals] composite-slides failed (${compositeRes.status}) — publishing with raw images`)
+      }
+    } catch (e) {
+      console.warn('[approvals] composite-slides error:', e instanceof Error ? e.message : e)
+    }
+
+    // Ensure food carousels always include facebook in active platforms
+    if (item.channel === 'Omnira Food' && !item.platforms.includes('facebook')) {
+      item.platforms = [...item.platforms, 'facebook']
+    }
+    if (item.channel === 'Omnira Food' && !item.platforms.includes('instagram')) {
+      item.platforms = [...item.platforms, 'instagram']
+    }
 
     // Publish to instagram and facebook; YouTube enabled for Gentlemen of Fuel only
     const activePlatforms = item.platforms.filter(p =>

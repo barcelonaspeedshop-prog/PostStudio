@@ -15,6 +15,8 @@ type ChartData = {
   items: { label: string; value: number | string; unit?: string }[]
 }
 
+type FoodInfoItem = { icon: string; label: string; value: string }
+
 type SlideInput = {
   num: string
   tag: string
@@ -23,10 +25,13 @@ type SlideInput = {
   badge: string
   accent: string
   image?: string
-  tileType?: 'hook' | 'brand' | 'story' | 'story-text' | 'cta' | 'poll'
+  tileType?: 'hook' | 'brand' | 'story' | 'story-text' | 'cta' | 'poll' | 'food-image' | 'food-must-order' | 'food-info'
   channel?: string
   chartData?: ChartData
   pollOptions?: string[]
+  foodMustOrder?: { name: string; description: string; priceRange?: string }
+  foodInfoItems?: FoodInfoItem[]
+  foodRestaurantName?: string
 }
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -560,11 +565,177 @@ function buildPollSvg(
   return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`
 }
 
+// ── Tile: FOOD-IMAGE ────────────────────────────────────────────────────────
+// Full-bleed image. Headline only at bottom — no body text.
+function buildFoodImageSvg(slide: SlideInput, primary: string, channelName: string): string {
+  const [pr, pg, pb] = hexToRgb(primary)
+  const pad = 72
+
+  const hedFontSize = dynamicFontSize(slide.headline, W - pad * 2, 100)
+  const hedLines = wrapText(slide.headline, Math.floor((W - pad * 2) / (hedFontSize * 0.55)))
+  const hedLineH = Math.round(hedFontSize * 1.1)
+  const hedH = hedLines.length * hedLineH
+
+  const accentLineY = H - pad - hedH - 32
+  const hedStartY = H - pad - hedH
+
+  const defs = `<defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="black" stop-opacity="0"/>
+      <stop offset="38%" stop-color="black" stop-opacity="0"/>
+      <stop offset="100%" stop-color="black" stop-opacity="0.92"/>
+    </linearGradient>
+    <linearGradient id="topgrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="black" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="black" stop-opacity="0"/>
+    </linearGradient>
+  </defs>`
+
+  let svg = defs
+  svg += `<rect width="${W}" height="210" fill="url(#topgrad)"/>`
+  svg += `<rect width="${W}" height="${H}" fill="url(#grad)"/>`
+
+  // Channel badge top-left
+  const badgeName = escapeXml(channelName.toUpperCase())
+  const badgeW = Math.min(badgeName.length * 14 + 48, 650)
+  svg += `<rect x="${pad}" y="52" width="${badgeW}" height="48" rx="6" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.92"/>`
+  svg += `<text x="${pad + 20}" y="85" font-family="${FONT_STACK}" font-size="22" font-weight="700" fill="white" fill-opacity="1" letter-spacing="2">${badgeName}</text>`
+
+  // Slide number top-right
+  svg += `<text x="${W - pad}" y="88" font-family="${FONT_STACK}" font-size="30" fill="white" fill-opacity="0.28" text-anchor="end">${escapeXml(slide.num)}</text>`
+
+  // Accent rule above headline
+  svg += `<rect x="${pad}" y="${accentLineY}" width="200" height="3" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.95"/>`
+
+  // Headline only — large, bold, no body
+  hedLines.forEach((line, i) => {
+    svg += `<text x="${pad}" y="${hedStartY + (i + 1) * hedLineH}" font-family="${FONT_STACK}" font-size="${hedFontSize}" font-weight="600" fill="white" fill-opacity="1">${escapeXml(line)}</text>`
+  })
+
+  return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`
+}
+
+// ── Tile: FOOD-MUST-ORDER ───────────────────────────────────────────────────
+// Solid channel bg. Large dish name, description, optional price badge.
+function buildFoodMustOrderSvg(slide: SlideInput, primary: string, bg: string, channelName: string): string {
+  const [pr, pg, pb] = hexToRgb(primary)
+  const [bgr, bgg, bgb] = hexToRgb(bg)
+  const pad = 80
+
+  const dish = slide.foodMustOrder
+  const dishName = dish?.name || slide.headline
+  const dishDesc = dish?.description || slide.body
+  const dishPrice = dish?.priceRange || ''
+
+  const nameFontSize = dynamicFontSize(dishName, W - pad * 2, 88)
+  const nameLines = wrapText(dishName, Math.floor((W - pad * 2) / (nameFontSize * 0.55)))
+  const nameLineH = Math.round(nameFontSize * 1.12)
+
+  const descLines = wrapText(dishDesc, Math.floor((W - pad * 2) / (36 * 0.58))).slice(0, 5)
+  const descLineH = 54
+
+  let svg = ''
+  svg += `<rect width="${W}" height="${H}" fill="rgb(${bgr},${bgg},${bgb})" fill-opacity="1"/>`
+  svg += `<rect x="0" y="0" width="${W}" height="12" fill="rgb(${pr},${pg},${pb})" fill-opacity="1"/>`
+
+  // Channel name top-centre
+  svg += `<text x="${W / 2}" y="92" font-family="${FONT_STACK}" font-size="22" font-weight="700" fill="rgb(${pr},${pg},${pb})" fill-opacity="1" text-anchor="middle" letter-spacing="4">${escapeXml(channelName.toUpperCase())}</text>`
+
+  // "MUST ORDER" label left
+  svg += `<text x="${pad}" y="164" font-family="${FONT_STACK}" font-size="26" font-weight="700" fill="rgb(${pr},${pg},${pb})" fill-opacity="1" letter-spacing="3">&#x2605; MUST ORDER</text>`
+
+  // Full-width rule
+  svg += `<rect x="${pad}" y="180" width="${W - pad * 2}" height="1.5" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.28"/>`
+
+  // Dish name starting at y=250
+  const nameStartY = 250
+  nameLines.forEach((line, i) => {
+    svg += `<text x="${pad}" y="${nameStartY + i * nameLineH}" font-family="${FONT_STACK}" font-size="${nameFontSize}" font-weight="700" fill="white" fill-opacity="1">${escapeXml(line)}</text>`
+  })
+
+  // Accent divider below dish name
+  const divY = nameStartY + nameLines.length * nameLineH + 28
+  svg += `<rect x="${pad}" y="${divY}" width="120" height="3" fill="rgb(${pr},${pg},${pb})" fill-opacity="1"/>`
+
+  // Description — 36px white
+  const descStartY = divY + 52
+  descLines.forEach((line, i) => {
+    svg += `<text x="${pad}" y="${descStartY + i * descLineH}" font-family="${FONT_STACK}" font-size="36" fill="white" fill-opacity="0.82">${escapeXml(line)}</text>`
+  })
+
+  // Price pill at bottom if present
+  if (dishPrice) {
+    const pillY = H - 140
+    const pillW = Math.min(dishPrice.length * 22 + 48, 420)
+    svg += `<rect x="${pad}" y="${pillY}" width="${pillW}" height="58" rx="10" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.2" stroke="rgb(${pr},${pg},${pb})" stroke-opacity="0.55" stroke-width="1.5"/>`
+    svg += `<text x="${pad + 24}" y="${pillY + 39}" font-family="${FONT_STACK}" font-size="28" font-weight="700" fill="rgb(${pr},${pg},${pb})" fill-opacity="1">${escapeXml(dishPrice)}</text>`
+  }
+
+  // Handle bottom-right white 25%
+  svg += `<text x="${W - pad}" y="${H - 64}" font-family="${FONT_STACK}" font-size="24" fill="white" fill-opacity="0.25" text-anchor="end" letter-spacing="1">${escapeXml(channelName)}</text>`
+
+  return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`
+}
+
+// ── Tile: FOOD-INFO ─────────────────────────────────────────────────────────
+// Solid channel bg. Restaurant name large at top. Structured info rows: address, hours, price, maps.
+function buildFoodInfoSvg(slide: SlideInput, primary: string, bg: string): string {
+  const [pr, pg, pb] = hexToRgb(primary)
+  const [bgr, bgg, bgb] = hexToRgb(bg)
+  const pad = 80
+
+  const restName = slide.foodRestaurantName || slide.tag || slide.headline
+  const items: FoodInfoItem[] = slide.foodInfoItems || []
+
+  const nameFontSize = dynamicFontSize(restName, W - pad * 2, 60)
+  const nameLines = wrapText(restName, Math.floor((W - pad * 2) / (nameFontSize * 0.55)))
+  const nameLineH = Math.round(nameFontSize * 1.12)
+
+  let svg = ''
+  svg += `<rect width="${W}" height="${H}" fill="rgb(${bgr},${bgg},${bgb})" fill-opacity="1"/>`
+  svg += `<rect x="0" y="0" width="${W}" height="12" fill="rgb(${pr},${pg},${pb})" fill-opacity="1"/>`
+
+  // Restaurant name
+  let y = 100
+  nameLines.forEach((line, i) => {
+    svg += `<text x="${pad}" y="${y + i * nameLineH}" font-family="${FONT_STACK}" font-size="${nameFontSize}" font-weight="700" fill="white" fill-opacity="1">${escapeXml(line)}</text>`
+  })
+  y += nameLines.length * nameLineH + 20
+
+  // "THE ESSENTIALS" label
+  svg += `<text x="${pad}" y="${y}" font-family="${FONT_STACK}" font-size="22" font-weight="700" fill="rgb(${pr},${pg},${pb})" fill-opacity="1" letter-spacing="3">THE ESSENTIALS</text>`
+  y += 28
+
+  // Full-width rule
+  svg += `<rect x="${pad}" y="${y}" width="${W - pad * 2}" height="1.5" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.3"/>`
+  y += 36
+
+  // Info rows
+  for (const item of items) {
+    // Icon circle
+    svg += `<circle cx="${pad + 28}" cy="${y + 28}" r="28" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.18"/>`
+    svg += `<text x="${pad + 28}" y="${y + 38}" font-family="${FONT_STACK}" font-size="22" text-anchor="middle" fill="rgb(${pr},${pg},${pb})" fill-opacity="1" font-weight="700">${escapeXml(item.icon)}</text>`
+
+    // Label (e.g. ADDRESS, HOURS)
+    svg += `<text x="${pad + 78}" y="${y + 20}" font-family="${FONT_STACK}" font-size="20" font-weight="700" fill="rgb(${pr},${pg},${pb})" fill-opacity="0.85" letter-spacing="2">${escapeXml(item.label)}</text>`
+
+    // Value — up to 2 lines at 38px
+    const valLines = wrapText(item.value, Math.floor((W - pad - 90) / (38 * 0.56))).slice(0, 2)
+    valLines.forEach((vl, vi) => {
+      svg += `<text x="${pad + 78}" y="${y + 52 + vi * 46}" font-family="${FONT_STACK}" font-size="38" fill="white" fill-opacity="0.92">${escapeXml(vl)}</text>`
+    })
+
+    y += valLines.length > 1 ? 158 : 110
+  }
+
+  return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`
+}
+
 function determineTileType(
   slide: SlideInput,
   index: number,
   total: number,
-): 'hook' | 'brand' | 'story' | 'story-text' | 'cta' | 'poll' {
+): SlideInput['tileType'] {
   if (slide.tileType) return slide.tileType
   if (index === 0) return 'hook'
   if (index === 1) return 'brand'
@@ -589,7 +760,7 @@ export async function POST(req: NextRequest) {
       let base: sharp.Sharp
 
       // Solid-bg tiles: never use image
-      if (tileType === 'brand' || tileType === 'story-text' || tileType === 'poll') {
+      if (tileType === 'brand' || tileType === 'story-text' || tileType === 'poll' || tileType === 'food-must-order' || tileType === 'food-info') {
         base = sharp({
           create: { width: W, height: H, channels: 3, background: { r: bgr, g: bgg, b: bgb } },
         })
@@ -616,6 +787,10 @@ export async function POST(req: NextRequest) {
           case 'story-text': return buildStoryTextSvg(slide, ch.primary, ch.bg)
           case 'cta': return buildCtaSvg(slide, ch.primary, ch.name, ch.handle, ch.tagline)
           case 'poll': return buildPollSvg(slide, ch.primary, ch.bg, ch.name, ch.handle)
+          case 'food-image': return buildFoodImageSvg(slide, ch.primary, ch.name)
+          case 'food-must-order': return buildFoodMustOrderSvg(slide, ch.primary, ch.bg, ch.name)
+          case 'food-info': return buildFoodInfoSvg(slide, ch.primary, ch.bg)
+          default: return buildStoryTextSvg(slide, ch.primary, ch.bg)
         }
       })()
 
