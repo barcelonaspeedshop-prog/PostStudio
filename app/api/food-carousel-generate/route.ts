@@ -334,6 +334,7 @@ Return ONLY this JSON (plain text, no HTML):
     mapsUrl: stripHtml(meta.mapsUrl || ''),
     phone: stripHtml(meta.phone || ''),
     website: stripHtml(meta.website || ''),
+    menuUrl: stripHtml(meta.menuUrl || ''),
     payment: stripHtml(meta.payment || ''),
     proTips: (meta.proTips || []).map((t: string) => stripHtml(t)),
     bookingNote: stripHtml(meta.bookingNote || ''),
