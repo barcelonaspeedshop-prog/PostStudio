@@ -478,6 +478,8 @@ async function assembleInBackground(
 export async function POST(req: NextRequest) {
   cleanOldJobs()
   const tmpDir = `/tmp/story_video_${Date.now()}`
+  const contentLength = req.headers.get('content-length')
+  console.log(`[story-video/start] incoming request — content-length: ${contentLength ?? 'unknown'}`)
 
   try {
     await mkdir(tmpDir, { recursive: true })
@@ -510,21 +512,40 @@ export async function POST(req: NextRequest) {
       mediaByChapter[chId].push({ path: mediaPath, isVideo })
     }
 
-    // Stream chapter audio files to disk
-    const audioFiles = formData.getAll('audio') as File[]
-    const audioChapterIds = formData.getAll('audioChapterIds') as string[]
+    // Handle chapter audio — supports both base64 text fields (new) and file blobs (legacy)
     const audioByChapter: Record<number, string> = {}
+    const audioChapterIds = formData.getAll('audioChapterIds') as string[]
+    const audioB64s = formData.getAll('audio_b64') as string[]
+    const audioMimes = formData.getAll('audio_mime') as string[]
+    const audioFiles = formData.getAll('audio') as File[]
 
-    for (let i = 0; i < audioFiles.length; i++) {
-      const file = audioFiles[i]
-      const chId = parseInt(audioChapterIds[i])
-      const ext = file.type.includes('wav') ? 'wav' : 'mp3'
-      const audioPath = path.join(tmpDir, `audio_ch${chId}.${ext}`)
-      await streamToDisk(file, audioPath)
-      audioByChapter[chId] = audioPath
-      console.log(`[story-video] Received audio for chapter ${chId}: ${file.name} (${(file.size / 1024).toFixed(1)} KB, type=${file.type})`)
+    if (audioB64s.length > 0) {
+      // New path: base64 text fields (avoids browser Blob serialization issues)
+      for (let i = 0; i < audioChapterIds.length; i++) {
+        const chId = parseInt(audioChapterIds[i])
+        const base64 = audioB64s[i]
+        const mime = audioMimes[i] || 'audio/mpeg'
+        if (!base64) continue
+        const ext = mime.includes('wav') ? 'wav' : 'mp3'
+        const audioPath = path.join(tmpDir, `audio_ch${chId}.${ext}`)
+        const buf = Buffer.from(base64, 'base64')
+        await writeFile(audioPath, buf)
+        audioByChapter[chId] = audioPath
+        console.log(`[story-video] Audio ch${chId}: decoded ${(buf.byteLength / 1024).toFixed(1)} KB from base64 (mime=${mime})`)
+      }
+    } else {
+      // Legacy path: binary file blobs
+      for (let i = 0; i < audioFiles.length; i++) {
+        const file = audioFiles[i]
+        const chId = parseInt(audioChapterIds[i])
+        const ext = file.type.includes('wav') ? 'wav' : 'mp3'
+        const audioPath = path.join(tmpDir, `audio_ch${chId}.${ext}`)
+        await streamToDisk(file, audioPath)
+        audioByChapter[chId] = audioPath
+        console.log(`[story-video] Audio ch${chId}: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`)
+      }
     }
-    console.log(`[story-video] Audio files received for ${Object.keys(audioByChapter).length} chapters: [${Object.keys(audioByChapter).join(', ')}]`)
+    console.log(`[story-video] Audio ready for ${Object.keys(audioByChapter).length} chapters: [${Object.keys(audioByChapter).join(', ')}]`)
 
     // Music: use default track if enabled
     const musicEnabledRaw = formData.get('musicEnabled')

@@ -306,14 +306,10 @@ export default function LongFormPage() {
         }
       }
       for (const [chIdStr, dataUrl] of Object.entries(chapterAudio)) {
-        const base64 = dataUrl.split(',')[1]
-        const mime = dataUrl.split(';')[0].split(':')[1] || 'audio/mpeg'
-        const binary = atob(base64)
-        const bytes = new Uint8Array(binary.length)
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-        const ext = mime.includes('wav') ? 'wav' : 'mp3'
-        const blob = new Blob([bytes], { type: mime })
-        formData.append('audio', blob, `ch${chIdStr}_voiceover.${ext}`)
+        const [header, base64] = dataUrl.split(',')
+        const mime = header.match(/:(.*?);/)?.[1] || 'audio/mpeg'
+        formData.append('audio_b64', base64)
+        formData.append('audio_mime', mime)
         formData.append('audioChapterIds', chIdStr)
       }
       formData.append('musicEnabled', String(musicEnabled))
@@ -723,14 +719,10 @@ export default function LongFormPage() {
       }
 
       for (const [chIdStr, dataUrl] of Object.entries(localAudio)) {
-        const base64 = dataUrl.split(',')[1]
-        const mime = dataUrl.split(';')[0].split(':')[1] || 'audio/mpeg'
-        const binary = atob(base64)
-        const bytes = new Uint8Array(binary.length)
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-        const ext = mime.includes('wav') ? 'wav' : 'mp3'
-        const blob = new Blob([bytes], { type: mime })
-        formData.append('audio', blob, `ch${chIdStr}_voiceover.${ext}`)
+        const [header, base64] = dataUrl.split(',')
+        const mime = header.match(/:(.*?);/)?.[1] || 'audio/mpeg'
+        formData.append('audio_b64', base64)
+        formData.append('audio_mime', mime)
         formData.append('audioChapterIds', chIdStr)
       }
 
@@ -933,13 +925,10 @@ export default function LongFormPage() {
         setChapterAudio(prev => { resolve(prev); return prev })
       })
       for (const [chIdStr, dataUrl] of Object.entries(latestAudio)) {
-        const base64 = dataUrl.split(',')[1]
-        const mime = dataUrl.split(';')[0].split(':')[1] || 'audio/mpeg'
-        const binary = atob(base64)
-        const bytes = new Uint8Array(binary.length)
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-        const ext = mime.includes('wav') ? 'wav' : 'mp3'
-        formData.append('audio', new Blob([bytes], { type: mime }), `ch${chIdStr}_voiceover.${ext}`)
+        const [header, base64] = dataUrl.split(',')
+        const mime = header.match(/:(.*?);/)?.[1] || 'audio/mpeg'
+        formData.append('audio_b64', base64)
+        formData.append('audio_mime', mime)
         formData.append('audioChapterIds', chIdStr)
       }
       formData.append('musicEnabled', String(musicEnabled))
