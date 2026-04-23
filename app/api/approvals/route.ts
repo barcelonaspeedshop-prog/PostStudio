@@ -4,7 +4,6 @@ import { existsSync } from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import { trackHashtags } from '@/lib/hashtags'
-import type { ContentType } from '@/lib/content-mix'
 import type { RestaurantMeta } from '@/app/api/food-carousel-generate/route'
 import { restaurants as staticRestaurants } from '@/lib/restaurants'
 import type { Restaurant } from '@/lib/restaurants'
@@ -29,9 +28,6 @@ export type ApprovalItem = {
   cta?: string
   includeCta?: boolean
   hashtags?: string[]
-  contentType?: ContentType
-  pollQuestion?: string
-  pollOptions?: string[]
   restaurantMeta?: RestaurantMeta
   restaurantMetas?: RestaurantMeta[]
   createdAt: string
@@ -144,7 +140,7 @@ export async function GET() {
 // POST — add new item to queue
 export async function POST(req: NextRequest) {
   try {
-    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, cta, hashtags, contentType, pollQuestion, pollOptions, restaurantMeta, restaurantMetas } = await req.json()
+    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, cta, hashtags, restaurantMeta, restaurantMetas } = await req.json()
 
     if (!channel || !slides || !Array.isArray(slides)) {
       return NextResponse.json({ error: 'channel and slides are required' }, { status: 400 })
@@ -163,9 +159,6 @@ export async function POST(req: NextRequest) {
       ytTags: ytTags || [],
       cta: cta || undefined,
       hashtags: Array.isArray(hashtags) ? hashtags : undefined,
-      contentType: contentType || 'news',
-      pollQuestion: pollQuestion || undefined,
-      pollOptions: Array.isArray(pollOptions) ? pollOptions : undefined,
       restaurantMeta: restaurantMeta || undefined,
       restaurantMetas: Array.isArray(restaurantMetas) ? restaurantMetas : undefined,
       createdAt: new Date().toISOString(),
@@ -187,7 +180,7 @@ export async function POST(req: NextRequest) {
 // PUT — update an item (e.g. attach video after generation, or regenerate with fresh content)
 export async function PUT(req: NextRequest) {
   try {
-    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, cta, includeCta, hashtags, musicEnabled, contentType, pollQuestion, pollOptions } = await req.json()
+    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, cta, includeCta, hashtags, musicEnabled } = await req.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
     const items = await loadApprovals()
@@ -207,9 +200,6 @@ export async function PUT(req: NextRequest) {
     if (includeCta !== undefined) item.includeCta = includeCta
     if (hashtags !== undefined) item.hashtags = Array.isArray(hashtags) ? hashtags : item.hashtags
     if (musicEnabled !== undefined) (item as Record<string, unknown>).musicEnabled = musicEnabled
-    if (contentType) item.contentType = contentType as ContentType
-    if (pollQuestion !== undefined) item.pollQuestion = pollQuestion || undefined
-    if (pollOptions !== undefined) item.pollOptions = Array.isArray(pollOptions) ? pollOptions : undefined
     await saveApprovals(items)
 
     return NextResponse.json({ id: item.id, hasVideo: !!item.videoBase64 })

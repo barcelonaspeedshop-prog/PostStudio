@@ -4,13 +4,6 @@ export type HashtagSet = {
   engagement: string[]
 }
 
-export type ContentMixConfig = {
-  quizTopics: string[]
-  tipsTopics: string[]
-  historyTopics: string[]
-  statsSubjects: string[]
-}
-
 export type ChannelConfig = {
   name: string
   active: boolean
@@ -21,7 +14,6 @@ export type ChannelConfig = {
   ctaStyle: string
   storyThemes: string
   hashtagSets: HashtagSet
-  contentMix: ContentMixConfig
   /** Override the global music default for this channel. Undefined = use global setting. */
   defaultMusic?: boolean
 }
@@ -36,12 +28,6 @@ export const CHANNELS: Record<string, ChannelConfig> = {
     tagline: 'Cars · Culture · Class',
     ctaStyle: 'collector-to-collector — invite readers to share their own heritage; ask about ownership stories, favourite models, or memories at auctions; keep the tone reverential and specific to this exact car or era',
     storyThemes: 'Design icons and their origin stories (E-Type, 250 GTO, Silver Arrows, Miura), legendary coachbuilders (Pininfarina, Zagato, Bertone, Ghia), lost and forgotten marques (Delahaye, Talbot-Lago, Hispano-Suiza, Cisitalia), barn find mythology and the greatest discoveries, concours dynasties and the families behind them, Le Mans legends and the cars that defined endurance racing, celebrity ownership and the stories cars carry, auction record breakers and the bidders behind them, restoration epics that brought icons back from the dead, the rivalry between Italian and British design schools, the death of the coachbuilding era, golden eras of motorsport that produced the most beautiful machines',
-    contentMix: {
-      quizTopics: ['Ferrari history and heritage', 'Porsche 911 evolution', 'Le Mans legends', 'coachbuilder trivia', 'classic auction records', 'famous barn finds', 'Jaguar E-Type heritage', 'Lamborghini founding story'],
-      tipsTopics: ['classic car storage and preservation', 'buying your first classic car', 'concours preparation tips', 'classic car maintenance essentials', 'spotting a genuine barn find', 'navigating classic car auctions'],
-      historyTopics: ['Ferrari', 'Porsche', 'Jaguar', 'Aston Martin', 'Le Mans 24 Hours', 'Goodwood Festival of Speed', 'classic car auction history', 'legendary coachbuilders'],
-      statsSubjects: ['Ferrari vs Porsche production numbers', 'Le Mans win records by manufacturer', 'auction record prices for classic cars', 'rarest classic car models ever built', 'Concours d\'Elegance win records'],
-    },
     hashtagSets: {
       core: ['#ClassicCars', '#GentlemenOfFuel', '#VintageCars', '#CarCulture', '#AutomotiveHistory', '#ClassicMotoring'],
       rotating: [
@@ -69,12 +55,6 @@ export const CHANNELS: Record<string, ChannelConfig> = {
     tagline: 'Formula 1 · Grand Prix · Racing',
     ctaStyle: 'insider debate — spark a technical or strategic argument specific to this story; ask for predictions, constructor allegiances, or driver rankings; use paddock vocabulary; feel like a question from a fellow obsessive, not a content manager',
     storyThemes: 'Driver rivalries that defined eras (Senna vs Prost, Hunt vs Lauda, Hamilton vs Rosberg, Villeneuve vs Pironi), constructor dynasties and their dominance (Red Bull 2010-13, Ferrari 2000-04, McLaren 1988, Williams early 90s), engineering revolutions that changed the sport (fan car, turbo era, active suspension, DRS), tragic losses that shaped the sport (Senna at Imola, Rindt posthumous champion, Villeneuve at Zandvoort), great escapes and near-misses (Regazzoni at Watkins Glen, Hill at Monaco), legendary circuits and what they demanded of drivers, political controversies that almost broke F1 (FISA-FOCA war, 2005 USGP), the great technical battles between engineers, dominant cars that nobody could touch',
-    contentMix: {
-      quizTopics: ['Senna vs Prost rivalry', 'F1 world champions trivia', 'iconic F1 circuits', 'legendary constructor battles', 'F1 rule changes through the years', 'famous F1 crashes and safety evolution', 'fastest F1 cars ever built'],
-      tipsTopics: ['understanding F1 tyre strategy', 'how to follow a Formula 1 race', 'F1 technical regulations explained', 'DRS and overtaking strategy', 'how F1 teams use data during a race'],
-      historyTopics: ['Formula 1 World Championship', 'Ayrton Senna', 'Michael Schumacher', 'Ferrari in Formula 1', 'Monaco Grand Prix', 'Silverstone Grand Prix', 'British Grand Prix'],
-      statsSubjects: ['Hamilton vs Schumacher career records', 'Red Bull vs Mercedes constructor wins', 'fastest lap records at iconic circuits', 'most pole positions in F1 history', 'constructor championship points comparisons'],
-    },
     hashtagSets: {
       core: ['#F1', '#Formula1', '#OmniraF1', '#Motorsport', '#GrandPrix', '#F1Racing'],
       rotating: [
@@ -102,12 +82,6 @@ export const CHANNELS: Record<string, ChannelConfig> = {
     tagline: 'Motorsport · Rally · Endurance',
     ctaStyle: 'competitive spirit — challenge readers to share their race day stories, lap times, or team loyalties tied to this specific event or topic; raw and direct, no fluff',
     storyThemes: 'Le Mans epics that became mythology (1966 Ford vs Ferrari, Porsche 917 era, Mazda 787B win), Group B rally golden age and its brutal end, endurance driver legends and their defining drives (Jacky Ickx, Derek Bell, Tom Kristensen), grassroots racing to glory stories, the brutal Nürburgring and the drivers who mastered it, Dakar Rally pioneers and the extreme machines, touring car eras that captured the imagination (BTCC 90s, DTM golden age), the Citroen C1 endurance world and the community it built, tragedies that changed safety in motorsport, the greatest dices in endurance racing history, prototype evolution and the engineers behind it',
-    contentMix: {
-      quizTopics: ['Le Mans 24 Hours trivia', 'Group B rally cars', 'Nürburgring lap records', 'famous endurance racing drivers', 'WRC rally history', 'Citroen C1 Endurance Championship'],
-      tipsTopics: ['how to prepare for your first track day', 'essential safety kit for track driving', 'tyre pressure and setup for track days', 'how to improve lap times', 'choosing your first track car'],
-      historyTopics: ['Le Mans 24 Hours', 'Group B rally era', 'Nürburgring 24 Hours', 'World Rally Championship', 'Dakar Rally', 'BTCC touring cars'],
-      statsSubjects: ['Le Mans win records by manufacturer', 'Nürburgring lap time records', 'WRC championship wins comparison', 'Group B rally car performance specs', 'endurance race distance records'],
-    },
     hashtagSets: {
       core: ['#RoadAndTrax', '#Motorsport', '#Racing', '#EnduranceRacing', '#MotorsportLife'],
       rotating: [
@@ -134,12 +108,6 @@ export const CHANNELS: Record<string, ChannelConfig> = {
     tagline: 'Football · Transfers · Matchday',
     ctaStyle: 'fan passion — ask for match predictions, transfer opinions, or player ratings tied directly to this story; feel like overheard terrace banter, not a social media exec asking for engagement',
     storyThemes: 'Iconic Champions League finals (1999 Manchester United, 2005 Istanbul, 2012 penalty shootouts), managerial dynasties and the teams they built (Ferguson, Cruyff, Guardiola, Mourinho early career), great underdog runs that rewrote football history (Leicester 2016, Denmark Euro 1992, Greece 2004), El Clásico defining moments that shifted the balance of power, World Cup finals and the moments that became folklore, tactical revolutions that changed how the game is played (Total Football, Gegenpressing, Tiki-taka), transfers that forever changed clubs and players, bitter rivalries that transcended sport, golden generations that never won what they should have, the clubs that rose and fell dramatically',
-    contentMix: {
-      quizTopics: ['Champions League history and records', 'Premier League records and trivia', 'World Cup finals trivia', 'legendary football managers', 'iconic transfer records', 'football tactical evolution'],
-      tipsTopics: ['how to understand football tactics', 'reading a football match like a coach', 'fantasy football tips', 'how VAR works and when it applies', 'understanding offside rule'],
-      historyTopics: ['Champions League', 'FIFA World Cup', 'Premier League', 'El Clasico rivalry', 'Manchester United history', 'Real Madrid history', 'Barcelona tiki-taka era'],
-      statsSubjects: ['Ronaldo vs Messi career goals', 'Premier League top scorer records', 'Champions League wins by club', 'World Cup wins by nation', 'most expensive transfers ever'],
-    },
     hashtagSets: {
       core: ['#Football', '#Soccer', '#OmniraFootball', '#Footy', '#TheBigGame'],
       rotating: [
@@ -166,12 +134,6 @@ export const CHANNELS: Record<string, ChannelConfig> = {
     tagline: 'Cricket · Test · T20 · IPL',
     ctaStyle: 'purist respect — invite readers to share match memories, player tributes, or all-time XI picks related to this story; measured, thoughtful, cricket-specific',
     storyThemes: 'Ashes defining moments that became part of English sporting culture, World Cup finals that went to the last ball (1983, 2019 Super Over), captaincy eras that changed the game (Bradman, Benaud, Botham, Imran, Ganguly), centuries and innings that transcended cricket and became cultural moments, bowling spells that became folklore (Laker 19 wickets, Warne ball of the century, Anderson at his peak), India vs Pakistan rivalry and what it means beyond sport, match-fixing scandals that shook the game to its core, the evolution of batting techniques across eras, players who came back from the impossible, legends who defined their nations through cricket',
-    contentMix: {
-      quizTopics: ['Ashes series history', 'cricket World Cup records', 'legendary innings and centuries', 'bowling records and milestones', 'IPL records and trivia', 'cricket captaincy legends'],
-      tipsTopics: ['understanding cricket formats (Test vs T20 vs ODI)', 'how to read a cricket scorecard', 'cricket betting basics and DLS method', 'following the IPL as a new fan', 'understanding spin bowling'],
-      historyTopics: ['The Ashes cricket series', 'Cricket World Cup', 'India vs Pakistan cricket rivalry', 'Don Bradman era', 'Shane Warne career', 'IPL founding and evolution'],
-      statsSubjects: ['Kohli vs Smith batting records', 'Test cricket top run scorers', 'IPL most valuable players', 'fastest centuries in Test history', 'bowling wicket records comparison'],
-    },
     hashtagSets: {
       core: ['#Cricket', '#OmniraCricket', '#CricketFans', '#CricketWorld', '#CricketLife'],
       rotating: [
@@ -199,12 +161,6 @@ export const CHANNELS: Record<string, ChannelConfig> = {
     tagline: 'Golf · PGA Tour · Majors',
     ctaStyle: 'strategic curiosity — prompt course opinions, major predictions, or mental game observations tied to this specific story; the voice of a post-round conversation at the 19th hole, not a content team',
     storyThemes: 'Major moments that became immortal (Tiger\'s 1997 Masters, Jack\'s 1986 farewell charge, Watson at Turnberry 1977, Duel in the Sun), great rivalries that elevated the sport (Palmer vs Nicklaus, Seve vs the Americans, Woods vs Mickelson), Ryder Cup epics that defined national pride (Brookline 1999, Medinah 2012, Belfry 2002), the mythology of Augusta National and its secrets, St Andrews history and what it means to win The Open, swing revolutions that changed how golf is taught and played, the mental game and how legends handled pressure, drug and rule controversies that tested the sport, the amateur era and its greatest figures, course design legends and the philosophy behind iconic holes',
-    contentMix: {
-      quizTopics: ['The Masters history and Augusta trivia', 'Tiger Woods career records', 'Ryder Cup memorable moments', 'golf Major winners trivia', 'famous golf course holes', 'Nicklaus vs Palmer rivalry'],
-      tipsTopics: ['improving your golf swing fundamentals', 'course management strategy for amateurs', 'how to read greens', 'mental game tips for golfers', 'club selection strategy', 'short game improvement tips'],
-      historyTopics: ['The Masters at Augusta', 'The Open Championship at St Andrews', 'Ryder Cup history', 'Tiger Woods dominance era', 'Jack Nicklaus career', 'Seve Ballesteros legacy'],
-      statsSubjects: ['Tiger Woods vs Jack Nicklaus Major wins', 'PGA Tour scoring records', 'Ryder Cup Europe vs USA win totals', 'lowest rounds ever recorded in Majors', 'longest drives on tour statistics'],
-    },
     hashtagSets: {
       core: ['#Golf', '#OmniraGolf', '#GolfLife', '#ProfessionalGolf', '#GolfPro'],
       rotating: [
@@ -232,12 +188,6 @@ export const CHANNELS: Record<string, ChannelConfig> = {
     tagline: 'NFL · American Football · Playoffs',
     ctaStyle: 'bold takes — demand predictions, championship picks, or GOAT arguments sparked by this exact story; superlative energy, big declarations, feels like the stadium is full',
     storyThemes: 'Super Bowl moments that became American mythology (The Catch, wide right, Malcolm Butler interception), dynasty eras and the culture behind them (Brady Patriots, 49ers dynasty, Steel Curtain Steelers, 85 Bears), legendary QB rivalries and what drove them, iconic plays with their own names and stories (Immaculate Reception, The Drive, The Catch II), Hall of Fame careers told through their defining games, the NFL Draft and the picks that made or broke franchises, coaching legends and their philosophies (Walsh, Landry, Belichick), rule changes that fundamentally altered the game, the scandals that tested the league (Deflategate, bountygate, Ray Rice), the evolution of the game from run-first to air raid',
-    contentMix: {
-      quizTopics: ['Super Bowl history and records', 'NFL all-time records trivia', 'legendary quarterback careers', 'famous NFL Draft picks', 'iconic Super Bowl plays', 'NFL dynasty teams'],
-      tipsTopics: ['understanding NFL positions and roles', 'how to read NFL play-calling', 'NFL fantasy football strategy', 'understanding the NFL Draft and combine', 'salary cap and team building explained'],
-      historyTopics: ['Super Bowl history', 'Tom Brady Patriots dynasty', 'San Francisco 49ers dynasty', 'Pittsburgh Steelers Steel Curtain', 'NFL Draft history', 'Monday Night Football history'],
-      statsSubjects: ['Brady vs Manning career stats', 'Super Bowl touchdown records', 'most rushing yards in NFL history', 'quarterback passer rating records', 'NFL Dynasty win percentage comparisons'],
-    },
     hashtagSets: {
       core: ['#NFL', '#OmniraNFL', '#AmericanFootball', '#NFLFootball', '#Gridiron'],
       rotating: [
@@ -264,12 +214,6 @@ export const CHANNELS: Record<string, ChannelConfig> = {
     tagline: 'Food · Recipes · Culture',
     ctaStyle: 'sensory sharing — ask about personal recipes, restaurant memories, or food associations tied to this specific dish or chef; warm, inviting, never generic',
     storyThemes: 'Chef legends who shaped modern cuisine (Bocuse, Escoffier, Bourdain, Julia Child, Ferran Adrià, Joël Robuchon), dish origin stories and the debates behind them (pizza, pho, carbonara, croissant, beef wellington), restaurant dynasties that defined cities (Noma, El Bulli, The Fat Duck, Le Bernardin), how regional cuisines were born and why they survived, food revolutions that changed how we eat (nouvelle cuisine, molecular gastronomy, the farm-to-table movement, fermentation renaissance), iconic ingredients and the cultures built around them (truffles, wagyu, saffron, parmigiano), culinary rivalries between nations and chefs, the Michelin Guide history and its darker side, cooking techniques that became art forms, food writers who changed what we think about eating',
-    contentMix: {
-      quizTopics: ['Michelin star restaurant trivia', 'world cuisine origins and myths', 'famous chef career trivia', 'iconic dishes and their true origins', 'food and wine pairing rules', 'cooking technique trivia'],
-      tipsTopics: ['essential knife skills for home cooks', 'how to season food properly', 'building flavour layers in cooking', 'understanding umami and why it matters', 'wine pairing basics', 'how to cook the perfect steak'],
-      historyTopics: ['Michelin Guide history', 'French cuisine revolution', 'El Bulli and molecular gastronomy', 'Anthony Bourdain legacy', 'history of pasta and Italian cuisine', 'fermentation and food preservation history'],
-      statsSubjects: ['most Michelin stars by chef', 'world\'s most expensive ingredients', 'restaurant industry revenue comparisons', 'most ordered dishes globally', 'food waste statistics by country'],
-    },
     hashtagSets: {
       core: ['#Food', '#Foodie', '#OmniraFood', '#FoodLover', '#FoodPhotography'],
       rotating: [
@@ -296,12 +240,6 @@ export const CHANNELS: Record<string, ChannelConfig> = {
     tagline: 'Travel · Destinations · Adventure',
     ctaStyle: 'wanderlust spark — invite readers to share their own stories from this exact destination or type of trip; aspirational and personal, like a conversation between two travellers',
     storyThemes: 'Lost cities and the explorers who found them (Machu Picchu, Petra, Angkor Wat before tourism), legendary rail journeys and what made them iconic (Orient Express, Trans-Siberian, Indian Pacific, Glacier Express), great explorer stories and their defining journeys (Shackleton, Marco Polo, Livingstone, Amelia Earhart), hotel mythologies and the figures who made them (The Ritz, Savoy, Raffles, Hotel du Cap-Eden-Roc), historic pilgrimage routes and why people still walk them (Camino, Kumbh Mela, Hajj), destinations utterly transformed by tourism and the consequences, colonial-era grand travel and its legacy, the golden age of ocean liners, places that no longer exist for travellers, spy hotels and the Cold War destinations',
-    contentMix: {
-      quizTopics: ['world capital cities trivia', 'famous explorer journeys', 'iconic hotel history', 'UNESCO World Heritage Sites', 'airline history trivia', 'famous travel writers and their routes'],
-      tipsTopics: ['packing light for long trips', 'finding flights at the best prices', 'staying safe while travelling solo', 'navigating airports like a pro', 'how to deal with jet lag', 'travelling on a budget in Europe'],
-      historyTopics: ['Orient Express railway history', 'Titanic and ocean liner golden age', 'Marco Polo Silk Road journey', 'Ernest Shackleton Antarctic expedition', 'Cold War spy destinations', 'Machu Picchu and Inca history'],
-      statsSubjects: ['most visited countries in the world', 'cheapest vs most expensive cities to visit', 'longest flight routes ever flown', 'most powerful passports by country', 'tourism revenue by destination'],
-    },
     hashtagSets: {
       core: ['#Travel', '#OmniraTravel', '#Wanderlust', '#TravelPhotography', '#TravelBlogger'],
       rotating: [

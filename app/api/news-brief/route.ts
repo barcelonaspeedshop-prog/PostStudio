@@ -353,36 +353,6 @@ Return only the JSON array, nothing else.`
       }
     }
 
-    // Step 5: Generate poll question for the story
-    let pollQuestion: string | undefined
-    let pollOptions: string[] | undefined
-    try {
-      const pollMsg = await callClaudeWithRetry({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 200,
-        messages: [{
-          role: 'user',
-          content: `Based on this news story: "${trend.topic}" (channel: ${channel})
-
-Generate a short, controversial poll question with exactly 3 options that will spark debate.
-Return ONLY valid JSON: {"question": "...", "options": ["Option A", "Option B", "Option C"]}
-Rules: question max 12 words, each option max 5 words, no "None of the above"`,
-        }],
-      })
-      const pollText = pollMsg.content.filter((b) => b.type === 'text').map((b) => (b as { type: 'text'; text: string }).text).join('')
-      const cleaned = pollText.replace(/```json|```/g, '').trim()
-      const jsonMatch = cleaned.match(/\{[\s\S]*\}/)?.[0]
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch) as { question?: string; options?: string[] }
-        if (parsed.question && Array.isArray(parsed.options) && parsed.options.length >= 2) {
-          pollQuestion = parsed.question
-          pollOptions = parsed.options.slice(0, 3)
-        }
-      }
-    } catch (e) {
-      console.warn('[news-brief] Poll generation failed (non-fatal):', e instanceof Error ? e.message : e)
-    }
-
     return NextResponse.json({
       channel,
       story: trend.headline,
@@ -390,8 +360,6 @@ Rules: question max 12 words, each option max 5 words, no "None of the above"`,
       articleUrl: trend.articleUrl || null,
       articleImageUrl,
       slides,
-      pollQuestion,
-      pollOptions,
     }, {
       headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },
     })
