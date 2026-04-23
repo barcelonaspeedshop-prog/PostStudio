@@ -27,7 +27,7 @@ export const CHANNELS: Record<string, ChannelConfig> = {
     primary: '#e8a020',
     bg: '#1a1208',
     handle: '@gentlemenoffuel',
-    youtubeChannelId: '', // TODO: Mike fills in from YT Studio → Settings → Channel → Advanced settings
+    youtubeChannelId: 'UCRul9-FAiGqwz7yKa7WRCwQ',
     tagline: 'Cars · Culture · Class',
     ctaStyle: 'collector-to-collector — invite readers to share their own heritage; ask about ownership stories, favourite models, or memories at auctions; keep the tone reverential and specific to this exact car or era',
     storyThemes: 'Design icons and their origin stories (E-Type, 250 GTO, Silver Arrows, Miura), legendary coachbuilders (Pininfarina, Zagato, Bertone, Ghia), lost and forgotten marques (Delahaye, Talbot-Lago, Hispano-Suiza, Cisitalia), barn find mythology and the greatest discoveries, concours dynasties and the families behind them, Le Mans legends and the cars that defined endurance racing, celebrity ownership and the stories cars carry, auction record breakers and the bidders behind them, restoration epics that brought icons back from the dead, the rivalry between Italian and British design schools, the death of the coachbuilding era, golden eras of motorsport that produced the most beautiful machines',
@@ -55,7 +55,7 @@ export const CHANNELS: Record<string, ChannelConfig> = {
     primary: '#378add',
     bg: '#0a1628',
     handle: '@omniraf1',
-    youtubeChannelId: '', // TODO: Mike fills in from YT Studio → Settings → Channel → Advanced settings
+    youtubeChannelId: 'UCpJHo_MnHVZ2cCydZVAND2Q',
     tagline: 'Formula 1 · Grand Prix · Racing',
     ctaStyle: 'insider debate — spark a technical or strategic argument specific to this story; ask for predictions, constructor allegiances, or driver rankings; use paddock vocabulary; feel like a question from a fellow obsessive, not a content manager',
     storyThemes: 'Driver rivalries that defined eras (Senna vs Prost, Hunt vs Lauda, Hamilton vs Rosberg, Villeneuve vs Pironi), constructor dynasties and their dominance (Red Bull 2010-13, Ferrari 2000-04, McLaren 1988, Williams early 90s), engineering revolutions that changed the sport (fan car, turbo era, active suspension, DRS), tragic losses that shaped the sport (Senna at Imola, Rindt posthumous champion, Villeneuve at Zandvoort), great escapes and near-misses (Regazzoni at Watkins Glen, Hill at Monaco), legendary circuits and what they demanded of drivers, political controversies that almost broke F1 (FISA-FOCA war, 2005 USGP), the great technical battles between engineers, dominant cars that nobody could touch',
@@ -109,7 +109,7 @@ export const CHANNELS: Record<string, ChannelConfig> = {
     primary: '#d85a30',
     bg: '#1a0c08',
     handle: '@omnirafootball',
-    youtubeChannelId: '', // TODO: Mike fills in from YT Studio → Settings → Channel → Advanced settings
+    youtubeChannelId: 'UClMPeEgy_Q21K0v5GrOh4kw',
     tagline: 'Football · Transfers · Matchday',
     ctaStyle: 'fan passion — ask for match predictions, transfer opinions, or player ratings tied directly to this story; feel like overheard terrace banter, not a social media exec asking for engagement',
     storyThemes: 'Iconic Champions League finals (1999 Manchester United, 2005 Istanbul, 2012 penalty shootouts), managerial dynasties and the teams they built (Ferguson, Cruyff, Guardiola, Mourinho early career), great underdog runs that rewrote football history (Leicester 2016, Denmark Euro 1992, Greece 2004), El Clásico defining moments that shifted the balance of power, World Cup finals and the moments that became folklore, tactical revolutions that changed how the game is played (Total Football, Gegenpressing, Tiki-taka), transfers that forever changed clubs and players, bitter rivalries that transcended sport, golden generations that never won what they should have, the clubs that rose and fell dramatically',
@@ -216,7 +216,7 @@ export const CHANNELS: Record<string, ChannelConfig> = {
     primary: '#ea580c',
     bg: '#1a0c08',
     handle: '@OmniraFood',
-    youtubeChannelId: '', // TODO: Mike fills in from YT Studio → Settings → Channel → Advanced settings
+    youtubeChannelId: 'UC970CeC0HKQIlLuiqbvgkkA',
     tagline: 'Food · Recipes · Culture',
     ctaStyle: 'sensory sharing — ask about personal recipes, restaurant memories, or food associations tied to this specific dish or chef; warm, inviting, never generic',
     storyThemes: 'Chef legends who shaped modern cuisine (Bocuse, Escoffier, Bourdain, Julia Child, Ferran Adrià, Joël Robuchon), dish origin stories and the debates behind them (pizza, pho, carbonara, croissant, beef wellington), restaurant dynasties that defined cities (Noma, El Bulli, The Fat Duck, Le Bernardin), how regional cuisines were born and why they survived, food revolutions that changed how we eat (nouvelle cuisine, molecular gastronomy, the farm-to-table movement, fermentation renaissance), iconic ingredients and the cultures built around them (truffles, wagyu, saffron, parmigiano), culinary rivalries between nations and chefs, the Michelin Guide history and its darker side, cooking techniques that became art forms, food writers who changed what we think about eating',
