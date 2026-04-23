@@ -7,7 +7,6 @@ type Script = { title: string; summary: string; chapters: Chapter[] }
 type BuildPhase = 'idle' | 'script' | 'prompts' | 'images' | 'voiceover' | 'assembly' | 'complete' | 'error'
 
 const CHANNELS = ['Gentlemen of Fuel', 'Omnira F1', 'Omnira Football', 'Omnira Food']
-const CALM_CHANNELS = ['Omnira Food']
 
 const VOICES = [
   { id: 'v1Oa3bMmaLK6LwTzVkOy', label: 'Peter — BBC Type' },
@@ -87,7 +86,6 @@ export default function LongFormPage() {
   const [generatingAllVoiceovers, setGeneratingAllVoiceovers] = useState(false)
   const [testMode, setTestMode] = useState(false)
   const [testDuration, setTestDuration] = useState<10 | 30>(10)
-  const [musicMood, setMusicMood] = useState<'calm' | 'energy'>('energy')
   const [musicEnabled, setMusicEnabled] = useState(true)
   const [selectedVoice, setSelectedVoice] = useState(VOICES[0].id)
   const [currentJobId, setCurrentJobId] = useState<string | null>(null)
@@ -145,7 +143,6 @@ export default function LongFormPage() {
         if (d.topic) setTopic(d.topic)
         if (d.channel) setChannel(d.channel)
         if (d.script) setScript(d.script)
-        if (d.musicMood) setMusicMood(d.musicMood)
         if (d.selectedVoice) setSelectedVoice(d.selectedVoice)
         if (d.chapterAudio && typeof d.chapterAudio === 'object') setChapterAudio(d.chapterAudio)
         if (d.voiceoverStatus && typeof d.voiceoverStatus === 'object') setVoiceoverStatus(d.voiceoverStatus)
@@ -182,7 +179,7 @@ export default function LongFormPage() {
     if (!topic && !script) return
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({
-        topic, channel, script, musicMood, selectedVoice, chapterAudio, voiceoverStatus, testMode, testDuration,
+        topic, channel, script, selectedVoice, chapterAudio, voiceoverStatus, testMode, testDuration,
       }))
       setDraftSaved(true)
       if (draftTimerRef.current) clearTimeout(draftTimerRef.current)
@@ -190,7 +187,7 @@ export default function LongFormPage() {
     } catch {
       // Quota exceeded (large audio) — fail silently
     }
-  }, [isRestored, topic, channel, script, musicMood, selectedVoice, chapterAudio, voiceoverStatus, testMode, testDuration])
+  }, [isRestored, topic, channel, script, selectedVoice, chapterAudio, voiceoverStatus, testMode, testDuration])
 
   // ─── Load global music setting ───
   useEffect(() => {
@@ -319,8 +316,6 @@ export default function LongFormPage() {
         formData.append('audio', blob, `ch${chIdStr}_voiceover.${ext}`)
         formData.append('audioChapterIds', chIdStr)
       }
-      formData.append('musicMood', musicMood)
-      formData.append('musicVolume', '0.15')
       formData.append('musicEnabled', String(musicEnabled))
       formData.append('channel', channel)
       const startRes = await fetch('/api/story-video/start', { method: 'POST', body: formData })
@@ -360,7 +355,6 @@ export default function LongFormPage() {
     setTopic('')
     setChannel(CHANNELS[0])
     setScript(null)
-    setMusicMood('energy')
     setSelectedVoice(VOICES[0].id)
     setChapterAudio({})
     setVoiceoverStatus({})
@@ -740,8 +734,6 @@ export default function LongFormPage() {
         formData.append('audioChapterIds', chIdStr)
       }
 
-      formData.append('musicMood', musicMood)
-      formData.append('musicVolume', '0.15')
       formData.append('musicEnabled', String(musicEnabled))
       formData.append('channel', channel)
 
@@ -950,8 +942,6 @@ export default function LongFormPage() {
         formData.append('audio', new Blob([bytes], { type: mime }), `ch${chIdStr}_voiceover.${ext}`)
         formData.append('audioChapterIds', chIdStr)
       }
-      formData.append('musicMood', musicMood)
-      formData.append('musicVolume', '0.15')
       formData.append('musicEnabled', String(musicEnabled))
       formData.append('channel', channel)
 
@@ -1339,7 +1329,7 @@ export default function LongFormPage() {
                       <label className="text-[11px] font-medium text-stone-500 uppercase tracking-widest block mb-1.5">Channel</label>
                       <select
                         value={channel}
-                        onChange={(e) => { setChannel(e.target.value); setMusicMood(CALM_CHANNELS.includes(e.target.value) ? 'calm' : 'energy') }}
+                        onChange={(e) => { setChannel(e.target.value) }}
                         className="w-full text-[14px] border border-stone-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-1 focus:ring-stone-400"
                       >
                         {CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
@@ -1437,27 +1427,7 @@ export default function LongFormPage() {
                           <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${musicEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                         </button>
                       </div>
-                      {/* Calm/Energy buttons — only when music is on */}
-                      {musicEnabled ? (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setMusicMood('calm')}
-                            className={`flex-1 py-2.5 text-[13px] font-medium rounded-xl border transition-colors ${
-                              musicMood === 'calm' ? 'bg-sky-100 text-sky-700 border-sky-300' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'
-                            }`}
-                          >
-                            🎵 Calm
-                          </button>
-                          <button
-                            onClick={() => setMusicMood('energy')}
-                            className={`flex-1 py-2.5 text-[13px] font-medium rounded-xl border transition-colors ${
-                              musicMood === 'energy' ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'
-                            }`}
-                          >
-                            ⚡ Energy
-                          </button>
-                        </div>
-                      ) : (
+                      {!musicEnabled && (
                         <p className="text-[11px] text-stone-400 py-1">No background music — voiceover only</p>
                       )}
                     </div>
@@ -1997,7 +1967,7 @@ export default function LongFormPage() {
 
               <div>
                 <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest mb-2">Channel</p>
-                <select value={channel} onChange={(e) => { setChannel(e.target.value); setMusicMood(CALM_CHANNELS.includes(e.target.value) ? 'calm' : 'energy') }} className="w-full text-[16px] md:text-[13px] border border-stone-200 rounded-lg px-3 py-2.5 min-h-[44px] bg-white focus:outline-none focus:ring-1 focus:ring-stone-400">
+                <select value={channel} onChange={(e) => { setChannel(e.target.value) }} className="w-full text-[16px] md:text-[13px] border border-stone-200 rounded-lg px-3 py-2.5 min-h-[44px] bg-white focus:outline-none focus:ring-1 focus:ring-stone-400">
                   {CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
@@ -2051,15 +2021,7 @@ export default function LongFormPage() {
                       <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${musicEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                     </button>
                   </div>
-                  {musicEnabled ? (
-                    <>
-                      <div className="flex gap-2">
-                        <button onClick={() => setMusicMood('calm')} className={`flex-1 py-2 text-[12px] font-medium rounded-lg border transition-colors ${musicMood === 'calm' ? 'bg-sky-100 text-sky-700 border-sky-300' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'}`}>Calm</button>
-                        <button onClick={() => setMusicMood('energy')} className={`flex-1 py-2 text-[12px] font-medium rounded-lg border transition-colors ${musicMood === 'energy' ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-white border-stone-200 text-stone-500 hover:bg-stone-50'}`}>Energy</button>
-                      </div>
-                      <p className="text-[10px] text-stone-400">Track auto-selected from library</p>
-                    </>
-                  ) : (
+                  {!musicEnabled && (
                     <p className="text-[11px] text-stone-400">Music off — voiceover only</p>
                   )}
                 </div>

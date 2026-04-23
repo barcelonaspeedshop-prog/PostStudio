@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { exec } from 'child_process'
 import { promisify } from 'util'
-import { writeFile, mkdir, readFile, unlink, rmdir } from 'fs/promises'
+import { writeFile, mkdir, readFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
 import https from 'https'
 import http from 'http'
+import { loadSettings } from '@/lib/settings'
+import { MUSIC_FILE_PATH, MUSIC_VOLUME_LINEAR } from '@/lib/music'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -30,7 +32,7 @@ export async function POST(req: NextRequest) {
   const tmpDir = `/tmp/carousel_${Date.now()}`
   
   try {
-    const { slides, slideDuration: rawDuration = 5, audioUrl, musicVolume = 20, musicEnabled = true } = await req.json()
+    const { slides, slideDuration: rawDuration = 5 } = await req.json()
     const videoW = 1080
     const videoH = 1350
     const scaleFilter = `scale=${videoW}:${videoH}:force_original_aspect_ratio=decrease,pad=${videoW}:${videoH}:(ow-iw)/2:(oh-ih)/2,setsar=1`
@@ -91,20 +93,12 @@ export async function POST(req: NextRequest) {
     const outputPath = path.join(tmpDir, 'carousel.mp4')
 
     // Build ffmpeg command
+    const settings = await loadSettings()
     let ffmpegCmd: string
 
-    if (audioUrl && musicEnabled !== false) {
-      const audioPath = path.join(tmpDir, 'audio.mp3')
-      if (audioUrl.startsWith('data:')) {
-        const base64Data = audioUrl.replace(/^data:audio\/\w+;base64,/, '')
-        await writeFile(audioPath, Buffer.from(base64Data, 'base64'))
-      } else {
-        await downloadImage(audioUrl, audioPath)
-      }
+    if (settings.includeMusic && existsSync(MUSIC_FILE_PATH)) {
       const totalDuration = slides.reduce((sum: number, s: { tileType?: string }) => sum + getTileDuration(s), 0)
-      // Clamp volume to 0-100 and convert to ffmpeg volume factor (0.0-1.0)
-      const vol = Math.max(0, Math.min(100, Number(musicVolume) || 20)) / 100
-      ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -i ${audioPath} -vf "${scaleFilter}" -af "volume=${vol}" -r 30 -vsync cfr -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -t ${totalDuration} -shortest -movflags +faststart -y ${outputPath}`
+      ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -stream_loop -1 -i ${MUSIC_FILE_PATH} -vf "${scaleFilter}" -af "volume=${MUSIC_VOLUME_LINEAR}" -r 30 -vsync cfr -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -t ${totalDuration} -shortest -movflags +faststart -y ${outputPath}`
     } else {
       ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -vf "${scaleFilter}" -r 30 -vsync cfr -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -preset fast -crf 23 -an -movflags +faststart -y ${outputPath}`
     }

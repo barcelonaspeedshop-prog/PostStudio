@@ -1,31 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { spawn } from 'child_process'
 import { writeFile, mkdir, rename, copyFile } from 'fs/promises'
-import { createWriteStream, existsSync, statSync, readdirSync } from 'fs'
+import { createWriteStream, existsSync, statSync } from 'fs'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import path from 'path'
 import { createJob, updateJob, cleanOldJobs, VIDEOS_DIR } from '../jobs'
-import { getRandomDriveMusicTrack, downloadDriveFileToPath } from '@/lib/drive-images'
 import { getChannel } from '@/lib/channels'
-
-// Local fallback music directories (mounted from /docker/poststudio/music)
-const LOCAL_MUSIC: Record<'calm' | 'energy', string> = {
-  calm:   '/music/Ambient',
-  energy: '/music/Energetic',
-}
-
-function pickLocalMusicTrack(mood: 'calm' | 'energy'): string | null {
-  try {
-    const dir = LOCAL_MUSIC[mood]
-    const files = readdirSync(dir).filter(f => /\.(mp3|m4a|wav|aac)$/i.test(f))
-    if (files.length === 0) return null
-    const picked = files[Math.floor(Math.random() * files.length)]
-    return path.join(dir, picked)
-  } catch {
-    return null
-  }
-}
+import { loadSettings } from '@/lib/settings'
+import { MUSIC_FILE_PATH, MUSIC_VOLUME_LINEAR } from '@/lib/music'
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -543,53 +526,21 @@ export async function POST(req: NextRequest) {
     }
     console.log(`[story-video] Audio files received for ${Object.keys(audioByChapter).length} chapters: [${Object.keys(audioByChapter).join(', ')}]`)
 
-    // Stream background music to disk — either uploaded file or Drive mood pick
+    // Music: use default track if enabled
+    const musicEnabledRaw = formData.get('musicEnabled')
+    const musicEnabled = musicEnabledRaw !== null
+      ? musicEnabledRaw !== 'false'
+      : (await loadSettings()).includeMusic
     let musicPath: string | null = null
-    let musicVolume = 0.15
-    const musicFile = formData.get('music') as File | null
-    const musicMood = formData.get('musicMood') as string | null
-    const musicVolumeRaw = formData.get('musicVolume') as string | null
-    // musicEnabled='false' means skip all music mixing (voiceover stays; no bed)
-    const musicEnabled = formData.get('musicEnabled') !== 'false'
+    const musicVolume = MUSIC_VOLUME_LINEAR
 
     if (!musicEnabled) {
       console.log('[story-video] Music disabled — skipping music track')
-    } else if (musicFile && musicFile.size > 0) {
-      // Legacy: uploaded file
-      const ext = musicFile.name.split('.').pop() || 'mp3'
-      musicPath = path.join(tmpDir, `bg_music.${ext}`)
-      await streamToDisk(musicFile, musicPath)
-    } else if (musicMood === 'calm' || musicMood === 'energy') {
-      // Pick a random track: try Google Drive first, fall back to local /music/ mount
-      try {
-        const track = await getRandomDriveMusicTrack(musicMood)
-        if (track) {
-          const ext = track.name.split('.').pop() || 'mp3'
-          musicPath = path.join(tmpDir, `bg_music.${ext}`)
-          await downloadDriveFileToPath(track.id, musicPath)
-          console.log(`[story-video] Drive music track (${musicMood}): ${track.name}`)
-        } else {
-          // Drive folder is empty — try local fallback
-          const local = pickLocalMusicTrack(musicMood)
-          if (local) {
-            musicPath = local
-            console.log(`[story-video] Local music fallback (${musicMood}): ${path.basename(local)}`)
-          } else {
-            console.warn(`[story-video] No tracks found in Drive or local /music/${musicMood === 'calm' ? 'Ambient' : 'Energetic'}/ — continuing without music`)
-          }
-        }
-      } catch (e) {
-        console.warn(`[story-video] Drive music fetch failed for mood "${musicMood}":`, e instanceof Error ? e.message : e)
-        // Try local fallback on Drive error
-        const local = pickLocalMusicTrack(musicMood)
-        if (local) {
-          musicPath = local
-          console.log(`[story-video] Local music fallback (after Drive error, ${musicMood}): ${path.basename(local)}`)
-        }
-      }
-    }
-    if (musicVolumeRaw) {
-      musicVolume = Math.max(0, Math.min(1, parseFloat(musicVolumeRaw) || 0.15))
+    } else if (existsSync(MUSIC_FILE_PATH)) {
+      musicPath = MUSIC_FILE_PATH
+      console.log(`[story-video] Using default music track: ${MUSIC_FILE_PATH}`)
+    } else {
+      console.warn(`[story-video] Music file not found at ${MUSIC_FILE_PATH} — continuing without music`)
     }
 
     const channelName = (formData.get('channel') as string | null) || undefined

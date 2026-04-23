@@ -36,7 +36,6 @@ type ApprovalItem = {
   cta?: string
   includeCta?: boolean
   hashtags?: string[]
-  musicEnabled?: boolean
   createdAt: string
   status: 'pending' | 'approved' | 'rejected'
   reviewedAt?: string
@@ -153,7 +152,7 @@ export default function ApprovalsPage() {
       const vidRes = await fetch('/api/video-export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slides: compositedSlides, slideDuration: 3, musicEnabled: item.musicEnabled !== false }),
+        body: JSON.stringify({ slides: compositedSlides, slideDuration: 3 }),
       })
       const vidData = await vidRes.json()
       if (!vidRes.ok) throw new Error(vidData.error || 'Video export failed')
@@ -259,7 +258,7 @@ export default function ApprovalsPage() {
       const vidRes = await fetch('/api/video-export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slides: compositedSlides, slideDuration: 3, musicEnabled: item.musicEnabled !== false }),
+        body: JSON.stringify({ slides: compositedSlides, slideDuration: 3 }),
       })
       const vidData = await vidRes.json()
       if (!vidRes.ok) throw new Error(vidData.error || 'Video export failed')
@@ -758,19 +757,6 @@ export default function ApprovalsPage() {
     } catch {}
   }
 
-  const toggleMusicEnabled = async (item: ApprovalItem) => {
-    const next = item.musicEnabled === false ? true : false
-    // Clear existing video so user must regenerate with new setting
-    setItems(prev => prev.map(i => i.id === item.id ? { ...i, musicEnabled: next, videoBase64: undefined } : i))
-    try {
-      await fetch('/api/approvals', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: item.id, musicEnabled: next, videoBase64: null }),
-      })
-    } catch {}
-  }
-
   const downloadVideo = (item: ApprovalItem) => {
     if (!item.videoBase64) return
     const src = item.videoBase64.startsWith('data:')
@@ -1067,18 +1053,6 @@ export default function ApprovalsPage() {
 
                       {/* Actions */}
                       <div className="flex flex-col gap-2 px-4 pb-4 pt-2">
-                        {/* Music toggle for carousel video */}
-                        <div className="flex items-center justify-between px-1">
-                          <span className="text-[11px] text-stone-400">Background music</span>
-                          <button
-                            onClick={() => toggleMusicEnabled(item)}
-                            title={item.musicEnabled === false ? 'Enable music' : 'Disable music'}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${item.musicEnabled !== false ? 'bg-stone-800' : 'bg-stone-200'}`}
-                          >
-                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${item.musicEnabled !== false ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                          </button>
-                        </div>
-
                         {!hasVideo && (
                           <button
                             onClick={() => generateVideoForItem(item)}
