@@ -13,6 +13,7 @@ export type ContentMixConfig = {
 
 export type ChannelConfig = {
   name: string
+  active: boolean
   primary: string
   bg: string
   handle: string
@@ -28,6 +29,7 @@ export type ChannelConfig = {
 export const CHANNELS: Record<string, ChannelConfig> = {
   'Gentlemen of Fuel': {
     name: 'Gentlemen of Fuel',
+    active: true,
     primary: '#e8a020',
     bg: '#1a1208',
     handle: '@gentlemenoffuel',
@@ -60,6 +62,7 @@ export const CHANNELS: Record<string, ChannelConfig> = {
 
   'Omnira F1': {
     name: 'Omnira F1',
+    active: true,
     primary: '#378add',
     bg: '#0a1628',
     handle: '@omniraf1',
@@ -92,6 +95,7 @@ export const CHANNELS: Record<string, ChannelConfig> = {
 
   'Road & Trax': {
     name: 'Road & Trax',
+    active: false,
     primary: '#5dcaa5',
     bg: '#081410',
     handle: '@roadandtrax',
@@ -123,6 +127,7 @@ export const CHANNELS: Record<string, ChannelConfig> = {
 
   'Omnira Football': {
     name: 'Omnira Football',
+    active: true,
     primary: '#d85a30',
     bg: '#1a0c08',
     handle: '@omnirafootball',
@@ -154,6 +159,7 @@ export const CHANNELS: Record<string, ChannelConfig> = {
 
   'Omnira Cricket': {
     name: 'Omnira Cricket',
+    active: false,
     primary: '#16a34a',
     bg: '#0a1a0e',
     handle: '@OmniraCricket',
@@ -186,6 +192,7 @@ export const CHANNELS: Record<string, ChannelConfig> = {
 
   'Omnira Golf': {
     name: 'Omnira Golf',
+    active: false,
     primary: '#15803d',
     bg: '#081408',
     handle: '@OmniraGolf',
@@ -218,6 +225,7 @@ export const CHANNELS: Record<string, ChannelConfig> = {
 
   'Omnira NFL': {
     name: 'Omnira NFL',
+    active: false,
     primary: '#dc2626',
     bg: '#1a0808',
     handle: '@OmniraNFL',
@@ -249,6 +257,7 @@ export const CHANNELS: Record<string, ChannelConfig> = {
 
   'Omnira Food': {
     name: 'Omnira Food',
+    active: true,
     primary: '#ea580c',
     bg: '#1a0c08',
     handle: '@OmniraFood',
@@ -280,6 +289,7 @@ export const CHANNELS: Record<string, ChannelConfig> = {
 
   'Omnira Travel': {
     name: 'Omnira Travel',
+    active: false,
     primary: '#0891b2',
     bg: '#08141a',
     handle: '@OmniraTravel',
@@ -312,6 +322,10 @@ export const CHANNELS: Record<string, ChannelConfig> = {
 
 export function getChannel(name: string): ChannelConfig {
   return CHANNELS[name] || CHANNELS['Gentlemen of Fuel']
+}
+
+export function getActiveChannels(): ChannelConfig[] {
+  return Object.values(CHANNELS).filter(c => c.active)
 }
 
 export type ChannelScoringCriteria = {

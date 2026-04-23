@@ -2,20 +2,15 @@
 import Sidebar from '@/components/Sidebar'
 import { CHANNELS } from '@/lib/channels'
 
-const CHANNEL_NAMES = Object.keys(CHANNELS)
+const CHANNEL_NAMES = Object.keys(CHANNELS).filter(k => CHANNELS[k].active)
 
 type ChannelStats = { views: string; followers: string; engagement: string; posts: number; topFormat: string; topTopic: string }
 
 const PLACEHOLDER_STATS: Record<string, ChannelStats> = {
   'Gentlemen of Fuel': { views: '12.4K', followers: '2.1K', engagement: '4.2%', posts: 24, topFormat: 'Carousel', topTopic: 'Pagani Huayra launch' },
   'Omnira F1': { views: '31.8K', followers: '5.6K', engagement: '6.1%', posts: 31, topFormat: 'Short video', topTopic: 'Verstappen title race' },
-  'Road & Trax': { views: '8.2K', followers: '1.4K', engagement: '3.8%', posts: 18, topFormat: 'Carousel', topTopic: 'Le Mans preview' },
   'Omnira Football': { views: '22.1K', followers: '3.9K', engagement: '5.4%', posts: 28, topFormat: 'Reel', topTopic: 'Champions League final' },
-  'Omnira Cricket': { views: '0', followers: '0', engagement: '0%', posts: 0, topFormat: '-', topTopic: '-' },
-  'Omnira Golf': { views: '0', followers: '0', engagement: '0%', posts: 0, topFormat: '-', topTopic: '-' },
-  'Omnira NFL': { views: '0', followers: '0', engagement: '0%', posts: 0, topFormat: '-', topTopic: '-' },
   'Omnira Food': { views: '0', followers: '0', engagement: '0%', posts: 0, topFormat: '-', topTopic: '-' },
-  'Omnira Travel': { views: '0', followers: '0', engagement: '0%', posts: 0, topFormat: '-', topTopic: '-' },
 }
 
 const DEFAULT_STATS: ChannelStats = { views: '0', followers: '0', engagement: '0%', posts: 0, topFormat: '-', topTopic: '-' }

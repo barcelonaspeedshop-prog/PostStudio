@@ -29,13 +29,8 @@ async function callClaudeWithRetry(
 const CHANNEL_TOPICS: Record<string, string> = {
   'Gentlemen of Fuel': 'classic cars, luxury cars, supercars, exotic cars, automotive, car launches, car auctions',
   'Omnira F1': 'Formula 1, F1 racing, Grand Prix, F1 driver news, F1 team news, F1 championship',
-  'Road & Trax': 'motorsport, racing, rally, endurance racing, NASCAR, IndyCar, WRC, IMSA, DTM',
   'Omnira Football': 'football, soccer, Premier League, Champions League, La Liga, Bundesliga, Serie A, Ligue 1, transfer news — NOT American football, NOT NFL, NOT rugby',
-  'Omnira Cricket': 'cricket, Test cricket, T20, IPL, international cricket, county cricket, ODI',
-  'Omnira Golf': 'golf, PGA Tour, Masters, Ryder Cup, LIV Golf, European Tour, DP World Tour, golf tournament',
-  'Omnira NFL': 'NFL, American football, NFL draft, NFL free agency, Super Bowl, quarterback, touchdowns',
   'Omnira Food': 'food, recipes, restaurants, cuisine, cooking, chefs, Michelin star, food trends, dining',
-  'Omnira Travel': 'travel, destinations, tourism, adventure, hotels, flights, travel news, holiday',
 }
 
 // 2-3 search angles per channel — tried in order if the first yields nothing
@@ -50,40 +45,15 @@ const CHANNEL_SEARCH_ANGLES: Record<string, string[]> = {
     'F1 driver team announcement result',
     'Formula One qualifying championship standings',
   ],
-  'Road & Trax': [
-    'motorsport race result news',
-    'NASCAR IndyCar WRC rally latest',
-    'endurance racing Le Mans IMSA update',
-  ],
   'Omnira Football': [
     'Premier League Champions League news',
     'soccer football transfer signing',
     'La Liga Bundesliga Serie A match result',
   ],
-  'Omnira Cricket': [
-    'IPL cricket match result score',
-    'international cricket Test T20 ODI series',
-    'cricket news player team update',
-  ],
-  'Omnira Golf': [
-    'PGA Tour golf tournament leaderboard result',
-    'LIV Golf DP World Tour news',
-    'golf player news Masters Ryder Cup',
-  ],
-  'Omnira NFL': [
-    'NFL draft pick news trade',
-    'NFL free agency signing quarterback',
-    'American football NFL team news update',
-  ],
   'Omnira Food': [
     'restaurant chef Michelin star news',
     'food trend recipe celebrity chef',
     'dining food industry news opening',
-  ],
-  'Omnira Travel': [
-    'travel destination news tourism',
-    'airline hotel travel deal news',
-    'holiday adventure travel update',
   ],
 }
 

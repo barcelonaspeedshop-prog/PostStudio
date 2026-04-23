@@ -18,47 +18,17 @@ const ACCOUNT_DATA = [
     { platform: 'TikTok', handle: '@omniraf1', status: 'pending', url: '' },
     { platform: 'Facebook', handle: 'Omnira F1', status: 'connected', url: 'https://facebook.com' },
   ]},
-  { channel: 'Road & Trax', accounts: [
-    { platform: 'YouTube', handle: '@roadandtrax', status: 'connected', url: 'https://youtube.com/@roadandtrax' },
-    { platform: 'Instagram', handle: '@roadandtrax', status: 'connected', url: 'https://instagram.com/roadandtrax' },
-    { platform: 'TikTok', handle: '@roadandtrax', status: 'pending', url: '' },
-    { platform: 'Facebook', handle: 'Road & Trax', status: 'connected', url: 'https://facebook.com' },
-  ]},
   { channel: 'Omnira Football', accounts: [
     { platform: 'YouTube', handle: '@omnirafc', status: 'connected', url: 'https://youtube.com/@omnirafc' },
     { platform: 'Instagram', handle: '@omnirafootball', status: 'connected', url: 'https://instagram.com/omnirafootball' },
     { platform: 'TikTok', handle: '@omnirafootball', status: 'pending', url: '' },
     { platform: 'Facebook', handle: 'Omnira Football', status: 'connected', url: 'https://facebook.com' },
   ]},
-  { channel: 'Omnira Cricket', accounts: [
-    { platform: 'YouTube', handle: '@OmniraCricket', status: 'connected', url: 'https://youtube.com/@OmniraCricket' },
-    { platform: 'Instagram', handle: '@omniracricket', status: 'pending', url: '' },
-    { platform: 'TikTok', handle: '@omniracricket', status: 'pending', url: '' },
-    { platform: 'Facebook', handle: 'Omnira Cricket', status: 'pending', url: '' },
-  ]},
-  { channel: 'Omnira Golf', accounts: [
-    { platform: 'YouTube', handle: '@OmniraGolf', status: 'connected', url: 'https://youtube.com/@OmniraGolf' },
-    { platform: 'Instagram', handle: '@omniragolf', status: 'pending', url: '' },
-    { platform: 'TikTok', handle: '@omniragolf', status: 'pending', url: '' },
-    { platform: 'Facebook', handle: 'Omnira Golf', status: 'pending', url: '' },
-  ]},
-  { channel: 'Omnira NFL', accounts: [
-    { platform: 'YouTube', handle: '@OmniraNFL', status: 'connected', url: 'https://youtube.com/@OmniraNFL' },
-    { platform: 'Instagram', handle: '@omniranfl', status: 'pending', url: '' },
-    { platform: 'TikTok', handle: '@omniranfl', status: 'pending', url: '' },
-    { platform: 'Facebook', handle: 'Omnira NFL', status: 'pending', url: '' },
-  ]},
   { channel: 'Omnira Food', accounts: [
     { platform: 'YouTube', handle: '@OmniraFood', status: 'connected', url: 'https://youtube.com/@OmniraFood' },
     { platform: 'Instagram', handle: '@omnirafood', status: 'connected', url: 'https://instagram.com/omnirafood' },
     { platform: 'TikTok', handle: '@omnirafood', status: 'pending', url: '' },
     { platform: 'Facebook', handle: 'Omnira Food', status: 'pending', url: '' },
-  ]},
-  { channel: 'Omnira Travel', accounts: [
-    { platform: 'YouTube', handle: '@OmniraTravel', status: 'connected', url: 'https://youtube.com/@OmniraTravel' },
-    { platform: 'Instagram', handle: '@omniratravel', status: 'pending', url: '' },
-    { platform: 'TikTok', handle: '@omniratravel', status: 'pending', url: '' },
-    { platform: 'Facebook', handle: 'Omnira Travel', status: 'pending', url: '' },
   ]},
 ]
 

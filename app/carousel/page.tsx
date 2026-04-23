@@ -22,11 +22,7 @@ const CHANNELS = [
   'Gentlemen of Fuel',
   'Omnira F1',
   'Omnira Football',
-  'Omnira Cricket',
-  'Omnira Golf',
-  'Omnira NFL',
   'Omnira Food',
-  'Omnira Travel',
 ]
 
 const ACCENT_COLORS: Record<string, { bg: string; text: string; badge: string }> = {

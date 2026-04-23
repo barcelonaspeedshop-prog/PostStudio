@@ -150,20 +150,15 @@ function isBlockedImageUrl(url: string): boolean {
 const DEFAULT_CHANNELS = [
   'Gentlemen of Fuel',
   'Omnira F1',
-  'Road & Trax',
   'Omnira Football',
-  'Omnira Cricket',
-  'Omnira Golf',
-  'Omnira NFL',
   'Omnira Food',
-  'Omnira Travel',
 ]
 
 const CHANNEL_TAGS: Record<string, string[]> = {
   'Gentlemen of Fuel': ['Motorsport', 'Cars', 'Racing', 'Automotive'],
   'Omnira F1': ['Formula 1', 'F1', 'Grand Prix', 'Racing', 'Motorsport'],
-  'Road & Trax': ['Cars', 'Automotive', 'Driving', 'Road Cars'],
   'Omnira Football': ['Football', 'Soccer', 'Premier League'],
+  'Omnira Food': ['Food', 'Restaurants', 'Cuisine', 'Dining'],
 }
 
 const DEFAULT_PLATFORMS = ['instagram', 'facebook', 'tiktok', 'youtube']
@@ -171,13 +166,8 @@ const DEFAULT_PLATFORMS = ['instagram', 'facebook', 'tiktok', 'youtube']
 const CHANNEL_FALLBACK_QUERIES: Record<string, string> = {
   'Gentlemen of Fuel': 'luxury supercar racing',
   'Omnira F1': 'Formula 1 race track',
-  'Road & Trax': 'motorsport racing circuit',
   'Omnira Football': 'football stadium crowd soccer',
-  'Omnira Cricket': 'cricket stadium match',
-  'Omnira Golf': 'golf course green',
-  'Omnira NFL': 'american football stadium',
   'Omnira Food': 'gourmet food restaurant',
-  'Omnira Travel': 'travel destination landscape',
 }
 
 type ChartData = {

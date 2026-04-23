@@ -6,8 +6,8 @@ type Chapter = { id: number; title: string; type: string; narration: string; vis
 type Script = { title: string; summary: string; chapters: Chapter[] }
 type BuildPhase = 'idle' | 'script' | 'prompts' | 'images' | 'voiceover' | 'assembly' | 'complete' | 'error'
 
-const CHANNELS = ['Gentlemen of Fuel', 'Omnira F1', 'Road & Trax', 'Omnira Football', 'Omnira Cricket', 'Omnira Golf', 'Omnira NFL', 'Omnira Food', 'Omnira Travel']
-const CALM_CHANNELS = ['Omnira Food', 'Omnira Travel']
+const CHANNELS = ['Gentlemen of Fuel', 'Omnira F1', 'Omnira Football', 'Omnira Food']
+const CALM_CHANNELS = ['Omnira Food']
 
 const VOICES = [
   { id: 'v1Oa3bMmaLK6LwTzVkOy', label: 'Peter — BBC Type' },

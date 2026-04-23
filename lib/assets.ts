@@ -11,7 +11,7 @@ export const ASSETS_BASE = path.join(DATA_DIR, 'assets')
 export const ASSETS_DIR = path.join(ASSETS_BASE, 'images')
 export const ASSETS_JSON = path.join(ASSETS_BASE, 'assets.json')
 
-const CHANNEL_NAMES = Object.keys(CHANNELS)
+const CHANNEL_NAMES = Object.keys(CHANNELS).filter(k => CHANNELS[k].active)
 
 const IMAGE_TYPES = [
   'driver', 'car', 'person', 'place', 'dish', 'event',
