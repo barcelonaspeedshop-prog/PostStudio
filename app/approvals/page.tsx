@@ -88,14 +88,6 @@ export default function ApprovalsPage() {
   const [imageLoadError, setImageLoadError] = useState(false)
   const [uploadTarget, setUploadTarget] = useState<{ itemId: string; slideIndex: number } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [thumbnailModal, setThumbnailModal] = useState<{
-    itemId: string
-    accentWord: string
-    heroFile: File | null
-    generating: boolean
-    result: string | null
-  } | null>(null)
-  const thumbnailHeroRef = useRef<HTMLInputElement>(null)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -792,41 +784,6 @@ export default function ApprovalsPage() {
     a.click()
   }
 
-  const generateThumbnailForItem = async () => {
-    if (!thumbnailModal) return
-    const item = items.find(i => i.id === thumbnailModal.itemId)
-    if (!item) return
-    setThumbnailModal(m => m ? { ...m, generating: true } : null)
-    try {
-      let heroImageBase64: string | undefined
-      if (thumbnailModal.heroFile) {
-        const reader = new FileReader()
-        heroImageBase64 = await new Promise<string>((resolve, reject) => {
-          reader.onload = () => resolve(reader.result as string)
-          reader.onerror = reject
-          reader.readAsDataURL(thumbnailModal.heroFile!)
-        })
-      }
-      const res = await fetch('/api/generate-thumbnail', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          channel: item.channel,
-          title: item.headline,
-          accentWord: thumbnailModal.accentWord.trim(),
-          heroImageBase64,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      setThumbnailModal(m => m ? { ...m, result: data.thumbnailBase64, generating: false } : null)
-      showToast('Thumbnail saved to Drive')
-    } catch (e: unknown) {
-      showToast(e instanceof Error ? e.message : 'Thumbnail generation failed', 'error')
-      setThumbnailModal(m => m ? { ...m, generating: false } : null)
-    }
-  }
-
   const pending = items.filter(i => i.status === 'pending')
   const reviewed = items.filter(i => i.status !== 'pending')
   const previewItem = previewId ? items.find(i => i.id === previewId) : null
@@ -1159,19 +1116,6 @@ export default function ApprovalsPage() {
                               <span className="text-[11px]">↓</span> Download
                             </button>
                           )}
-                          <button
-                            onClick={() => setThumbnailModal({
-                              itemId: item.id,
-                              accentWord: '',
-                              heroFile: null,
-                              generating: false,
-                              result: null,
-                            })}
-                            className="px-4 py-2.5 min-h-[44px] border border-stone-200 text-stone-600 text-[13px] font-medium rounded-lg hover:bg-stone-50 transition-colors flex items-center gap-1.5"
-                            title="Generate YouTube thumbnail"
-                          >
-                            Thumbnail
-                          </button>
                           <button
                             onClick={() => regenerateItem(item)}
                             disabled={isRegenerating || isActing}
@@ -1671,82 +1615,6 @@ export default function ApprovalsPage() {
                   Close
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Thumbnail modal */}
-      {thumbnailModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => !thumbnailModal.generating && setThumbnailModal(null)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-5 py-4 border-b border-stone-100 flex items-center justify-between">
-              <p className="text-[14px] font-semibold text-stone-900">Generate Thumbnail</p>
-              <button onClick={() => !thumbnailModal.generating && setThumbnailModal(null)} className="text-stone-400 hover:text-stone-600 text-[18px] leading-none">✕</button>
-            </div>
-            <div className="p-5 space-y-3">
-              <p className="text-[12px] text-stone-500 leading-relaxed">
-                {items.find(i => i.id === thumbnailModal.itemId)?.headline}
-              </p>
-              <input
-                type="text"
-                value={thumbnailModal.accentWord}
-                onChange={(e) => setThumbnailModal(m => m ? { ...m, accentWord: e.target.value } : null)}
-                placeholder="Accent word to highlight in colour"
-                className="w-full px-3 py-2 text-[13px] border border-stone-200 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-400"
-              />
-              <label className="flex items-center gap-2 px-3 py-2 border border-dashed border-stone-300 rounded-lg cursor-pointer hover:bg-stone-50 transition-colors">
-                <input
-                  ref={thumbnailHeroRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => setThumbnailModal(m => m ? { ...m, heroFile: e.target.files?.[0] ?? null } : null)}
-                />
-                <svg className="w-4 h-4 text-stone-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4-4a3 3 0 014 0l4 4M14 12l2-2a3 3 0 014 0l2 2" />
-                </svg>
-                <span className="text-[12px] text-stone-500 truncate">
-                  {thumbnailModal.heroFile ? thumbnailModal.heroFile.name : 'Hero image (optional)'}
-                </span>
-              </label>
-              <button
-                onClick={generateThumbnailForItem}
-                disabled={thumbnailModal.generating}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 text-[13px] font-medium bg-stone-900 text-white rounded-xl hover:bg-stone-800 transition-colors disabled:opacity-50"
-              >
-                {thumbnailModal.generating ? (
-                  <>
-                    <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
-                      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-                    </svg>
-                    Generating...
-                  </>
-                ) : 'Generate Thumbnail'}
-              </button>
-              {thumbnailModal.result && (
-                <div className="rounded-xl overflow-hidden border border-stone-100">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={thumbnailModal.result} alt="Generated thumbnail" className="w-full block" />
-                  <div className="px-3 py-2 flex items-center justify-between bg-stone-50">
-                    <p className="text-[11px] text-stone-500">Saved to Drive · AI Generated</p>
-                    <a
-                      href={thumbnailModal.result}
-                      download="thumbnail.jpg"
-                      className="text-[12px] font-bold text-stone-600 hover:text-stone-900"
-                    >
-                      ↓ Download
-                    </a>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
