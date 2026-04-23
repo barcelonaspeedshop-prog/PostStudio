@@ -6,8 +6,6 @@ import { useState, useEffect } from 'react'
 const links = [
   { href: '/carousel', label: 'Carousel', icon: 'M4 6h16M4 10h16M4 14h16M4 18h7' },
   { href: '/longform', label: 'Long Form', icon: 'M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0-11V3m0 0a2 2 0 012 2v4a2 2 0 01-2 2m0-8a2 2 0 00-2 2v4a2 2 0 002 2' },
-
-  { href: '/curation', label: 'Curation', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01', curationBadge: true },
   { href: '/hooks', label: 'Hooks', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
   { href: '/hashtags', label: 'Hashtags', icon: 'M7 20l4-16m2 16l4-16M6 9h14M4 15h14' },
   { href: '/approvals', label: 'Approvals', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', badge: true },
@@ -21,7 +19,6 @@ export default function Sidebar() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
-  const [curationCount, setCurationCount] = useState(0)
 
   // Close on route change
   useEffect(() => { setOpen(false) }, [pathname])
@@ -46,28 +43,6 @@ export default function Sidebar() {
     }
     fetchCount()
     const interval = setInterval(fetchCount, 30000)
-    return () => clearInterval(interval)
-  }, [])
-
-  // Fetch pending curation count (channels with stories awaiting review)
-  useEffect(() => {
-    const fetchCuration = async () => {
-      try {
-        const res = await fetch('/api/curation')
-        if (res.ok) {
-          const queue = await res.json()
-          const count = Object.values(queue.channels || {}).filter(
-            (ch) => {
-              const c = ch as { status: string; stories?: unknown[] }
-              return c.stories && c.stories.length > 0 && c.status === 'pending'
-            }
-          ).length
-          setCurationCount(count)
-        }
-      } catch {}
-    }
-    fetchCuration()
-    const interval = setInterval(fetchCuration, 60000)
     return () => clearInterval(interval)
   }, [])
 
@@ -104,7 +79,7 @@ export default function Sidebar() {
             post<span className="text-stone-400 font-normal">studio</span>
           </span>
         </div>
-        <SidebarNav pathname={pathname} pendingCount={pendingCount} curationCount={curationCount} />
+        <SidebarNav pathname={pathname} pendingCount={pendingCount} />
         <div className="mt-auto px-5 pt-4 border-t border-stone-100">
           <p className="text-[10px] text-stone-400">3 accounts connected</p>
         </div>
@@ -130,7 +105,7 @@ export default function Sidebar() {
             </svg>
           </button>
         </div>
-        <SidebarNav pathname={pathname} pendingCount={pendingCount} curationCount={curationCount} />
+        <SidebarNav pathname={pathname} pendingCount={pendingCount} />
         <div className="mt-auto px-5 pt-4 border-t border-stone-100">
           <p className="text-[10px] text-stone-400">3 accounts connected</p>
         </div>
@@ -139,10 +114,10 @@ export default function Sidebar() {
   )
 }
 
-function SidebarNav({ pathname, pendingCount, curationCount }: { pathname: string; pendingCount: number; curationCount: number }) {
+function SidebarNav({ pathname, pendingCount }: { pathname: string; pendingCount: number }) {
   return (
     <nav className="flex flex-col gap-0.5 px-2">
-      {links.map(({ href, label, icon, badge, curationBadge }) => {
+      {links.map(({ href, label, icon, badge }) => {
         const active = pathname === href
         return (
           <Link
@@ -166,9 +141,6 @@ function SidebarNav({ pathname, pendingCount, curationCount }: { pathname: strin
             {label}
             {badge && pendingCount > 0 && (
               <span className="ml-auto px-1.5 py-0.5 bg-amber-500 text-white text-[9px] font-bold rounded-full min-w-[18px] text-center">{pendingCount}</span>
-            )}
-            {curationBadge && curationCount > 0 && (
-              <span className="ml-auto px-1.5 py-0.5 bg-blue-500 text-white text-[9px] font-bold rounded-full min-w-[18px] text-center">{curationCount}</span>
             )}
           </Link>
         )
