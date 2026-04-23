@@ -316,7 +316,6 @@ export default function CarouselPage() {
   }
 
   const runGeneration = async (hook?: string) => {
-    setHookPickerOpen(false)
     const prevImages = slides.map(s => s.image)
     setGenerating(true)
     try {
