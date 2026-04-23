@@ -332,7 +332,7 @@ export async function PATCH(req: NextRequest) {
               firstSlideHeadline: item.headline,
               channel: item.channel,
               slides: item.slides,
-              videoBase64: item.videoBase64,
+              // videoBase64 intentionally omitted — Facebook carousel uses slide images via publishAlbumToFacebook
             }),
           })
             .then(async r => {
