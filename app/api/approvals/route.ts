@@ -25,6 +25,8 @@ export type ApprovalItem = {
   ytTitle?: string
   ytDescription?: string
   ytTags?: string[]
+  tiktokCaption?: string
+  xCaption?: string
   cta?: string
   includeCta?: boolean
   hashtags?: string[]

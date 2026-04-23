@@ -48,10 +48,12 @@ For the poll:
 For tags (CRITICAL):
 - Generate exactly 18 tags
 - ALL tags must be multi-word phrases (2-4 words), NEVER single words
+- NEVER use # prefix — YouTube tags are plain keywords, not hashtags
+- No punctuation, no commas within a tag
 - Use specific search phrases people actually type on YouTube
 - Mix: main topic phrases, channel niche phrases, broader category phrases
 - Examples of good tags: "formula 1 2024", "best racing cars", "motorsport history"
-- Bad tags: "racing", "cars", "sport" (too generic, single word)
+- Bad tags: "racing", "cars", "#f1", "formula,1" (too generic, single word, or wrong format)
 
 Return ONLY valid JSON, no markdown, no explanation.`
 

@@ -315,6 +315,20 @@ function enforceTilePattern(slides: Slide[]): void {
   })
 }
 
+function truncateAtWordBoundary(text: string, maxLen: number): string {
+  if (text.length <= maxLen) return text
+  const cut = text.slice(0, maxLen)
+  const lastSpace = cut.lastIndexOf(' ')
+  return lastSpace > 0 ? cut.slice(0, lastSpace) : cut
+}
+
+function validateYtTags(tags: string[], source: string): void {
+  for (const tag of tags) {
+    if (tag.startsWith('#')) console.warn(`[auto-generate] YT tag has # prefix (${source}): "${tag}"`)
+    if (tag.includes(',')) console.warn(`[auto-generate] YT tag contains comma (${source}): "${tag}"`)
+  }
+}
+
 function generateTags(channel: string, topic: string, slides: Slide[]): string[] {
   const tags: string[] = [channel, ...(CHANNEL_TAGS[channel] || [])]
   const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'of', 'in', 'on', 'at', 'to', 'for', 'is', 'was', 'are', 'vs', 'with', 'how', 'why', 'what'])
@@ -635,8 +649,13 @@ export async function POST(req: NextRequest) {
 
       // Generate tags
       const ytTags = generateTags(channel, topic, slides)
-      const ytTitle = headline
-      const ytDescription = slides.map(s => s.headline + '\n' + s.body).join('\n\n')
+      validateYtTags(ytTags, 'generateTags')
+      const rawYtTitle = headline
+      const ytTitle = truncateAtWordBoundary(rawYtTitle, 70)
+      if (ytTitle !== rawYtTitle) console.warn(`[auto-generate] [${channel}] ytTitle truncated: "${rawYtTitle}" → "${ytTitle}"`)
+      const rawYtDescription = slides.map(s => s.headline + '\n' + s.body).join('\n\n')
+      const ytDescription = rawYtDescription.length > 5000 ? rawYtDescription.slice(0, 5000) : rawYtDescription
+      if (ytDescription !== rawYtDescription) console.warn(`[auto-generate] [${channel}] ytDescription truncated from ${rawYtDescription.length} chars`)
 
       // Generate CTA
       let cta: string | undefined
@@ -660,6 +679,41 @@ export async function POST(req: NextRequest) {
         console.warn(`[auto-generate] [${channel}] Hashtag generation failed (non-fatal):`, e instanceof Error ? e.message : e)
       }
 
+      // Generate TikTok and X captions in parallel (non-fatal)
+      let tiktokCaption: string | undefined
+      let xCaption: string | undefined
+      try {
+        const slidePayload = slides.map(s => ({ headline: s.headline, body: s.body }))
+        const [tiktokRes, xRes] = await Promise.all([
+          fetch(`${baseUrl}/api/generate-tiktok-caption`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic, channel, slides: slidePayload }),
+          }),
+          fetch(`${baseUrl}/api/generate-x-caption`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic, channel, slides: slidePayload }),
+          }),
+        ])
+        if (tiktokRes.ok) {
+          const d = await tiktokRes.json() as { caption?: string }
+          tiktokCaption = d.caption
+          console.log(`[auto-generate] [${channel}] TikTok caption (${tiktokCaption?.length} chars): "${tiktokCaption?.slice(0, 60)}…"`)
+        } else {
+          console.warn(`[auto-generate] [${channel}] TikTok caption generation failed: ${tiktokRes.status}`)
+        }
+        if (xRes.ok) {
+          const d = await xRes.json() as { caption?: string; length?: number }
+          xCaption = d.caption
+          console.log(`[auto-generate] [${channel}] X caption (${d.length} chars): "${xCaption}"`)
+        } else {
+          console.warn(`[auto-generate] [${channel}] X caption generation failed: ${xRes.status}`)
+        }
+      } catch (e) {
+        console.warn(`[auto-generate] [${channel}] Platform caption generation failed (non-fatal):`, e instanceof Error ? e.message : e)
+      }
+
       console.log(`[auto-generate] [${channel}] Adding to approval queue...`)
       const approvalRes = await fetch(`${baseUrl}/api/approvals`, {
         method: 'POST',
@@ -676,6 +730,8 @@ export async function POST(req: NextRequest) {
           ytTags,
           cta,
           hashtags,
+          tiktokCaption,
+          xCaption,
         }),
       })
       const approvalData = await approvalRes.json()

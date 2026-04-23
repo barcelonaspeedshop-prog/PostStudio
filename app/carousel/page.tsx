@@ -109,6 +109,13 @@ export default function CarouselPage() {
   const [isRestored, setIsRestored] = useState(false)
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const truncateYtTitle = (t: string) => {
+    if (t.length <= 70) return t
+    const cut = t.slice(0, 70)
+    const lastSpace = cut.lastIndexOf(' ')
+    return lastSpace > 0 ? cut.slice(0, lastSpace) : cut
+  }
+
   const generateYtTags = () => {
     const tags: string[] = []
     // Channel name and its keywords
@@ -154,8 +161,9 @@ export default function CarouselPage() {
   // Reset YouTube fields when slides or channel change
   useEffect(() => {
     if (slides.length > 0) {
-      setYtTitle(slides[0]?.headline || '')
-      setYtDescription(slides.map(s => s.headline + '\n' + s.body).join('\n\n'))
+      setYtTitle(truncateYtTitle(slides[0]?.headline || ''))
+      const rawDesc = slides.map(s => s.headline + '\n' + s.body).join('\n\n')
+      setYtDescription(rawDesc.length > 5000 ? rawDesc.slice(0, 5000) : rawDesc)
       setYtTags(generateYtTags())
     }
   }, [slides, channel])
@@ -587,8 +595,8 @@ export default function CarouselPage() {
           slides,
           videoBase64: videoUrl || undefined,
           platforms: publishPlatforms.length > 0 ? publishPlatforms : ['instagram', 'tiktok', 'youtube'],
-          ytTitle: ytTitle || slides[0]?.headline || '',
-          ytDescription: ytDescription || slides.map(s => s.headline + '\n' + s.body).join('\n\n'),
+          ytTitle: truncateYtTitle(ytTitle || slides[0]?.headline || ''),
+          ytDescription: (() => { const d = ytDescription || slides.map(s => s.headline + '\n' + s.body).join('\n\n'); return d.length > 5000 ? d.slice(0, 5000) : d })(),
           ytTags: ytTags ? ytTags.split(',').map((t: string) => t.trim()).filter(Boolean) : [],
           // Food Guide: pass restaurant metadata for auto-publish to website on approval
           ...(channel === 'Omnira Food' && foodRestaurantMetas.length === 1 && { restaurantMeta: foodRestaurantMetas[0] }),
@@ -1150,8 +1158,8 @@ export default function CarouselPage() {
                     <button
                       onClick={() => {
                         setShowYouTube(!showYouTube)
-                        if (!ytTitle) setYtTitle(slides[0]?.headline || '')
-                        if (!ytDescription) setYtDescription(slides.map(s => `${s.headline} — ${s.body}`).join('\n\n'))
+                        if (!ytTitle) setYtTitle(truncateYtTitle(slides[0]?.headline || ''))
+                        if (!ytDescription) { const d = slides.map(s => `${s.headline} — ${s.body}`).join('\n\n'); setYtDescription(d.length > 5000 ? d.slice(0, 5000) : d) }
                         if (!ytTags) setYtTags(generateYtTags())
                       }}
                       className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 text-white text-[13px] font-medium rounded-xl hover:bg-red-700 transition-colors"
