@@ -289,32 +289,84 @@ export default function LongFormPage() {
     }))
   }
 
+  // ─── Staged file upload helper ───
+  const stageFiles = async (
+    mediaMap: Record<string | number, File[]>,
+    audioMap: Record<string | number, string>,
+    onProgress: (msg: string) => void,
+  ): Promise<string> => {
+    const mediaEntries = Object.entries(mediaMap).flatMap(([chId, files]) =>
+      files.map(f => ({ chId, file: f }))
+    )
+    const audioEntries = Object.entries(audioMap)
+    const total = mediaEntries.length + audioEntries.length
+    let done = 0
+    let stageId: string | null = null
+
+    for (const { chId, file } of mediaEntries) {
+      done++
+      onProgress(`Uploading file ${done}/${total}...`)
+      const fd = new FormData()
+      if (stageId) fd.append('stageId', stageId)
+      fd.append('type', 'media')
+      fd.append('chapterId', chId)
+      fd.append('file', file, file.name)
+      const res = await fetch('/api/story-video/stage', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Stage upload failed')
+      stageId = data.stageId
+    }
+
+    for (const [chId, dataUrl] of audioEntries) {
+      done++
+      onProgress(`Uploading audio ${done}/${total}...`)
+      const [header, base64] = dataUrl.split(',')
+      const mime = header.match(/:(.*?);/)?.[1] || 'audio/mpeg'
+      const fd = new FormData()
+      if (stageId) fd.append('stageId', stageId)
+      fd.append('type', 'audio')
+      fd.append('chapterId', chId)
+      fd.append('audio_b64', base64)
+      fd.append('audio_mime', mime)
+      const res = await fetch('/api/story-video/stage', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Stage upload failed')
+      stageId = data.stageId
+    }
+
+    if (!stageId) {
+      // No files — create empty stage
+      const fd = new FormData()
+      fd.append('type', 'empty')
+      const res = await fetch('/api/story-video/stage', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Stage init failed')
+      stageId = data.stageId
+    }
+
+    return stageId!
+  }
+
   // ─── Video assembly (advanced mode) ───
   const assembleVideo = async () => {
     if (!script) return
     setAssembling(true)
-    setAssemblyProgress('Uploading media...')
+    setAssemblyProgress('Preparing upload...')
     setVideoUrl(null)
     setClips([])
     try {
-      const formData = new FormData()
-      formData.append('chapters', JSON.stringify(script.chapters.map(ch => ({ id: ch.id, narration: ch.narration, title: ch.title }))))
-      for (const [chIdStr, files] of Object.entries(chapterMedia)) {
-        for (const file of files) {
-          formData.append('media', file, `ch${chIdStr}_${file.name}`)
-          formData.append('mediaChapterIds', chIdStr)
-        }
-      }
-      for (const [chIdStr, dataUrl] of Object.entries(chapterAudio)) {
-        const [header, base64] = dataUrl.split(',')
-        const mime = header.match(/:(.*?);/)?.[1] || 'audio/mpeg'
-        formData.append('audio_b64', base64)
-        formData.append('audio_mime', mime)
-        formData.append('audioChapterIds', chIdStr)
-      }
-      formData.append('musicEnabled', String(musicEnabled))
-      formData.append('channel', channel)
-      const startRes = await fetch('/api/story-video/start', { method: 'POST', body: formData })
+      const stageId = await stageFiles(chapterMedia, chapterAudio, setAssemblyProgress)
+      setAssemblyProgress('Starting assembly...')
+      const startRes = await fetch('/api/story-video/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stageId,
+          chapters: script.chapters.map(ch => ({ id: ch.id, narration: ch.narration, title: ch.title })),
+          musicEnabled,
+          channel,
+        }),
+      })
       const startData = await startRes.json()
       if (!startRes.ok) throw new Error(startData.error)
       setAssemblyProgress('Rendering video...')
@@ -703,33 +755,22 @@ export default function LongFormPage() {
 
       // ── Step 5: Assembly ──
       setBuildPhase('assembly')
-      setBuildMessage('Assembling video...')
+      setBuildMessage('Uploading files...')
       setBuildSubProgress(null)
 
-      const formData = new FormData()
-      formData.append('chapters', JSON.stringify(generatedScript.chapters.map(ch => ({
-        id: ch.id, narration: ch.narration, title: ch.title,
-      }))))
+      const stageId = await stageFiles(localMedia, localAudio, setBuildMessage)
+      setBuildMessage('Assembling video...')
 
-      for (const [chIdStr, files] of Object.entries(localMedia)) {
-        for (const file of files) {
-          formData.append('media', file, `ch${chIdStr}_${file.name}`)
-          formData.append('mediaChapterIds', chIdStr)
-        }
-      }
-
-      for (const [chIdStr, dataUrl] of Object.entries(localAudio)) {
-        const [header, base64] = dataUrl.split(',')
-        const mime = header.match(/:(.*?);/)?.[1] || 'audio/mpeg'
-        formData.append('audio_b64', base64)
-        formData.append('audio_mime', mime)
-        formData.append('audioChapterIds', chIdStr)
-      }
-
-      formData.append('musicEnabled', String(musicEnabled))
-      formData.append('channel', channel)
-
-      const startRes = await fetch('/api/story-video/start', { method: 'POST', body: formData })
+      const startRes = await fetch('/api/story-video/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stageId,
+          chapters: generatedScript.chapters.map(ch => ({ id: ch.id, narration: ch.narration, title: ch.title })),
+          musicEnabled,
+          channel,
+        }),
+      })
       const startData = await startRes.json()
       if (!startRes.ok) throw new Error(startData.error || 'Assembly start failed')
 
@@ -907,34 +948,25 @@ export default function LongFormPage() {
 
       // ── Step 4: Assembly ──
       setBuildPhase('assembly')
-      setBuildMessage('Assembling video…')
+      setBuildMessage('Uploading files…')
       setBuildSubProgress(null)
 
-      const formData = new FormData()
-      formData.append('chapters', JSON.stringify(generatedScript.chapters.map(ch => ({
-        id: ch.id, narration: ch.narration, title: ch.title,
-      }))))
-
-      for (const [chIdStr, files] of Object.entries(localMedia)) {
-        for (const file of files) {
-          formData.append('media', file, `ch${chIdStr}_${file.name}`)
-          formData.append('mediaChapterIds', chIdStr)
-        }
-      }
       const latestAudio = await new Promise<Record<number, string>>(resolve => {
         setChapterAudio(prev => { resolve(prev); return prev })
       })
-      for (const [chIdStr, dataUrl] of Object.entries(latestAudio)) {
-        const [header, base64] = dataUrl.split(',')
-        const mime = header.match(/:(.*?);/)?.[1] || 'audio/mpeg'
-        formData.append('audio_b64', base64)
-        formData.append('audio_mime', mime)
-        formData.append('audioChapterIds', chIdStr)
-      }
-      formData.append('musicEnabled', String(musicEnabled))
-      formData.append('channel', channel)
+      const foodStageId = await stageFiles(localMedia, latestAudio, setBuildMessage)
+      setBuildMessage('Assembling video…')
 
-      const startRes = await fetch('/api/story-video/start', { method: 'POST', body: formData })
+      const startRes = await fetch('/api/story-video/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stageId: foodStageId,
+          chapters: generatedScript.chapters.map(ch => ({ id: ch.id, narration: ch.narration, title: ch.title })),
+          musicEnabled,
+          channel,
+        }),
+      })
       const startData = await startRes.json()
       if (!startRes.ok) throw new Error(startData.error)
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { spawn } from 'child_process'
-import { writeFile, mkdir, rename, copyFile } from 'fs/promises'
+import { writeFile, mkdir, rename, copyFile, readFile } from 'fs/promises'
 import { createWriteStream, existsSync, statSync } from 'fs'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
@@ -9,6 +9,11 @@ import { createJob, updateJob, cleanOldJobs, VIDEOS_DIR } from '../jobs'
 import { getChannel } from '@/lib/channels'
 import { loadSettings } from '@/lib/settings'
 import { MUSIC_FILE_PATH, MUSIC_VOLUME_LINEAR } from '@/lib/music'
+
+type ManifestEntry =
+  | { type: 'media'; chapterId: number; filePath: string; isVideo: boolean }
+  | { type: 'audio'; chapterId: number; filePath: string }
+interface Manifest { entries: ManifestEntry[]; counters: Record<number, number> }
 
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
@@ -477,9 +482,69 @@ async function assembleInBackground(
 
 export async function POST(req: NextRequest) {
   cleanOldJobs()
+
+  const contentType = req.headers.get('content-type') || ''
+
+  // ── Staged path: JSON body with stageId ──
+  if (contentType.includes('application/json')) {
+    try {
+      const body = await req.json()
+      const { stageId, chapters, musicEnabled: musicEnabledInput, channel: channelName } = body
+      if (!stageId) return NextResponse.json({ error: 'stageId is required' }, { status: 400 })
+      if (!chapters) return NextResponse.json({ error: 'chapters is required' }, { status: 400 })
+
+      const stageDir = `/tmp/stage_${stageId}`
+      const manifestPath = path.join(stageDir, 'manifest.json')
+      if (!existsSync(manifestPath)) {
+        return NextResponse.json({ error: `Stage not found: ${stageId}` }, { status: 400 })
+      }
+
+      const manifest: Manifest = JSON.parse(await readFile(manifestPath, 'utf-8'))
+      console.log(`[story-video/start] staged job — stageId=${stageId}, chapters=${chapters.length}, entries=${manifest.entries.length}`)
+
+      const mediaByChapter: Record<number, MediaItem[]> = {}
+      const audioByChapter: Record<number, string> = {}
+
+      for (const entry of manifest.entries) {
+        if (entry.type === 'media') {
+          if (!mediaByChapter[entry.chapterId]) mediaByChapter[entry.chapterId] = []
+          mediaByChapter[entry.chapterId].push({ path: entry.filePath, isVideo: entry.isVideo })
+        } else if (entry.type === 'audio') {
+          audioByChapter[entry.chapterId] = entry.filePath
+        }
+      }
+
+      const musicEnabled = musicEnabledInput !== undefined
+        ? Boolean(musicEnabledInput)
+        : (await loadSettings()).includeMusic
+      let musicPath: string | null = null
+      const musicVolume = MUSIC_VOLUME_LINEAR
+
+      if (!musicEnabled) {
+        console.log('[story-video] Music disabled')
+      } else if (existsSync(MUSIC_FILE_PATH)) {
+        musicPath = MUSIC_FILE_PATH
+      } else {
+        console.warn(`[story-video] Music file not found at ${MUSIC_FILE_PATH}`)
+      }
+
+      const job = createJob()
+      const mediaSummary = Object.entries(mediaByChapter).map(([ch, items]) => `ch${ch}:${items.length}files`).join(', ')
+      console.log(`[story-video/start] spawning job ${job.id} — media: ${mediaSummary || 'none'}, music: ${musicPath ? 'yes' : 'no'}, channel: ${channelName}`)
+      assembleInBackground(job.id, chapters, mediaByChapter, audioByChapter, musicPath, musicVolume, stageDir, channelName)
+      return NextResponse.json({ jobId: job.id })
+
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      console.error('[story-video/start] Error:', msg)
+      return NextResponse.json({ error: msg }, { status: 500 })
+    }
+  }
+
+  // ── Legacy FormData path ──
   const tmpDir = `/tmp/story_video_${Date.now()}`
   const contentLength = req.headers.get('content-length')
-  console.log(`[story-video/start] incoming request — content-length: ${contentLength ?? 'unknown'}`)
+  console.log(`[story-video/start] formdata request — content-length: ${contentLength ?? 'unknown'}`)
 
   try {
     await mkdir(tmpDir, { recursive: true })
@@ -491,11 +556,8 @@ export async function POST(req: NextRequest) {
     const chapters: ChapterInfo[] = JSON.parse(chaptersRaw)
     console.log(`[story-video/start] chapters=${JSON.stringify(chapters)}`)
 
-    // Stream media files to disk
     const mediaFiles = formData.getAll('media') as File[]
     const mediaChapterIds = formData.getAll('mediaChapterIds') as string[]
-    console.log(`[story-video/start] received ${mediaFiles.length} media files, ${mediaChapterIds.length} chapterIds`)
-    mediaFiles.forEach((f, i) => console.log(`  media[${i}]: name=${f.name} type=${f.type} size=${(f.size/1024).toFixed(1)}KB chapterId=${mediaChapterIds[i]}`))
     const mediaByChapter: Record<number, MediaItem[]> = {}
     const counters: Record<number, number> = {}
 
@@ -512,7 +574,6 @@ export async function POST(req: NextRequest) {
       mediaByChapter[chId].push({ path: mediaPath, isVideo })
     }
 
-    // Handle chapter audio — supports both base64 text fields (new) and file blobs (legacy)
     const audioByChapter: Record<number, string> = {}
     const audioChapterIds = formData.getAll('audioChapterIds') as string[]
     const audioB64s = formData.getAll('audio_b64') as string[]
@@ -520,7 +581,6 @@ export async function POST(req: NextRequest) {
     const audioFiles = formData.getAll('audio') as File[]
 
     if (audioB64s.length > 0) {
-      // New path: base64 text fields (avoids browser Blob serialization issues)
       for (let i = 0; i < audioChapterIds.length; i++) {
         const chId = parseInt(audioChapterIds[i])
         const base64 = audioB64s[i]
@@ -528,13 +588,10 @@ export async function POST(req: NextRequest) {
         if (!base64) continue
         const ext = mime.includes('wav') ? 'wav' : 'mp3'
         const audioPath = path.join(tmpDir, `audio_ch${chId}.${ext}`)
-        const buf = Buffer.from(base64, 'base64')
-        await writeFile(audioPath, buf)
+        await writeFile(audioPath, Buffer.from(base64, 'base64'))
         audioByChapter[chId] = audioPath
-        console.log(`[story-video] Audio ch${chId}: decoded ${(buf.byteLength / 1024).toFixed(1)} KB from base64 (mime=${mime})`)
       }
     } else {
-      // Legacy path: binary file blobs
       for (let i = 0; i < audioFiles.length; i++) {
         const file = audioFiles[i]
         const chId = parseInt(audioChapterIds[i])
@@ -542,12 +599,9 @@ export async function POST(req: NextRequest) {
         const audioPath = path.join(tmpDir, `audio_ch${chId}.${ext}`)
         await streamToDisk(file, audioPath)
         audioByChapter[chId] = audioPath
-        console.log(`[story-video] Audio ch${chId}: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`)
       }
     }
-    console.log(`[story-video] Audio ready for ${Object.keys(audioByChapter).length} chapters: [${Object.keys(audioByChapter).join(', ')}]`)
 
-    // Music: use default track if enabled
     const musicEnabledRaw = formData.get('musicEnabled')
     const musicEnabled = musicEnabledRaw !== null
       ? musicEnabledRaw !== 'false'
@@ -556,21 +610,18 @@ export async function POST(req: NextRequest) {
     const musicVolume = MUSIC_VOLUME_LINEAR
 
     if (!musicEnabled) {
-      console.log('[story-video] Music disabled — skipping music track')
+      console.log('[story-video] Music disabled')
     } else if (existsSync(MUSIC_FILE_PATH)) {
       musicPath = MUSIC_FILE_PATH
-      console.log(`[story-video] Using default music track: ${MUSIC_FILE_PATH}`)
     } else {
-      console.warn(`[story-video] Music file not found at ${MUSIC_FILE_PATH} — continuing without music`)
+      console.warn(`[story-video] Music file not found at ${MUSIC_FILE_PATH}`)
     }
 
     const channelName = (formData.get('channel') as string | null) || undefined
-
     const job = createJob()
-    const mediaSummary = Object.entries(mediaByChapter).map(([ch, items]) => `ch${ch}:${items.length}files`).join(', ')
-    console.log(`[story-video/start] spawning job ${job.id} — media: ${mediaSummary || 'none'}, music: ${musicPath ? 'yes' : 'no'}, channel: ${channelName}`)
     assembleInBackground(job.id, chapters, mediaByChapter, audioByChapter, musicPath, musicVolume, tmpDir, channelName)
     return NextResponse.json({ jobId: job.id })
+
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
     console.error('[story-video/start] Error:', msg)
