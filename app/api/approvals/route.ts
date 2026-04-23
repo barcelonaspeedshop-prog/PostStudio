@@ -27,13 +27,14 @@ export type ApprovalItem = {
   ytTags?: string[]
   tiktokCaption?: string
   xCaption?: string
+  manualUploaded?: { youtube?: string; tiktok?: string; x?: string }
   cta?: string
   includeCta?: boolean
   hashtags?: string[]
   restaurantMeta?: RestaurantMeta
   restaurantMetas?: RestaurantMeta[]
   createdAt: string
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'published'
   reviewedAt?: string
 }
 
@@ -142,7 +143,7 @@ export async function GET() {
 // POST — add new item to queue
 export async function POST(req: NextRequest) {
   try {
-    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, cta, hashtags, restaurantMeta, restaurantMetas } = await req.json()
+    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, cta, hashtags, restaurantMeta, restaurantMetas } = await req.json()
 
     if (!channel || !slides || !Array.isArray(slides)) {
       return NextResponse.json({ error: 'channel and slides are required' }, { status: 400 })
@@ -159,6 +160,8 @@ export async function POST(req: NextRequest) {
       ytTitle: ytTitle || '',
       ytDescription: ytDescription || '',
       ytTags: ytTags || [],
+      tiktokCaption: tiktokCaption || undefined,
+      xCaption: xCaption || undefined,
       cta: cta || undefined,
       hashtags: Array.isArray(hashtags) ? hashtags : undefined,
       restaurantMeta: restaurantMeta || undefined,
@@ -182,7 +185,7 @@ export async function POST(req: NextRequest) {
 // PUT — update an item (e.g. attach video after generation, or regenerate with fresh content)
 export async function PUT(req: NextRequest) {
   try {
-    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, cta, includeCta, hashtags, musicEnabled } = await req.json()
+    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, manualUploaded, cta, includeCta, hashtags, musicEnabled } = await req.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
     const items = await loadApprovals()
@@ -198,13 +201,23 @@ export async function PUT(req: NextRequest) {
     if (ytTitle) item.ytTitle = ytTitle
     if (ytDescription) item.ytDescription = ytDescription
     if (ytTags && Array.isArray(ytTags)) item.ytTags = ytTags
+    if (tiktokCaption !== undefined) item.tiktokCaption = tiktokCaption || undefined
+    if (xCaption !== undefined) item.xCaption = xCaption || undefined
+    if (manualUploaded !== undefined) {
+      item.manualUploaded = manualUploaded
+      const { youtube, tiktok, x } = item.manualUploaded || {}
+      if (youtube && tiktok && x) {
+        item.status = 'published'
+        if (!item.reviewedAt) item.reviewedAt = new Date().toISOString()
+      }
+    }
     if (cta !== undefined) item.cta = cta
     if (includeCta !== undefined) item.includeCta = includeCta
     if (hashtags !== undefined) item.hashtags = Array.isArray(hashtags) ? hashtags : item.hashtags
     if (musicEnabled !== undefined) (item as Record<string, unknown>).musicEnabled = musicEnabled
     await saveApprovals(items)
 
-    return NextResponse.json({ id: item.id, hasVideo: !!item.videoBase64 })
+    return NextResponse.json({ id: item.id, hasVideo: !!item.videoBase64, status: item.status })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[approvals] PUT error:', message)

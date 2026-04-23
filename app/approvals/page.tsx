@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Sidebar from '@/components/Sidebar'
+import PublishPanel, { type PanelItem } from '@/components/PublishPanel'
+import { CHANNELS } from '@/lib/channels'
 
 const BLOCKED_IMAGE_DOMAINS = [
   'instagram.com', 'lookaside.instagram.com', 'lookaside.fbsbx.com',
@@ -33,11 +35,17 @@ type ApprovalItem = {
   slides: Slide[]
   videoBase64?: string
   platforms: string[]
+  ytTitle?: string
+  ytDescription?: string
+  ytTags?: string[]
+  tiktokCaption?: string
+  xCaption?: string
+  manualUploaded?: { youtube?: string; tiktok?: string; x?: string }
   cta?: string
   includeCta?: boolean
   hashtags?: string[]
   createdAt: string
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'published'
   reviewedAt?: string
 }
 
@@ -63,6 +71,7 @@ export default function ApprovalsPage() {
   const [regeneratingHashtagsId, setRegeneratingHashtagsId] = useState<string | null>(null)
   const [editingHashtagsId, setEditingHashtagsId] = useState<string | null>(null)
   const [hashtagDraft, setHashtagDraft] = useState('')
+  const [publishPanelId, setPublishPanelId] = useState<string | null>(null)
   const [imagePicker, setImagePicker] = useState<{
     itemId: string
     slideIndex: number
@@ -1051,6 +1060,18 @@ export default function ApprovalsPage() {
                         )}
                       </div>
 
+                      {/* Publish Panel */}
+                      {publishPanelId === item.id && (
+                        <PublishPanel
+                          item={item as PanelItem}
+                          youtubeChannelId={CHANNELS[item.channel]?.youtubeChannelId}
+                          onUpdate={(updates) => {
+                            setItems(prev => prev.map(i => i.id === item.id ? { ...i, ...updates } as ApprovalItem : i))
+                            if (updates.status === 'published') setPublishPanelId(null)
+                          }}
+                        />
+                      )}
+
                       {/* Actions */}
                       <div className="flex flex-col gap-2 px-4 pb-4 pt-2">
                         {!hasVideo && (
@@ -1089,6 +1110,12 @@ export default function ApprovalsPage() {
                               <span className="text-[11px]">↓</span> Download
                             </button>
                           )}
+                          <button
+                            onClick={() => setPublishPanelId(publishPanelId === item.id ? null : item.id)}
+                            className={`px-4 py-2.5 min-h-[44px] text-[13px] font-medium rounded-lg transition-colors flex items-center gap-1.5 ${publishPanelId === item.id ? 'bg-violet-100 text-violet-700 border border-violet-200' : 'border border-stone-200 text-stone-700 hover:bg-stone-50'}`}
+                          >
+                            <span className="text-[11px]">🚀</span> Publish
+                          </button>
                           <button
                             onClick={() => regenerateItem(item)}
                             disabled={isRegenerating || isActing}
