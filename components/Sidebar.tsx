@@ -6,7 +6,6 @@ import { useState, useEffect } from 'react'
 const links = [
   { href: '/carousel', label: 'Carousel', icon: 'M4 6h16M4 10h16M4 14h16M4 18h7' },
   { href: '/longform', label: 'Long Form', icon: 'M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0-11V3m0 0a2 2 0 012 2v4a2 2 0 01-2 2m0-8a2 2 0 00-2 2v4a2 2 0 002 2' },
-  { href: '/hooks', label: 'Hooks', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
   { href: '/hashtags', label: 'Hashtags', icon: 'M7 20l4-16m2 16l4-16M6 9h14M4 15h14' },
   { href: '/approvals', label: 'Approvals', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', badge: true },
   { href: '/scheduled', label: 'Scheduled', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
