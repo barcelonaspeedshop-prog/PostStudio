@@ -714,6 +714,30 @@ export async function POST(req: NextRequest) {
         console.warn(`[auto-generate] [${channel}] Platform caption generation failed (non-fatal):`, e instanceof Error ? e.message : e)
       }
 
+      // Generate article (non-fatal)
+      let articleBody: string | undefined
+      let articleExcerpt: string | undefined
+      let articleSlug: string | undefined
+      try {
+        const slidePayload = slides.map(s => ({ headline: s.headline, body: s.body }))
+        const articleRes = await fetch(`${baseUrl}/api/generate-article`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channel, ytTitle, slides: slidePayload }),
+        })
+        if (articleRes.ok) {
+          const d = await articleRes.json() as { articleBody?: string; articleExcerpt?: string; articleSlug?: string }
+          articleBody = d.articleBody
+          articleExcerpt = d.articleExcerpt
+          articleSlug = d.articleSlug
+          console.log(`[auto-generate] [${channel}] Article generated: slug="${articleSlug}" (${articleBody?.split(/\s+/).length} words)`)
+        } else {
+          console.warn(`[auto-generate] [${channel}] Article generation failed: ${articleRes.status}`)
+        }
+      } catch (e) {
+        console.warn(`[auto-generate] [${channel}] Article generation failed (non-fatal):`, e instanceof Error ? e.message : e)
+      }
+
       console.log(`[auto-generate] [${channel}] Adding to approval queue...`)
       const approvalRes = await fetch(`${baseUrl}/api/approvals`, {
         method: 'POST',
@@ -732,6 +756,9 @@ export async function POST(req: NextRequest) {
           hashtags,
           tiktokCaption,
           xCaption,
+          articleBody,
+          articleExcerpt,
+          articleSlug,
         }),
       })
       const approvalData = await approvalRes.json()

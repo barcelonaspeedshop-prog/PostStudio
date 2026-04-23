@@ -41,6 +41,9 @@ type ApprovalItem = {
   tiktokCaption?: string
   xCaption?: string
   manualUploaded?: { youtube?: string; tiktok?: string; x?: string }
+  articleBody?: string
+  articleExcerpt?: string
+  articleSlug?: string
   cta?: string
   includeCta?: boolean
   hashtags?: string[]
@@ -72,6 +75,8 @@ export default function ApprovalsPage() {
   const [editingHashtagsId, setEditingHashtagsId] = useState<string | null>(null)
   const [hashtagDraft, setHashtagDraft] = useState('')
   const [publishPanelId, setPublishPanelId] = useState<string | null>(null)
+  const [articleExpandedId, setArticleExpandedId] = useState<string | null>(null)
+  const [regeneratingArticleId, setRegeneratingArticleId] = useState<string | null>(null)
   const [imagePicker, setImagePicker] = useState<{
     itemId: string
     slideIndex: number
@@ -725,6 +730,31 @@ export default function ApprovalsPage() {
     }
   }
 
+  const regenerateArticle = async (item: ApprovalItem) => {
+    setRegeneratingArticleId(item.id)
+    try {
+      const slidePayload = item.slides.map(s => ({ headline: s.headline, body: s.body }))
+      const res = await fetch('/api/generate-article', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, channel: item.channel, ytTitle: item.ytTitle, slides: slidePayload }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setItems(prev => prev.map(i => i.id === item.id ? {
+        ...i,
+        articleBody: data.articleBody,
+        articleExcerpt: data.articleExcerpt,
+        articleSlug: data.articleSlug,
+      } : i))
+      setArticleExpandedId(item.id)
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Article generation failed', 'error')
+    } finally {
+      setRegeneratingArticleId(null)
+    }
+  }
+
   const removeHashtag = async (item: ApprovalItem, tag: string) => {
     const updated = (item.hashtags || []).filter(t => t !== tag)
     setItems(prev => prev.map(i => i.id === item.id ? { ...i, hashtags: updated } : i))
@@ -1057,6 +1087,56 @@ export default function ApprovalsPage() {
                           </div>
                         ) : (
                           <p className="text-[12px] text-stone-400 italic">No hashtags — click Regen to generate</p>
+                        )}
+                      </div>
+
+                      {/* Article preview */}
+                      <div className="px-4 py-3 border-t border-stone-50 bg-stone-50/20">
+                        <div className="flex items-center justify-between mb-2">
+                          <button
+                            onClick={() => setArticleExpandedId(articleExpandedId === item.id ? null : item.id)}
+                            className="text-[10px] font-semibold text-stone-400 uppercase tracking-widest hover:text-stone-600 transition-colors flex items-center gap-1"
+                          >
+                            Article preview
+                            {item.articleBody && <span className="text-stone-300">{articleExpandedId === item.id ? '▲' : '▼'}</span>}
+                          </button>
+                          <button
+                            onClick={() => regenerateArticle(item)}
+                            disabled={regeneratingArticleId === item.id}
+                            className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-lg border border-stone-200 text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors disabled:opacity-40"
+                          >
+                            {regeneratingArticleId === item.id ? (
+                              <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                              </svg>
+                            ) : '↺'} {item.articleBody ? 'Regen article' : 'Generate article'}
+                          </button>
+                        </div>
+
+                        {item.articleBody ? (
+                          <>
+                            {item.articleExcerpt && (
+                              <p className="text-[11px] text-stone-500 italic mb-2 leading-relaxed">
+                                {item.articleExcerpt}
+                              </p>
+                            )}
+                            {item.articleSlug && (
+                              <p className="text-[10px] text-stone-400 font-mono mb-2">/{item.articleSlug}</p>
+                            )}
+                            {articleExpandedId === item.id && (
+                              <div className="text-[12px] text-stone-700 leading-relaxed space-y-2 mt-2 border-t border-stone-100 pt-2">
+                                {item.articleBody.split(/\n\n+/).map((para, i) => {
+                                  if (para.startsWith('## ')) {
+                                    return <p key={i} className="font-semibold text-stone-900 text-[13px]">{para.replace(/^## /, '')}</p>
+                                  }
+                                  return <p key={i}>{para}</p>
+                                })}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-[12px] text-stone-400 italic">No article yet — click Generate article</p>
                         )}
                       </div>
 

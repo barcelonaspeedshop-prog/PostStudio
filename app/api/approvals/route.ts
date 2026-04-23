@@ -28,6 +28,9 @@ export type ApprovalItem = {
   tiktokCaption?: string
   xCaption?: string
   manualUploaded?: { youtube?: string; tiktok?: string; x?: string }
+  articleBody?: string
+  articleExcerpt?: string
+  articleSlug?: string
   cta?: string
   includeCta?: boolean
   hashtags?: string[]
@@ -143,7 +146,7 @@ export async function GET() {
 // POST — add new item to queue
 export async function POST(req: NextRequest) {
   try {
-    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, cta, hashtags, restaurantMeta, restaurantMetas } = await req.json()
+    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, articleBody, articleExcerpt, articleSlug, cta, hashtags, restaurantMeta, restaurantMetas } = await req.json()
 
     if (!channel || !slides || !Array.isArray(slides)) {
       return NextResponse.json({ error: 'channel and slides are required' }, { status: 400 })
@@ -162,6 +165,9 @@ export async function POST(req: NextRequest) {
       ytTags: ytTags || [],
       tiktokCaption: tiktokCaption || undefined,
       xCaption: xCaption || undefined,
+      articleBody: articleBody || undefined,
+      articleExcerpt: articleExcerpt || undefined,
+      articleSlug: articleSlug || undefined,
       cta: cta || undefined,
       hashtags: Array.isArray(hashtags) ? hashtags : undefined,
       restaurantMeta: restaurantMeta || undefined,
@@ -185,7 +191,7 @@ export async function POST(req: NextRequest) {
 // PUT — update an item (e.g. attach video after generation, or regenerate with fresh content)
 export async function PUT(req: NextRequest) {
   try {
-    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, manualUploaded, cta, includeCta, hashtags, musicEnabled } = await req.json()
+    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, articleBody, articleExcerpt, articleSlug, manualUploaded, cta, includeCta, hashtags, musicEnabled } = await req.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
     const items = await loadApprovals()
@@ -203,6 +209,9 @@ export async function PUT(req: NextRequest) {
     if (ytTags && Array.isArray(ytTags)) item.ytTags = ytTags
     if (tiktokCaption !== undefined) item.tiktokCaption = tiktokCaption || undefined
     if (xCaption !== undefined) item.xCaption = xCaption || undefined
+    if (articleBody !== undefined) item.articleBody = articleBody || undefined
+    if (articleExcerpt !== undefined) item.articleExcerpt = articleExcerpt || undefined
+    if (articleSlug !== undefined) item.articleSlug = articleSlug || undefined
     if (manualUploaded !== undefined) {
       item.manualUploaded = manualUploaded
       const { youtube, tiktok, x } = item.manualUploaded || {}
