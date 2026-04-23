@@ -1,0 +1,137 @@
+import { writeFile, readFile, mkdir } from 'fs/promises'
+import { existsSync } from 'fs'
+import path from 'path'
+
+const DATA_DIR = process.env.TOKEN_STORAGE_PATH || '/data'
+const PUBLISHED_DIR = path.join(DATA_DIR, 'published')
+const INDEX_PATH = path.join(PUBLISHED_DIR, 'index.json')
+
+const CHANNEL_MAP: Record<string, string> = {
+  'Gentlemen of Fuel': 'fuel',
+  'Omnira F1': 'f1',
+  'Omnira Football': 'football',
+  'Omnira Food': 'food',
+}
+
+const BLOCKED_DOMAINS = [
+  'instagram.com', 'lookaside.fbsbx.com', 'lookaside.facebook.com', 'fbcdn.net', 'facebook.com',
+  'twitter.com', 'twimg.com', 'pbs.twimg.com', 'tiktok.com', 'tiktokcdn.com',
+  'pinterest.com', 'pinimg.com', 'reddit.com', 'redd.it', 'whatsapp.com',
+]
+
+function usableImageUrl(url: string | undefined | null): string | null {
+  if (!url) return null
+  if (url.startsWith('data:') || (url.length > 500 && !url.startsWith('http'))) return null
+  try {
+    const h = new URL(url).hostname.toLowerCase()
+    if (BLOCKED_DOMAINS.some(d => h === d || h.endsWith('.' + d))) return null
+    if (h.startsWith('scontent.') || h.startsWith('scontent-')) return null
+    return url
+  } catch {
+    return null
+  }
+}
+
+export type ArticleMeta = {
+  id: string
+  channel: string
+  slug: string
+  title: string
+  excerpt: string
+  publishedAt: string
+  coverImage: string | null
+}
+
+export type Article = ArticleMeta & {
+  body: string
+  carouselImages: string[]
+  ytVideoId: string | null
+  hashtags: string[]
+}
+
+type PublishableItem = {
+  id: string
+  channel: string
+  headline: string
+  ytTitle?: string
+  articleBody?: string
+  articleExcerpt?: string
+  articleSlug?: string
+  slides?: Array<{ imageOptions?: string[] }>
+  manualUploaded?: { youtube?: string; tiktok?: string; x?: string }
+  hashtags?: string[]
+}
+
+async function loadIndex(): Promise<ArticleMeta[]> {
+  try {
+    if (!existsSync(INDEX_PATH)) return []
+    return JSON.parse(await readFile(INDEX_PATH, 'utf-8'))
+  } catch {
+    return []
+  }
+}
+
+export async function publishToWebsite(item: PublishableItem): Promise<{ success: boolean; path?: string; error?: string }> {
+  try {
+    if (!item.articleBody || !item.articleExcerpt || !item.articleSlug || !item.channel) {
+      return { success: false, error: 'missing article fields' }
+    }
+
+    const channelSlug = CHANNEL_MAP[item.channel]
+    if (!channelSlug) {
+      return { success: false, error: `unknown channel: ${item.channel}` }
+    }
+
+    const coverImage = usableImageUrl(item.slides?.[0]?.imageOptions?.[0])
+    const carouselImages = (item.slides || [])
+      .map(s => usableImageUrl(s.imageOptions?.[0]))
+      .filter((u): u is string => u !== null)
+
+    let ytVideoId: string | null = null
+    const ytUrl = item.manualUploaded?.youtube
+    if (ytUrl && ytUrl.includes('youtu')) {
+      const m = ytUrl.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/)
+      if (m) ytVideoId = m[1]
+    }
+
+    const article: Article = {
+      id: item.id,
+      channel: channelSlug,
+      slug: item.articleSlug,
+      title: item.ytTitle || item.headline,
+      excerpt: item.articleExcerpt,
+      body: item.articleBody,
+      publishedAt: new Date().toISOString(),
+      coverImage,
+      carouselImages,
+      ytVideoId,
+      hashtags: item.hashtags || [],
+    }
+
+    const channelDir = path.join(PUBLISHED_DIR, channelSlug)
+    if (!existsSync(channelDir)) await mkdir(channelDir, { recursive: true })
+
+    const filePath = path.join(channelDir, `${item.articleSlug}.json`)
+    await writeFile(filePath, JSON.stringify(article, null, 2))
+
+    const meta: ArticleMeta = {
+      id: item.id,
+      channel: channelSlug,
+      slug: item.articleSlug,
+      title: article.title,
+      excerpt: article.excerpt,
+      publishedAt: article.publishedAt,
+      coverImage,
+    }
+
+    const index = await loadIndex()
+    const filtered = index.filter(a => !(a.channel === channelSlug && a.slug === item.articleSlug))
+    filtered.unshift(meta)
+    if (!existsSync(PUBLISHED_DIR)) await mkdir(PUBLISHED_DIR, { recursive: true })
+    await writeFile(INDEX_PATH, JSON.stringify(filtered, null, 2))
+
+    return { success: true, path: filePath }
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}

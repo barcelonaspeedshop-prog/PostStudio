@@ -44,6 +44,7 @@ type ApprovalItem = {
   articleBody?: string
   articleExcerpt?: string
   articleSlug?: string
+  websitePublished?: boolean
   cta?: string
   includeCta?: boolean
   hashtags?: string[]
@@ -1257,11 +1258,19 @@ export default function ApprovalsPage() {
                       <p className="text-[12px] font-medium text-stone-800 truncate">{item.headline}</p>
                       <p className="text-[10px] text-stone-400">{item.channel} · {formatDate(item.reviewedAt || item.createdAt)}</p>
                     </div>
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                      item.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
-                    }`}>
-                      {item.status}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {item.status === 'approved' && item.websitePublished === true && (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">✅ Website</span>
+                      )}
+                      {item.status === 'approved' && item.websitePublished === false && (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">⚠ Website</span>
+                      )}
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                        item.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                      }`}>
+                        {item.status}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>

@@ -4,6 +4,7 @@ import { existsSync } from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import { trackHashtags } from '@/lib/hashtags'
+import { publishToWebsite } from '@/lib/website-publisher'
 import type { RestaurantMeta } from '@/app/api/food-carousel-generate/route'
 import { restaurants as staticRestaurants } from '@/lib/restaurants'
 import type { Restaurant } from '@/lib/restaurants'
@@ -31,6 +32,7 @@ export type ApprovalItem = {
   articleBody?: string
   articleExcerpt?: string
   articleSlug?: string
+  websitePublished?: boolean
   cta?: string
   includeCta?: boolean
   hashtags?: string[]
@@ -405,6 +407,16 @@ export async function PATCH(req: NextRequest) {
       trackHashtags(item.channel, item.hashtags).catch(e =>
         console.warn('[approvals] trackHashtags failed:', e instanceof Error ? e.message : e)
       )
+    }
+
+    // Publish article to website (before stripping imageOptions — publisher needs them for coverImage)
+    const websiteResult = await publishToWebsite(item)
+    if (websiteResult.success) {
+      item.websitePublished = true
+      console.log(`[approvals] Website published "${item.headline}" → ${websiteResult.path}`)
+    } else {
+      item.websitePublished = false
+      console.warn(`[approvals] Website publish failed for "${item.headline}": ${websiteResult.error}`)
     }
 
     // Strip binary payload now that publishing is done — keeps approvals.json lean
