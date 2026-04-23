@@ -83,22 +83,6 @@ async function getVideoPathForFormat(jobId: string, format: string): Promise<str
     return squarePath
   }
 
-  if (format === 'reels') {
-    const reelsPath = job.reelsPath && existsSync(job.reelsPath)
-      ? job.reelsPath
-      : path.join(tmpDir, 'format_reels.mp4')
-    if (!existsSync(reelsPath)) {
-      await runFfmpeg([
-        '-i', job.videoPath,
-        '-vf', 'scale=1080:608:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,setsar=1',
-        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast', '-crf', '23',
-        '-c:a', 'copy', '-movflags', '+faststart', '-y', reelsPath,
-      ])
-      updateJob(jobId, { reelsPath })
-    }
-    return reelsPath
-  }
-
   throw new Error(`Unknown format: ${format}`)
 }
 
@@ -219,13 +203,13 @@ export async function POST(req: NextRequest) {
       results.errors.youtube = `No YouTube credentials for "${channelName}". Connect via the Accounts page.`
     }
 
-    // ── Instagram Reel (9:16) ─────────────────────────────────────────────────
+    // ── Instagram Square (1:1) ───────────────────────────────────────────────
 
     if (publishInstagram && !results.errors.instagram) {
       console.log(`[publish] Instagram — channel: "${channelName}", igAccountId: ${metaCfgPreflight?.instagramAccountId}`)
       try {
-        const reelsPath = await getVideoPathForFormat(jobId, 'reels')
-        const saved = await saveVideoPathToTempFile(reelsPath)
+        const igVideoPath = await getVideoPathForFormat(jobId, 'square')
+        const saved = await saveVideoPathToTempFile(igVideoPath)
         if (!saved) throw new Error('Could not create public URL for Instagram video')
         tempFiles.push(saved.filePath)
         console.log(`[publish] Publishing Instagram Reel for ${channelName}: ${saved.publicUrl}`)

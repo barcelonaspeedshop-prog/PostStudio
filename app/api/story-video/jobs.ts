@@ -17,9 +17,8 @@ export type Job = {
   chapterOrder?: number[]
   chapterDurations?: Record<number, number>
   chapterTitles?: Record<number, string>
-  // Cached format variants (created on first request)
+  // Cached format variant (created on first request)
   squarePath?: string
-  reelsPath?: string
 }
 
 const DATA_DIR = process.env.TOKEN_STORAGE_PATH || '/data'

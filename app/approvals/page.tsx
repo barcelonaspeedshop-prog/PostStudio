@@ -649,7 +649,6 @@ export default function ApprovalsPage() {
         if (item) {
           const now = new Date()
           const scheduleJobs: Array<{ format: string; platform: string; delayHours: number }> = []
-          if (item.platforms.includes('instagram')) scheduleJobs.push({ format: 'reel', platform: 'instagram', delayHours: 6 })
           if (item.platforms.includes('instagram')) scheduleJobs.push({ format: 'instagram_still', platform: 'instagram', delayHours: 8 })
 
           for (const job of scheduleJobs) {

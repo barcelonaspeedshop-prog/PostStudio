@@ -38,11 +38,10 @@ function serveFile(filePath: string, downloadName: string, contentType = 'video/
 }
 
 /**
- * GET /api/story-video/download/[jobId]?format=youtube|square|reels
+ * GET /api/story-video/download/[jobId]?format=youtube|square
  *
  * youtube (default) — serves the master 1920×1080 16:9 video as-is
  * square            — re-encodes to 1080×1080 (1:1) with center crop, caches in tmpDir
- * reels             — re-encodes to 1080×1920 (9:16) letterboxed, caches in tmpDir
  */
 export async function GET(
   req: NextRequest,
@@ -87,29 +86,6 @@ export async function GET(
     }
 
     return serveFile(squarePath, `story_instagram_square_1x1.mp4`)
-  }
-
-  // ── Reels 9:16 (1080×1920) ──
-  if (format === 'reels') {
-    const reelsPath = job.reelsPath && existsSync(job.reelsPath)
-      ? job.reelsPath
-      : path.join(tmpDir, 'format_reels.mp4')
-
-    if (!existsSync(reelsPath)) {
-      console.log(`[story-video/download] Generating reels 9:16 for job ${jobId}`)
-      // Scale 1920×1080 → 1080×608, then pad to 1080×1920 with black bars
-      await runFfmpeg([
-        '-i', job.videoPath,
-        '-vf', 'scale=1080:608:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,setsar=1',
-        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast', '-crf', '23',
-        '-c:a', 'copy',
-        '-movflags', '+faststart',
-        '-y', reelsPath,
-      ])
-      Object.assign(job, { reelsPath })
-    }
-
-    return serveFile(reelsPath, `story_instagram_reels_9x16.mp4`)
   }
 
   return NextResponse.json({ error: `Unknown format: ${format}` }, { status: 400 })

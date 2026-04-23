@@ -7,7 +7,7 @@ type ScheduledItem = {
   id: string
   channel: string
   headline: string
-  format: 'carousel' | 'reel' | 'short' | 'tiktok' | 'story'
+  format: 'carousel' | 'short' | 'tiktok' | 'story'
   platform: 'instagram' | 'youtube' | 'tiktok'
   scheduledTime: string
   status: 'pending' | 'published' | 'failed'
@@ -26,7 +26,6 @@ const Spinner = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
 
 const FORMAT_LABELS: Record<string, { label: string; color: string }> = {
   carousel: { label: 'Carousel', color: 'bg-blue-100 text-blue-700' },
-  reel: { label: 'Reel', color: 'bg-purple-100 text-purple-700' },
   short: { label: 'Short', color: 'bg-red-100 text-red-700' },
   tiktok: { label: 'TikTok', color: 'bg-stone-900 text-white' },
   story: { label: 'Story', color: 'bg-amber-100 text-amber-700' },

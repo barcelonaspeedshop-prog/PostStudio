@@ -13,7 +13,7 @@ export type ScheduledItem = {
   id: string
   channel: string
   headline: string
-  format: 'carousel' | 'reel' | 'short' | 'tiktok' | 'story'
+  format: 'carousel' | 'short' | 'tiktok' | 'story'
   platform: 'instagram' | 'youtube' | 'tiktok'
   scheduledTime: string
   status: 'pending' | 'published' | 'failed'

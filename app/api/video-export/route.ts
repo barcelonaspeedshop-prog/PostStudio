@@ -30,9 +30,9 @@ export async function POST(req: NextRequest) {
   const tmpDir = `/tmp/carousel_${Date.now()}`
   
   try {
-    const { slides, slideDuration: rawDuration = 5, audioUrl, musicVolume = 20, musicEnabled = true, reelMode } = await req.json()
+    const { slides, slideDuration: rawDuration = 5, audioUrl, musicVolume = 20, musicEnabled = true } = await req.json()
     const videoW = 1080
-    const videoH = reelMode ? 1920 : 1350
+    const videoH = 1350
     const scaleFilter = `scale=${videoW}:${videoH}:force_original_aspect_ratio=decrease,pad=${videoW}:${videoH}:(ow-iw)/2:(oh-ih)/2,setsar=1`
     // Enforce minimum 5 seconds per slide
     const slideDuration = Math.max(5, Number(rawDuration) || 5)

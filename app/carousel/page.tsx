@@ -246,7 +246,6 @@ export default function CarouselPage() {
       try {
         const now = new Date()
         const scheduleJobs = []
-        if (publishPlatforms.includes('instagram')) scheduleJobs.push({ format: 'reel', platform: 'instagram', hours: 6 })
         if (publishPlatforms.includes('youtube')) scheduleJobs.push({ format: 'short', platform: 'youtube', hours: 4 })
         if (publishPlatforms.includes('tiktok')) scheduleJobs.push({ format: 'tiktok', platform: 'tiktok', hours: 2 })
         for (const job of scheduleJobs) {

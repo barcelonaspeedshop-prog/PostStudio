@@ -1583,10 +1583,6 @@ export default function LongFormPage() {
                     className="flex items-center justify-between w-full px-4 py-3 text-[13px] font-medium border border-stone-200 text-stone-700 rounded-xl hover:bg-stone-50 transition-colors">
                     <span>Instagram Square</span><span className="opacity-60 text-[11px]">1:1 ↓</span>
                   </a>
-                  <a href={`${videoUrl}?format=reels`} download="story_instagram_reels.mp4"
-                    className="flex items-center justify-between w-full px-4 py-3 text-[13px] font-medium border border-stone-200 text-stone-700 rounded-xl hover:bg-stone-50 transition-colors">
-                    <span>Reels</span><span className="opacity-60 text-[11px]">9:16 ↓</span>
-                  </a>
                   <button
                     onClick={publishPanelOpen ? () => setPublishPanelOpen(false) : openPublishPanel}
                     className="flex items-center justify-between w-full px-4 py-3 text-[13px] font-medium bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors mt-2"
@@ -2132,9 +2128,6 @@ export default function LongFormPage() {
                       </a>
                       <a href={`${videoUrl}?format=square`} download="story_instagram_square.mp4" className="flex items-center justify-between w-full px-3 py-2 text-[12px] font-medium border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors">
                         <span>Instagram Square</span><span className="opacity-75 text-[10px]">1:1 ↓</span>
-                      </a>
-                      <a href={`${videoUrl}?format=reels`} download="story_instagram_reels.mp4" className="flex items-center justify-between w-full px-3 py-2 text-[12px] font-medium border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors">
-                        <span>Reels (full video)</span><span className="opacity-75 text-[10px]">9:16 ↓</span>
                       </a>
                       {/* Publish button — always visible when video is ready */}
                       <button

@@ -61,6 +61,6 @@ export const PLATFORMS: Platform[] = [
 export const TONES = ['casual', 'professional', 'funny', 'inspirational', 'promotional']
 
 export const FORMATS = [
-  '15s reel', '30s reel', '60s reel', '3 min video',
+  '3 min video',
   'Static image', 'Carousel', 'Story',
 ]
