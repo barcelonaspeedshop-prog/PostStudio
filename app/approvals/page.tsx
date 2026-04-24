@@ -83,9 +83,14 @@ export default function ApprovalsPage() {
     id: string; channel: string; slug: string; title: string
     excerpt: string; body: string; coverImage: string | null
     publishedAt: string; goLiveAt: string; previewUrl: string
+    ytVideoId?: string | null
   }
   const [pendingArticles, setPendingArticles] = useState<PendingArticle[]>([])
   const [killLoading, setKillLoading] = useState<string | null>(null)
+  const [ytUrlDraft, setYtUrlDraft] = useState<Record<string, string>>({})
+  const [ytUrlSaving, setYtUrlSaving] = useState<Record<string, boolean>>({})
+  const [ytUrlError, setYtUrlError] = useState<Record<string, string>>({})
+  const [ytUrlEditing, setYtUrlEditing] = useState<Record<string, boolean>>({})
   const [imagePicker, setImagePicker] = useState<{
     itemId: string
     slideIndex: number
@@ -153,6 +158,33 @@ export default function ApprovalsPage() {
       showToast('Kill failed', 'error')
     } finally {
       setKillLoading(null)
+    }
+  }
+
+  const saveYtUrl = async (article: PendingArticle) => {
+    const key = `${article.channel}/${article.slug}`
+    const url = ytUrlDraft[key] ?? ''
+    if (!url.includes('youtu')) {
+      setYtUrlError(p => ({ ...p, [key]: 'Enter a valid YouTube URL' }))
+      return
+    }
+    setYtUrlSaving(p => ({ ...p, [key]: true }))
+    setYtUrlError(p => { const n = { ...p }; delete n[key]; return n })
+    try {
+      const res = await fetch('/api/articles/set-youtube-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ articleSlug: article.slug, channel: article.channel, youtubeUrl: url }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Save failed')
+      showToast(`YouTube ID saved: ${data.ytVideoId}`, 'success')
+      setYtUrlEditing(p => ({ ...p, [key]: false }))
+      fetchPendingArticles()
+    } catch (e: unknown) {
+      setYtUrlError(p => ({ ...p, [key]: e instanceof Error ? e.message : 'Save failed' }))
+    } finally {
+      setYtUrlSaving(p => ({ ...p, [key]: false }))
     }
   }
 
@@ -1283,46 +1315,93 @@ export default function ApprovalsPage() {
                 {pendingArticles.map(article => {
                   const key = `${article.channel}/${article.slug}`
                   const isKilling = killLoading === key
+                  const isSaving = !!ytUrlSaving[key]
+                  const isEditing = !!ytUrlEditing[key]
                   const minsLeft = Math.ceil((new Date(article.goLiveAt).getTime() - Date.now()) / 60000)
                   return (
-                    <div key={article.id} className="bg-white border border-amber-100 rounded-xl p-4 flex gap-3">
-                      {article.coverImage && (
-                        <div
-                          className="w-14 h-14 rounded-lg bg-stone-100 shrink-0 bg-cover bg-center"
-                          style={{ backgroundImage: `url(${article.coverImage})` }}
-                        />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-medium text-stone-900 truncate">{article.title}</p>
-                        <p className="text-[11px] text-stone-500 mt-0.5 truncate">{article.excerpt.slice(0, 120)}</p>
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded font-medium">
-                            Live in ~{minsLeft} min
-                          </span>
-                          <span className="text-[10px] text-stone-400">{article.channel} · /{article.slug}</span>
+                    <div key={article.id} className="bg-white border border-amber-100 rounded-xl p-4 flex flex-col gap-3">
+                      <div className="flex gap-3">
+                        {article.coverImage && (
+                          <div
+                            className="w-14 h-14 rounded-lg bg-stone-100 shrink-0 bg-cover bg-center"
+                            style={{ backgroundImage: `url(${article.coverImage})` }}
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-medium text-stone-900 truncate">{article.title}</p>
+                          <p className="text-[11px] text-stone-500 mt-0.5 truncate">{article.excerpt.slice(0, 120)}</p>
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded font-medium">
+                              Live in ~{minsLeft} min
+                            </span>
+                            <span className="text-[10px] text-stone-400">{article.channel} · /{article.slug}</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1.5 shrink-0">
+                          <a
+                            href={article.previewUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 text-[11px] font-medium bg-stone-100 text-stone-700 rounded-lg hover:bg-stone-200 transition-colors text-center"
+                          >
+                            Preview
+                          </a>
+                          <button
+                            onClick={() => killArticle(article.channel, article.slug)}
+                            disabled={isKilling}
+                            className="px-3 py-1.5 text-[11px] font-medium bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                          >
+                            {isKilling ? (
+                              <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                              </svg>
+                            ) : 'Kill'}
+                          </button>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-1.5 shrink-0">
-                        <a
-                          href={article.previewUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-1.5 text-[11px] font-medium bg-stone-100 text-stone-700 rounded-lg hover:bg-stone-200 transition-colors text-center"
-                        >
-                          Preview
-                        </a>
-                        <button
-                          onClick={() => killArticle(article.channel, article.slug)}
-                          disabled={isKilling}
-                          className="px-3 py-1.5 text-[11px] font-medium bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
-                        >
-                          {isKilling ? (
-                            <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
-                              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-                            </svg>
-                          ) : 'Kill'}
-                        </button>
+                      {/* YouTube URL — set after manual upload to Studio */}
+                      <div className="border-t border-stone-100 pt-3">
+                        {article.ytVideoId && !isEditing ? (
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <svg className="w-3 h-3 text-red-500 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                              </svg>
+                              <span className="text-[11px] text-stone-600 font-mono truncate">{article.ytVideoId}</span>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setYtUrlEditing(p => ({ ...p, [key]: true }))
+                                setYtUrlDraft(p => ({ ...p, [key]: `https://youtube.com/watch?v=${article.ytVideoId}` }))
+                              }}
+                              className="text-[10px] text-stone-400 hover:text-stone-600 shrink-0"
+                            >Edit</button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <input
+                              value={ytUrlDraft[key] ?? ''}
+                              onChange={e => setYtUrlDraft(p => ({ ...p, [key]: e.target.value }))}
+                              placeholder="https://youtube.com/watch?v=..."
+                              className="flex-1 px-2.5 py-1.5 text-[11px] border border-red-100 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-red-200 bg-white min-w-0"
+                            />
+                            <button
+                              onClick={() => saveYtUrl(article)}
+                              disabled={isSaving || !ytUrlDraft[key]}
+                              className="px-2.5 py-1.5 text-[11px] font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 shrink-0"
+                            >{isSaving ? '…' : 'Save'}</button>
+                            {isEditing && (
+                              <button
+                                onClick={() => setYtUrlEditing(p => ({ ...p, [key]: false }))}
+                                className="text-[10px] text-stone-400 hover:text-stone-600 shrink-0"
+                              >Cancel</button>
+                            )}
+                          </div>
+                        )}
+                        {ytUrlError[key] && (
+                          <p className="text-[10px] text-red-500 mt-1">{ytUrlError[key]}</p>
+                        )}
                       </div>
                     </div>
                   )

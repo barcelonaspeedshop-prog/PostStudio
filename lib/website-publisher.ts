@@ -1,6 +1,7 @@
 import { writeFile, readFile, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
+import { extractYouTubeId } from './youtube-url'
 
 const DATA_DIR = process.env.TOKEN_STORAGE_PATH || '/data'
 const PUBLISHED_DIR = path.join(DATA_DIR, 'published')
@@ -61,7 +62,7 @@ type PublishableItem = {
   articleSlug?: string
   slides?: Array<{ imageOptions?: string[] }>
   coverImageDirect?: string
-  manualUploaded?: { youtube?: string; tiktok?: string; x?: string }
+  youtubeUrl?: string
   hashtags?: string[]
   goLiveAt?: string
 }
@@ -91,12 +92,7 @@ export async function publishToWebsite(item: PublishableItem): Promise<{ success
       .map(s => usableImageUrl(s.imageOptions?.[0]))
       .filter((u): u is string => u !== null)
 
-    let ytVideoId: string | null = null
-    const ytUrl = item.manualUploaded?.youtube
-    if (ytUrl && ytUrl.includes('youtu')) {
-      const m = ytUrl.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/)
-      if (m) ytVideoId = m[1]
-    }
+    const ytVideoId = extractYouTubeId(item.youtubeUrl ?? '')
 
     const goLiveAt = item.goLiveAt
     const now = new Date().toISOString()

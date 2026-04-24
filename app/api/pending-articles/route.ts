@@ -20,6 +20,7 @@ type StoredArticle = {
   body: string
   publishedAt: string
   coverImage: string | null
+  ytVideoId?: string | null
   goLiveAt?: string
   status?: string
 }

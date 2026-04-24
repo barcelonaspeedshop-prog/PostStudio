@@ -257,12 +257,13 @@ async function assembleInBackground(
             const imgDur = Math.max(perImageDur, 2)
             const frames = Math.max(Math.round(imgDur * 24), 48)
             console.log(`[story-video] Image clip ch${chId}[${j}]: dur=${imgDur.toFixed(2)}s frames=${frames} path=${m.path}`)
-            // Use lavfi color source + overlay with subtle Ken Burns.
-            // Scale to 2x target (not 8000) to avoid OOM on the VPS — zoom is only 0.0005/frame.
+            // Use lavfi color source + overlay with Ken Burns zoom.
+            // Scale to 2x target to avoid OOM on the VPS. Step 0.001/frame ensures
+            // ≥1 output pixel of movement per frame at 24fps, avoiding integer-quantization stepping.
             await runFfmpeg([
               '-f', 'lavfi', '-i', `color=black:size=${W}x${H}:rate=24`,
               '-i', m.path,
-              '-filter_complex', `[1:v]scale=${W * 2}:-1,zoompan=z='zoom+0.0005':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${W}x${H}:fps=24,setsar=1[zoomed];[0:v][zoomed]overlay=shortest=1`,
+              '-filter_complex', `[1:v]scale=${W * 2}:-1,zoompan=z='zoom+0.001':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${frames}:s=${W}x${H}:fps=24,setsar=1[zoomed];[0:v][zoomed]overlay=shortest=1`,
               '-t', String(imgDur),
               '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'veryfast', '-crf', '23',
               '-y', clipPath,

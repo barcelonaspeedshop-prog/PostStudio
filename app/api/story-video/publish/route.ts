@@ -103,11 +103,12 @@ export async function POST(req: NextRequest) {
       publishInstagram?: boolean
       publishFacebook?: boolean
       storyTopic?: string
+      youtubeUrl?: string
     }
 
     const {
       jobId, channelName, title, description, tags,
-      publishInstagram, publishFacebook, storyTopic,
+      publishInstagram, publishFacebook, storyTopic, youtubeUrl,
     } = body
     const format = body.format || 'youtube'
 
@@ -233,6 +234,7 @@ export async function POST(req: NextRequest) {
             articleSlug: slug,
             hashtags: tags,
             goLiveAt,
+            youtubeUrl,
           })
           if (result.success) {
             console.log(`[publish] Article queued: ${slug} (live at ${goLiveAt})`)

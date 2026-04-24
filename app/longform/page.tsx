@@ -122,6 +122,7 @@ export default function LongFormPage() {
   const [confirmPublishOpen, setConfirmPublishOpen] = useState(false)
   const [ytPoll, setYtPoll] = useState<{ question: string; options: string[] } | null>(null)
   const [ytGenerating, setYtGenerating] = useState(false)
+  const [ytUrl, setYtUrl] = useState('')
   const [copiedPoll, setCopiedPoll] = useState(false)
 
   // ─── Restore draft ───
@@ -1128,6 +1129,7 @@ export default function LongFormPage() {
           publishInstagram: !!plat?.ig,
           publishFacebook: !!plat?.fb,
           storyTopic: script?.title,
+          youtubeUrl: ytUrl || undefined,
         }),
       })
       const data = await res.json()
@@ -1663,6 +1665,18 @@ export default function LongFormPage() {
                         )
                       })}
 
+                      {/* YouTube URL — paste after uploading to Studio */}
+                      <div className="px-1 space-y-1">
+                        <label className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">YouTube URL (optional)</label>
+                        <input
+                          value={ytUrl}
+                          onChange={e => setYtUrl(e.target.value)}
+                          placeholder="https://youtube.com/watch?v=..."
+                          className="w-full px-2.5 py-1.5 text-[12px] border border-red-100 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-red-200 bg-white"
+                        />
+                        <p className="text-[10px] text-stone-400">Paste the URL after uploading to YouTube. Can also be added later from the article preview.</p>
+                      </div>
+
                       {/* Publish button */}
                       <button
                         onClick={handlePublishButton}
@@ -2102,6 +2116,17 @@ export default function LongFormPage() {
                           </div>
                         )
                       })}
+                      {/* YouTube URL — paste after uploading to Studio */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">YouTube URL (optional)</label>
+                        <input
+                          value={ytUrl}
+                          onChange={e => setYtUrl(e.target.value)}
+                          placeholder="https://youtube.com/watch?v=..."
+                          className="w-full px-2.5 py-1.5 text-[12px] border border-red-100 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-red-200 bg-white"
+                        />
+                        <p className="text-[10px] text-stone-400">Paste after uploading to YouTube. Can also be added later.</p>
+                      </div>
                       <button
                         onClick={handlePublishButton}
                         disabled={!CHANNELS.some(ch => channelPlatforms[ch]?.ig || channelPlatforms[ch]?.fb)}
