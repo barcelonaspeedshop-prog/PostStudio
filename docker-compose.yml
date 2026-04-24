@@ -6,7 +6,8 @@ services:
     ports:
       - '3000:3000'
     volumes:
-      - poststudio_data:/data
+      - /docker/poststudio/data:/data
+      - /docker/poststudio/music:/data/music
     environment:
       # App
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://app.premirafirst.com}
@@ -44,6 +45,9 @@ services:
 
       # ElevenLabs (optional — voice-over generation)
       ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+
+      # Preview token for pending article previews on premirafirst.com
+      PREVIEW_TOKEN: ${PREVIEW_TOKEN:-}
 
     labels:
       - "traefik.enable=true"
