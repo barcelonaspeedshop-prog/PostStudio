@@ -14,6 +14,8 @@ import {
   deleteTempFile,
 } from '@/lib/meta'
 import { getJob, updateJob } from '../jobs'
+import { expandScriptToArticle, slugify } from '@/lib/article-expander'
+import { publishToWebsite } from '@/lib/website-publisher'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -268,6 +270,38 @@ export async function POST(req: NextRequest) {
     }
 
     const anySuccess = !!(results.youtube || results.instagram || results.facebook)
+
+    // Auto-publish article to website with 15-min hold window
+    if (anySuccess) {
+      void (async () => {
+        try {
+          const articleBody = await expandScriptToArticle({ title, description, tags, channelName })
+          const excerpt = articleBody.replace(/^#+[^\n]*\n?/gm, '').replace(/\n+/g, ' ').trim().slice(0, 250)
+          const slug = slugify(title)
+          const goLiveAt = new Date(Date.now() + 15 * 60 * 1000).toISOString()
+          const result = await publishToWebsite({
+            id: crypto.randomUUID(),
+            channel: channelName,
+            headline: title,
+            ytTitle: title,
+            articleBody,
+            articleExcerpt: excerpt,
+            articleSlug: slug,
+            manualUploaded: results.youtube ? { youtube: results.youtube.videoUrl } : undefined,
+            hashtags: tags,
+            goLiveAt,
+          })
+          if (result.success) {
+            console.log(`[publish] Article queued: ${slug} (live at ${goLiveAt})`)
+          } else {
+            console.warn(`[publish] Article write failed: ${result.error}`)
+          }
+        } catch (e) {
+          console.warn('[publish] Article auto-publish failed (non-fatal):', e instanceof Error ? e.message : e)
+        }
+      })()
+    }
+
     return NextResponse.json({
       ...results,
       channelName,

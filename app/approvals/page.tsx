@@ -78,6 +78,14 @@ export default function ApprovalsPage() {
   const [publishPanelId, setPublishPanelId] = useState<string | null>(null)
   const [articleExpandedId, setArticleExpandedId] = useState<string | null>(null)
   const [regeneratingArticleId, setRegeneratingArticleId] = useState<string | null>(null)
+
+  type PendingArticle = {
+    id: string; channel: string; slug: string; title: string
+    excerpt: string; body: string; coverImage: string | null
+    publishedAt: string; goLiveAt: string; previewUrl: string
+  }
+  const [pendingArticles, setPendingArticles] = useState<PendingArticle[]>([])
+  const [killLoading, setKillLoading] = useState<string | null>(null)
   const [imagePicker, setImagePicker] = useState<{
     itemId: string
     slideIndex: number
@@ -120,7 +128,33 @@ export default function ApprovalsPage() {
     }
   }
 
-  useEffect(() => { fetchItems() }, [])
+  const fetchPendingArticles = async () => {
+    try {
+      const res = await fetch('/api/pending-articles')
+      if (res.ok) setPendingArticles(await res.json())
+    } catch { /* non-fatal */ }
+  }
+
+  useEffect(() => { fetchItems(); fetchPendingArticles() }, [])
+
+  const killArticle = async (channel: string, slug: string) => {
+    const key = `${channel}/${slug}`
+    setKillLoading(key)
+    try {
+      const res = await fetch(`/api/pending-articles?channel=${channel}&slug=${encodeURIComponent(slug)}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const d = await res.json()
+        showToast(d.error || 'Kill failed', 'error')
+      } else {
+        showToast('Article killed — removed before going live', 'success')
+        fetchPendingArticles()
+      }
+    } catch {
+      showToast('Kill failed', 'error')
+    } finally {
+      setKillLoading(null)
+    }
+  }
 
   const autoGenerateAll = async () => {
     setAutoGenerating(true)
@@ -1235,6 +1269,60 @@ export default function ApprovalsPage() {
                             Reject
                           </button>
                         </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Pending Articles (long-form auto-published, within 15-min hold window) */}
+            {pendingArticles.length > 0 && (
+              <div className="flex flex-col gap-3">
+                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Pending articles — going live soon</p>
+                {pendingArticles.map(article => {
+                  const key = `${article.channel}/${article.slug}`
+                  const isKilling = killLoading === key
+                  const minsLeft = Math.ceil((new Date(article.goLiveAt).getTime() - Date.now()) / 60000)
+                  return (
+                    <div key={article.id} className="bg-white border border-amber-100 rounded-xl p-4 flex gap-3">
+                      {article.coverImage && (
+                        <div
+                          className="w-14 h-14 rounded-lg bg-stone-100 shrink-0 bg-cover bg-center"
+                          style={{ backgroundImage: `url(${article.coverImage})` }}
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-medium text-stone-900 truncate">{article.title}</p>
+                        <p className="text-[11px] text-stone-500 mt-0.5 truncate">{article.excerpt.slice(0, 120)}</p>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded font-medium">
+                            Live in ~{minsLeft} min
+                          </span>
+                          <span className="text-[10px] text-stone-400">{article.channel} · /{article.slug}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1.5 shrink-0">
+                        <a
+                          href={article.previewUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 text-[11px] font-medium bg-stone-100 text-stone-700 rounded-lg hover:bg-stone-200 transition-colors text-center"
+                        >
+                          Preview
+                        </a>
+                        <button
+                          onClick={() => killArticle(article.channel, article.slug)}
+                          disabled={isKilling}
+                          className="px-3 py-1.5 text-[11px] font-medium bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                        >
+                          {isKilling ? (
+                            <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                            </svg>
+                          ) : 'Kill'}
+                        </button>
                       </div>
                     </div>
                   )

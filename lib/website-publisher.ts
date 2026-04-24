@@ -40,6 +40,7 @@ export type ArticleMeta = {
   excerpt: string
   publishedAt: string
   coverImage: string | null
+  goLiveAt?: string
 }
 
 export type Article = ArticleMeta & {
@@ -47,6 +48,7 @@ export type Article = ArticleMeta & {
   carouselImages: string[]
   ytVideoId: string | null
   hashtags: string[]
+  status?: 'pending' | 'live'
 }
 
 type PublishableItem = {
@@ -58,8 +60,10 @@ type PublishableItem = {
   articleExcerpt?: string
   articleSlug?: string
   slides?: Array<{ imageOptions?: string[] }>
+  coverImageDirect?: string
   manualUploaded?: { youtube?: string; tiktok?: string; x?: string }
   hashtags?: string[]
+  goLiveAt?: string
 }
 
 async function loadIndex(): Promise<ArticleMeta[]> {
@@ -82,7 +86,7 @@ export async function publishToWebsite(item: PublishableItem): Promise<{ success
       return { success: false, error: `unknown channel: ${item.channel}` }
     }
 
-    const coverImage = usableImageUrl(item.slides?.[0]?.imageOptions?.[0])
+    const coverImage = usableImageUrl(item.coverImageDirect ?? item.slides?.[0]?.imageOptions?.[0])
     const carouselImages = (item.slides || [])
       .map(s => usableImageUrl(s.imageOptions?.[0]))
       .filter((u): u is string => u !== null)
@@ -94,6 +98,9 @@ export async function publishToWebsite(item: PublishableItem): Promise<{ success
       if (m) ytVideoId = m[1]
     }
 
+    const goLiveAt = item.goLiveAt
+    const now = new Date().toISOString()
+
     const article: Article = {
       id: item.id,
       channel: channelSlug,
@@ -101,11 +108,12 @@ export async function publishToWebsite(item: PublishableItem): Promise<{ success
       title: item.ytTitle || item.headline,
       excerpt: item.articleExcerpt,
       body: item.articleBody,
-      publishedAt: new Date().toISOString(),
+      publishedAt: now,
       coverImage,
       carouselImages,
       ytVideoId,
       hashtags: item.hashtags || [],
+      ...(goLiveAt ? { goLiveAt, status: 'pending' as const } : {}),
     }
 
     const channelDir = path.join(PUBLISHED_DIR, channelSlug)
@@ -122,6 +130,7 @@ export async function publishToWebsite(item: PublishableItem): Promise<{ success
       excerpt: article.excerpt,
       publishedAt: article.publishedAt,
       coverImage,
+      ...(goLiveAt ? { goLiveAt } : {}),
     }
 
     const index = await loadIndex()
