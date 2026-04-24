@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createReadStream, existsSync } from 'fs'
-import { readFile, writeFile, mkdir, unlink } from 'fs/promises'
+import { existsSync } from 'fs'
+import { readFile, writeFile, mkdir } from 'fs/promises'
 import { spawn } from 'child_process'
 import path from 'path'
 import crypto from 'crypto'
-import { google } from 'googleapis'
-import { getAuthenticatedClient, loadTokens } from '@/lib/youtube'
 import {
   getChannelConfig,
   publishVideoToInstagram,
@@ -102,7 +100,6 @@ export async function POST(req: NextRequest) {
       tags: string[]
       format?: string
       thumbnailBase64?: string
-      privacyStatus?: string
       publishInstagram?: boolean
       publishFacebook?: boolean
       storyTopic?: string
@@ -110,10 +107,9 @@ export async function POST(req: NextRequest) {
 
     const {
       jobId, channelName, title, description, tags,
-      thumbnailBase64, publishInstagram, publishFacebook, storyTopic,
+      publishInstagram, publishFacebook, storyTopic,
     } = body
     const format = body.format || 'youtube'
-    const privacyStatus = body.privacyStatus || 'public'
 
     if (!jobId || !channelName || !title) {
       return NextResponse.json({ error: 'jobId, channelName, and title are required' }, { status: 400 })
@@ -121,11 +117,10 @@ export async function POST(req: NextRequest) {
 
     console.log(`[publish] Request — channel: "${channelName}", jobId: ${jobId}, publishInstagram: ${publishInstagram}, publishFacebook: ${publishFacebook}, format: ${format}`)
 
-    // ── Pre-flight: load credentials once ────────────────────────────────────
-    const [ytTokens, metaCfgPreflight] = await Promise.all([
-      loadTokens(),
-      (publishInstagram || publishFacebook) ? getChannelConfig(channelName) : Promise.resolve(null),
-    ])
+    // ── Pre-flight: load Meta credentials ────────────────────────────────────
+    const metaCfgPreflight = (publishInstagram || publishFacebook)
+      ? await getChannelConfig(channelName)
+      : null
 
     const preflight: string[] = []
     if (publishInstagram && !metaCfgPreflight?.instagramAccountId) {
@@ -142,7 +137,6 @@ export async function POST(req: NextRequest) {
     }
 
     const results: {
-      youtube?: { videoId: string; videoUrl: string }
       instagram?: { id: string }
       facebook?: { id: string }
       scheduledCarousel?: { id: string }
@@ -155,54 +149,6 @@ export async function POST(req: NextRequest) {
     }
     if (publishFacebook && (!metaCfgPreflight?.facebookPageId || !metaCfgPreflight?.pageAccessToken)) {
       results.errors.facebook = `No Facebook credentials configured for "${channelName}"`
-    }
-
-    // ── YouTube ──────────────────────────────────────────────────────────────
-
-    if (ytTokens[channelName]) {
-      try {
-        const ytVideoPath = await getVideoPathForFormat(jobId, format)
-        const oauth2 = await getAuthenticatedClient(channelName)
-        const youtube = google.youtube({ version: 'v3', auth: oauth2 })
-
-        console.log(`[publish] Uploading "${title}" to YouTube for ${channelName}`)
-
-        const insertRes = await youtube.videos.insert({
-          part: ['snippet', 'status'],
-          requestBody: {
-            snippet: { title, description, tags, categoryId: '17', defaultLanguage: 'en', defaultAudioLanguage: 'en' },
-            status: { privacyStatus },
-          },
-          media: { mimeType: 'video/mp4', body: createReadStream(ytVideoPath) },
-        })
-
-        const videoId = insertRes.data.id
-        if (!videoId) throw new Error('YouTube did not return a video ID')
-        console.log(`[publish] YouTube upload complete: https://youtube.com/watch?v=${videoId}`)
-
-        results.youtube = { videoId, videoUrl: `https://www.youtube.com/watch?v=${videoId}` }
-
-        // Set custom thumbnail
-        if (thumbnailBase64) {
-          try {
-            const thumbBuffer = Buffer.from(thumbnailBase64.replace(/^data:image\/\w+;base64,/, ''), 'base64')
-            const { Readable } = await import('stream')
-            await youtube.thumbnails.set({
-              videoId,
-              media: { mimeType: 'image/jpeg', body: Readable.from(thumbBuffer) },
-            })
-          } catch (e) {
-            console.warn('[publish] Thumbnail upload failed (non-fatal):', e instanceof Error ? e.message : e)
-          }
-        }
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e)
-        console.error(`[publish] YouTube error for ${channelName}:`, msg)
-        results.errors.youtube = msg
-      }
-    } else {
-      console.log(`[publish] No YouTube token for "${channelName}" — skipping YouTube upload`)
-      results.errors.youtube = `No YouTube credentials for "${channelName}". Connect via the Accounts page.`
     }
 
     // ── Instagram Square (1:1) ───────────────────────────────────────────────
@@ -247,8 +193,8 @@ export async function POST(req: NextRequest) {
 
     // ── Scheduled carousel (4 hours after publish) ───────────────────────────
 
-    const didPublishSomething = results.youtube || results.instagram || results.facebook
-    if (didPublishSomething && (publishInstagram || publishFacebook)) {
+    const anySuccess = !!(results.instagram || results.facebook)
+    if (anySuccess && (publishInstagram || publishFacebook)) {
       try {
         const scheduledTime = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString()
         const id = crypto.randomUUID()
@@ -269,8 +215,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const anySuccess = !!(results.youtube || results.instagram || results.facebook)
-
     // Auto-publish article to website with 15-min hold window
     if (anySuccess) {
       void (async () => {
@@ -287,7 +231,6 @@ export async function POST(req: NextRequest) {
             articleBody,
             articleExcerpt: excerpt,
             articleSlug: slug,
-            manualUploaded: results.youtube ? { youtube: results.youtube.videoUrl } : undefined,
             hashtags: tags,
             goLiveAt,
           })
@@ -305,8 +248,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ...results,
       channelName,
-      videoId: results.youtube?.videoId,
-      videoUrl: results.youtube?.videoUrl,
       ok: anySuccess,
     })
   } catch (err: unknown) {

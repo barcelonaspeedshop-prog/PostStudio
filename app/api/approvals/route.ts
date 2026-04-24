@@ -318,10 +318,9 @@ export async function PATCH(req: NextRequest) {
       item.platforms = [...item.platforms, 'instagram']
     }
 
-    // Publish to instagram and facebook; YouTube enabled for Gentlemen of Fuel only
+    // Publish to instagram and facebook only — YouTube is manual-only via the Publish Panel
     const activePlatforms = item.platforms.filter(p =>
-      p === 'instagram' || p === 'facebook' ||
-      (p === 'youtube' && item.channel === 'Gentlemen of Fuel')
+      p === 'instagram' || p === 'facebook'
     )
 
     const publishJobs = activePlatforms.map((platform): Promise<PlatformResult> => {
@@ -368,25 +367,6 @@ export async function PATCH(req: NextRequest) {
               return { platform: 'facebook', success: r.ok, error: d.error }
             })
             .catch(e => ({ platform: 'facebook', success: false, error: e instanceof Error ? e.message : String(e) }))
-
-        case 'youtube':
-          return fetch(`${baseUrl}/api/publish/youtube`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              videoBase64: item.videoBase64,
-              title: item.ytTitle || item.headline,
-              description: item.ytDescription || caption,
-              tags: item.ytTags || [],
-              channelName: item.channel,
-            }),
-          })
-            .then(async r => {
-              const d = await r.json()
-              if (r.ok) return { platform: 'youtube', success: true, url: d.url }
-              return { platform: 'youtube', success: false, error: d.error }
-            })
-            .catch(e => ({ platform: 'youtube', success: false, error: e instanceof Error ? e.message : String(e) }))
 
         default:
           return Promise.resolve({ platform, success: false, error: `No publish handler for platform: ${platform}` })

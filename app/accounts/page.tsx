@@ -32,34 +32,6 @@ const ACCOUNT_DATA = [
   ]},
 ]
 
-// Expected YouTube channel IDs — used to detect when the wrong Brand Account
-// was connected (all 8 Omnira channels sharing GoF's token is a known issue).
-const EXPECTED_YT_CHANNEL_IDS: Record<string, string> = {
-  'Gentlemen of Fuel': 'UCRul9-FAiGqwz7yKa7WRCwQ',
-  'Omnira F1':         'UCpJHo_MnHVZ2cCydZVAND2Q',
-  'Road & Trax':       'UCL2hKeQUBiEG36rfTs9bhbw',
-  'Omnira Football':   'UClMPeEgy_Q21K0v5GrOh4kw',
-  'Omnira Cricket':    'UCiXqVtRt-KYsRlS0LYl_iBw',
-  'Omnira Golf':       'UCyUvDlet6Py9D30aCdv46SA',
-  'Omnira NFL':        'UCR6DnL1k6Uq1lgHT27cKnHA',
-  'Omnira Food':       'UC970CeC0HKQIlLuiqbvgkkA',
-  'Omnira Travel':     'UCkehLjuwibcMWVeP5xzWlJA',
-}
-
-// YouTube handles to look for in Google's channel picker during OAuth.
-// Note: some Brand Account names differ from PostStudio channel names.
-const YT_PICKER_HANDLE: Record<string, string> = {
-  'Gentlemen of Fuel': '@gentlemenoffuel',
-  'Omnira F1':         '@omniraf1',
-  'Road & Trax':       '@roadandtrax',
-  'Omnira Football':   '@omnirafc',       // channel name is "Omnira FC"
-  'Omnira Cricket':    '@omniracricket',
-  'Omnira Golf':       '@omniragolf',
-  'Omnira NFL':        '@omniranfl',
-  'Omnira Food':       '@omnirafood',
-  'Omnira Travel':     '@omniratravel',
-}
-
 const PLATFORM_TIPS: Record<string, string> = {
   TikTok: 'Set up TikTok to reach a younger, high-engagement audience',
   Instagram: 'Instagram Reels drive significant organic reach',
@@ -84,27 +56,8 @@ type ConnectForm = {
   error: string
 }
 
-type YouTubeStatus = Record<string, {
-  connected: boolean
-  youtube_channel_name?: string
-  youtube_channel_id?: string
-  youtube_handle?: string
-  google_account_email?: string
-}>
-
-type YouTubeHealth = {
-  sharedGroups: { channels: string[] }[]
-  channels: { channel: string; shared: boolean }[]
-}
-
 function AccountsPageInner() {
   const [metaStatus, setMetaStatus] = useState<MetaStatus>({})
-  const [ytStatus, setYtStatus]     = useState<YouTubeStatus>({})
-  const [ytHealth, setYtHealth]     = useState<YouTubeHealth | null>(null)
-  const [ytDisconnecting, setYtDisconnecting] = useState<string | null>(null)
-  const [ytRevoking, setYtRevoking] = useState<string | null>(null)
-  // Per-channel Google account email inputs (used as login_hint during OAuth)
-  const [loginHints, setLoginHints] = useState<Record<string, string>>({})
   const [connectForm, setConnectForm] = useState<ConnectForm | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [disconnecting, setDisconnecting] = useState<string | null>(null)
@@ -130,75 +83,17 @@ function AccountsPageInner() {
     } catch { /* ignore */ }
   }
 
-  const fetchYtStatus = async () => {
-    try {
-      const res = await fetch('/api/auth/youtube?action=status')
-      if (res.ok) setYtStatus(await res.json())
-    } catch { /* ignore */ }
-  }
-
-  const fetchYtHealth = async () => {
-    try {
-      const res = await fetch('/api/auth/youtube?action=health')
-      if (res.ok) setYtHealth(await res.json())
-    } catch { /* ignore */ }
-  }
-
-  // Revoke the shared token for a channel, then redirect to fresh OAuth.
-  // Passes login_hint so Google pre-selects the correct account in the picker.
-  const revokeAndReconnect = async (channel: string) => {
-    setYtRevoking(channel)
-    try {
-      await fetch(`/api/auth/youtube?action=revoke&channel=${encodeURIComponent(channel)}`)
-      await fetchYtStatus()
-      await fetchYtHealth()
-      const hint = loginHints[channel]?.trim() || ytStatus[channel]?.google_account_email || ''
-      const hintParam = hint ? `&login_hint=${encodeURIComponent(hint)}` : ''
-      window.location.href = `/api/auth/youtube?channel=${encodeURIComponent(channel)}${hintParam}`
-    } catch {
-      showToast('Revoke failed', 'error')
-      setYtRevoking(null)
-    }
-  }
-
-  // Build OAuth URL including login_hint for Connect / Reconnect links
-  const ytOAuthUrl = (channel: string) => {
-    const hint = loginHints[channel]?.trim() || ytStatus[channel]?.google_account_email || ''
-    const hintParam = hint ? `&login_hint=${encodeURIComponent(hint)}` : ''
-    return `/api/auth/youtube?channel=${encodeURIComponent(channel)}${hintParam}`
-  }
-
-  const disconnectYt = async (channel: string) => {
-    setYtDisconnecting(channel)
-    try {
-      const res = await fetch(`/api/auth/youtube?action=disconnect&channel=${encodeURIComponent(channel)}`)
-      if (res.ok) {
-        await fetchYtStatus()
-        showToast(`YouTube disconnected for ${channel}`)
-      } else {
-        showToast(`Failed to disconnect YouTube for ${channel}`, 'error')
-      }
-    } catch { showToast('Disconnect failed', 'error') }
-    finally { setYtDisconnecting(null) }
-  }
-
   useEffect(() => {
     fetch('/api/settings').then(r => r.json()).then(s => {
       if (typeof s.includeMusic === 'boolean') setIncludeMusic(s.includeMusic)
     }).catch(() => {})
     fetchMetaStatus()
-    fetchYtStatus()
-    fetchYtHealth()
     // Show result of OAuth callback redirects
-    const ytConnected = searchParams.get('connected')
     const connected   = searchParams.get('meta_connected')
     const igCount     = searchParams.get('meta_ig')
     const metaErr     = searchParams.get('meta_error')
-    const authErr     = searchParams.get('error')
-    if (ytConnected) showToast(`YouTube connected for ${ytConnected}`)
     if (connected) showToast(`Meta connected — ${connected} channel${connected === '1' ? '' : 's'} updated, ${igCount ?? 0} Instagram IDs saved`)
     if (metaErr)   showToast(`Meta connection failed: ${metaErr}`, 'error')
-    if (authErr)   showToast(`YouTube auth failed: ${authErr}`, 'error')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -369,27 +264,6 @@ function AccountsPageInner() {
             </p>
           </div>
 
-          {/* Shared YouTube token warning */}
-          {ytHealth && ytHealth.sharedGroups.length > 0 && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-xl px-5 py-4">
-              <p className="text-[13px] font-semibold text-red-800 mb-2">
-                YouTube publishing broken — {ytHealth.sharedGroups.flatMap(g => g.channels).length} channels share the same Google token
-              </p>
-              <p className="text-[12px] text-red-700 leading-relaxed mb-3">
-                Videos from all affected channels will upload to the same place. Each Brand Account needs its own unique OAuth token.
-              </p>
-              <p className="text-[12px] font-semibold text-red-800 mb-1">How to fix (takes ~5 minutes):</p>
-              <ol className="text-[12px] text-red-700 space-y-1 list-decimal list-inside mb-3">
-                <li>Click <strong>↻ Revoke &amp; Reconnect</strong> on any affected channel below (this clears all shared tokens)</li>
-                <li>On Google&apos;s screen, when asked &quot;Choose your channel&quot; — pick the matching Brand Account handle</li>
-                <li>Return here and repeat for each remaining affected channel</li>
-              </ol>
-              <p className="text-[11px] text-red-600 font-medium">
-                Affected: {ytHealth.sharedGroups.flatMap(g => g.channels).join(', ')}
-              </p>
-            </div>
-          )}
-
           {/* Global Settings */}
           <div className="mb-6 bg-white border border-stone-100 rounded-xl p-5">
             <h2 className="text-[13px] font-semibold text-stone-900 mb-4">Global Settings</h2>
@@ -471,130 +345,16 @@ function AccountsPageInner() {
                       })}
                     </div>
 
-                    {/* YouTube API connection */}
-                    {(() => {
-                      const yt = ytStatus[ch.channel]
-                      const expectedId = EXPECTED_YT_CHANNEL_IDS[ch.channel]
-                      const connectedId = yt?.youtube_channel_id
-                      const wrongChannel = yt?.connected && expectedId && connectedId && connectedId !== expectedId
-                      const sharedToken = ytHealth?.channels.find(c => c.channel === ch.channel)?.shared ?? false
-                      const expectedHandle = YT_PICKER_HANDLE[ch.channel] || ch.channel
-                      const hasIssue = wrongChannel || sharedToken
-                      return (
-                        <div className="mt-4 pt-4 border-t border-stone-100">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="text-[12px] font-medium text-stone-700">YouTube API</p>
-                              {yt?.connected ? (
-                                <div className="mt-0.5 space-y-1">
-                                  <p className="text-[11px] text-stone-400 truncate">
-                                    {yt?.youtube_handle || yt?.youtube_channel_name || 'Connected'}
-                                  </p>
-                                  {sharedToken ? (
-                                    <div>
-                                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">
-                                        ⚠ SHARED TOKEN
-                                      </span>
-                                      <p className="text-[10px] text-amber-700 mt-1 leading-tight">
-                                        Shares a Google token with other channels — uploads will go to the wrong place.
-                                      </p>
-                                    </div>
-                                  ) : wrongChannel ? (
-                                    <div>
-                                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-red-50 text-red-700">
-                                        ⚠ WRONG CHANNEL
-                                      </span>
-                                      <p className="text-[10px] text-red-600 mt-1 leading-tight">
-                                        Connected to <code className="font-mono">{connectedId?.slice(0,12)}…</code> — expected <code className="font-mono">{expectedId?.slice(0,12)}…</code>.
-                                      </p>
-                                    </div>
-                                  ) : (
-                                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
-                                      CONNECTED
-                                    </span>
-                                  )}
-                                </div>
-                              ) : (
-                                <p className="text-[11px] text-stone-400 mt-0.5">
-                                  Connect to publish videos to YouTube
-                                </p>
-                              )}
-                            </div>
-                            {yt?.connected ? (
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                {sharedToken ? (
-                                  <button
-                                    onClick={() => revokeAndReconnect(ch.channel)}
-                                    disabled={ytRevoking === ch.channel}
-                                    className="px-2 py-1 text-[10px] font-medium bg-amber-500 text-white rounded hover:bg-amber-600 disabled:opacity-50 transition-colors"
-                                  >
-                                    {ytRevoking === ch.channel ? 'Revoking…' : '↻ Revoke & Reconnect'}
-                                  </button>
-                                ) : (
-                                  <a
-                                    href={ytOAuthUrl(ch.channel)}
-                                    className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${hasIssue ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
-                                  >
-                                    ↻ Reconnect
-                                  </a>
-                                )}
-                                <button
-                                  onClick={() => disconnectYt(ch.channel)}
-                                  disabled={ytDisconnecting === ch.channel}
-                                  className="text-[11px] text-stone-400 hover:text-red-500 transition-colors disabled:opacity-50"
-                                >
-                                  {ytDisconnecting === ch.channel ? 'Removing...' : 'Remove'}
-                                </button>
-                              </div>
-                            ) : (
-                              <a
-                                href={ytOAuthUrl(ch.channel)}
-                                className="shrink-0 px-3 py-1.5 text-[12px] font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                              >
-                                Connect
-                              </a>
-                            )}
-                          </div>
-                          {/* Google account email — shown when connected; used as login_hint */}
-                          {yt?.connected && yt.google_account_email && !hasIssue && (
-                            <p className="mt-1.5 text-[10px] text-stone-400">
-                              Google: {yt.google_account_email}
-                            </p>
-                          )}
-
-                          {/* login_hint email input — shown when there's a problem or no email stored */}
-                          {(hasIssue || (yt?.connected && !yt.google_account_email) || !yt?.connected) && (
-                            <div className="mt-2">
-                              <input
-                                type="email"
-                                value={loginHints[ch.channel] || ''}
-                                onChange={(e) => setLoginHints(h => ({ ...h, [ch.channel]: e.target.value }))}
-                                placeholder="Google account email (login_hint)"
-                                className="w-full px-2 py-1.5 text-[11px] border border-stone-200 rounded-lg text-stone-700 placeholder-stone-300 focus:outline-none focus:ring-1 focus:ring-stone-400"
-                              />
-                              <p className="mt-0.5 text-[10px] text-stone-400">
-                                Enter the Google account email for this channel so OAuth targets the right account.
-                              </p>
-                            </div>
-                          )}
-
-                          {sharedToken && (
-                            <div className="mt-2 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                              <p className="text-[10px] text-amber-800 leading-relaxed">
-                                <strong>Action required:</strong> Enter the Google email above, then click <strong>↻ Revoke &amp; Reconnect</strong>. On Google&apos;s &quot;Choose your channel&quot; screen, select <strong><code className="bg-amber-100 px-0.5 rounded font-mono">{expectedHandle}</code></strong>.
-                              </p>
-                            </div>
-                          )}
-                          {!sharedToken && wrongChannel && (
-                            <div className="mt-2 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                              <p className="text-[10px] text-red-700 leading-relaxed">
-                                <strong>Action required:</strong> Enter the Google email above, then click <strong>↻ Reconnect</strong>. On Google&apos;s screen, click <strong>&quot;Switch account&quot;</strong> and sign in as the <strong>{ch.channel}</strong> Brand Account.
-                              </p>
-                            </div>
-                          )}
+                    {/* YouTube — manual upload only */}
+                    <div className="mt-4 pt-4 border-t border-stone-100">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[12px] font-medium text-stone-700">YouTube</p>
+                          <p className="text-[11px] text-stone-400 mt-0.5">Upload manually via the Long Form Publish Panel</p>
                         </div>
-                      )
-                    })()}
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-stone-50 text-stone-400">MANUAL</span>
+                      </div>
+                    </div>
 
                     {/* Meta (Instagram + Facebook) direct API connection */}
                     <div className="mt-4 pt-4 border-t border-stone-100">

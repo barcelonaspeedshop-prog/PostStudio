@@ -99,8 +99,6 @@ export default function CarouselPage() {
   const [publishPlatforms, setPublishPlatforms] = useState<string[]>([])
   const [mobilePanel, setMobilePanel] = useState<'controls' | 'slides' | 'detail'>('slides')
   const slideStripRef = useRef<HTMLDivElement>(null)
-  const [showYouTube, setShowYouTube] = useState(false)
-  const [ytPublishing, setYtPublishing] = useState(false)
   const [sendingApproval, setSendingApproval] = useState(false)
   const [ytTitle, setYtTitle] = useState('')
   const [ytDescription, setYtDescription] = useState('')
@@ -546,39 +544,6 @@ export default function CarouselPage() {
     a.click()
     URL.revokeObjectURL(url)
     showToast('Slides exported!')
-  }
-
-  const publishToYouTube = async () => {
-    if (!videoUrl) { showToast('Export video first', 'error'); return }
-    setYtPublishing(true)
-    showToast('Uploading to YouTube...')
-    try {
-      const caption = slides.map((s) => `${s.headline} — ${s.body}`).join('\n\n')
-      const tagsArray = ytTags
-        ? ytTags.split(',').map(t => t.trim()).filter(Boolean)
-        : caption.match(/#[\w]+/g)?.map(t => t.replace('#', '')) || []
-      const payload = {
-        videoBase64: videoUrl,
-        title: ytTitle || slides[0]?.headline || 'Carousel Video',
-        description: ytDescription || caption,
-        tags: tagsArray,
-        channelName: channel,
-      }
-      console.log('[youtube-publish-client] Sending:', { title: payload.title, description: payload.description.slice(0, 100) + '...', tags: payload.tags, channelName: payload.channelName, videoSize: payload.videoBase64.length })
-      const res = await fetch('/api/publish/youtube', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      showToast(`Published to YouTube!`)
-      setShowYouTube(false)
-    } catch (e: unknown) {
-      showToast(e instanceof Error ? e.message : 'YouTube upload failed', 'error')
-    } finally {
-      setYtPublishing(false)
-    }
   }
 
   const sendForApproval = async () => {
@@ -1154,73 +1119,6 @@ export default function CarouselPage() {
                       </div>
                     )}
 
-                    {/* YouTube direct publish */}
-                    <button
-                      onClick={() => {
-                        setShowYouTube(!showYouTube)
-                        if (!ytTitle) setYtTitle(truncateYtTitle(slides[0]?.headline || ''))
-                        if (!ytDescription) { const d = slides.map(s => `${s.headline} — ${s.body}`).join('\n\n'); setYtDescription(d.length > 5000 ? d.slice(0, 5000) : d) }
-                        if (!ytTags) setYtTags(generateYtTags())
-                      }}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 text-white text-[13px] font-medium rounded-xl hover:bg-red-700 transition-colors"
-                    >
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                      </svg>
-                      YouTube Direct
-                    </button>
-
-                    {showYouTube && (
-                      <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex flex-col gap-2.5">
-                        <p className="text-[10px] font-medium text-red-700 uppercase tracking-widest">YouTube upload</p>
-                        <div>
-                          <p className="text-[10px] text-stone-400 mb-1">Title</p>
-                          <input
-                            value={ytTitle}
-                            onChange={(e) => setYtTitle(e.target.value)}
-                            className="w-full text-[16px] md:text-[12px] border border-red-200 rounded-lg px-2.5 py-2 min-h-[44px] bg-white focus:outline-none focus:border-red-400 text-stone-900"
-                            placeholder="Video title"
-                          />
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-stone-400 mb-1">Description</p>
-                          <textarea
-                            value={ytDescription}
-                            onChange={(e) => setYtDescription(e.target.value)}
-                            rows={3}
-                            className="w-full text-[16px] md:text-[12px] border border-red-200 rounded-lg px-2.5 py-2 resize-none bg-white focus:outline-none focus:border-red-400 text-stone-900"
-                            placeholder="Video description"
-                          />
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-stone-400 mb-1">Tags</p>
-                          <input
-                            value={ytTags}
-                            onChange={(e) => setYtTags(e.target.value)}
-                            className="w-full text-[16px] md:text-[12px] border border-red-200 rounded-lg px-2.5 py-2 min-h-[44px] bg-white focus:outline-none focus:border-red-400 text-stone-900"
-                            placeholder="tag1, tag2, tag3"
-                          />
-                        </div>
-                        <p className="text-[10px] text-stone-400">Channel: {channel}</p>
-                        <button
-                          onClick={publishToYouTube}
-                          disabled={ytPublishing}
-                          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 text-white text-[13px] font-medium rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {ytPublishing ? (
-                            <>
-                              <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
-                                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-                              </svg>
-                              Uploading to YouTube...
-                            </>
-                          ) : (
-                            'Upload to YouTube'
-                          )}
-                        </button>
-                      </div>
-                    )}
                   </>
                 )}
               </div>

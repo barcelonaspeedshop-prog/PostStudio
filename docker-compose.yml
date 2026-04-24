@@ -16,11 +16,6 @@ services:
       # Anthropic
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
 
-      # Google OAuth (shared by YouTube + Drive)
-      YOUTUBE_CLIENT_ID: ${YOUTUBE_CLIENT_ID}
-      YOUTUBE_CLIENT_SECRET: ${YOUTUBE_CLIENT_SECRET}
-      YOUTUBE_REDIRECT_URI: ${YOUTUBE_REDIRECT_URI}
-
       # Google Drive image library root folder
       GOOGLE_DRIVE_FOLDER_ID: 1wtB_6-2kTfPs7fnvo905MCw7Qr5Gk--Z
 

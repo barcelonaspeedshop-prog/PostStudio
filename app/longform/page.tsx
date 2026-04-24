@@ -33,12 +33,6 @@ const Spinner = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
   </svg>
 )
 
-const YT_ICON = (
-  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-  </svg>
-)
-
 function deriveTagsFromScript(s: Script | null): { ytTags: string; igTags: string } {
   if (!s) return { ytTags: '', igTags: '' }
   const stop = new Set(['with','this','that','from','have','will','been','they','were','when','what','your','into','more','also','some','than','then','them','these','their','here','just','over','after','very','each','much','such','both','even','most','only','about','which'])
@@ -117,18 +111,14 @@ export default function LongFormPage() {
 
   // ─── Publish panel ───
   const [publishPanelOpen, setPublishPanelOpen] = useState(false)
-  const [ytConnected, setYtConnected] = useState<Record<string, boolean>>({})
   const [metaConnected, setMetaConnected] = useState<Record<string, { instagram: boolean; facebook: boolean }>>({})
   // Per-channel platform selection: each platform is independently toggled
-  const [channelPlatforms, setChannelPlatforms] = useState<Record<string, { yt: boolean; ig: boolean; fb: boolean }>>({})
+  const [channelPlatforms, setChannelPlatforms] = useState<Record<string, { ig: boolean; fb: boolean }>>({})
   // Per-channel metadata with separate tag fields per platform
   const [publishMeta, setPublishMeta] = useState<Record<string, { title: string; description: string; ytTags: string; igTags: string }>>({})
   // Separate status + error tracking per platform
-  const [ytStatus, setYtStatus] = useState<Record<string, 'idle' | 'connecting' | 'uploading' | 'done' | 'error'>>({})
   const [metaStatus, setMetaStatus] = useState<Record<string, 'idle' | 'uploading' | 'done' | 'error'>>({})
-  const [ytError, setYtError] = useState<Record<string, string>>({})
   const [metaError, setMetaError] = useState<Record<string, string>>({})
-  const [ytPublishedUrl, setYtPublishedUrl] = useState<Record<string, string>>({})
   const [confirmPublishOpen, setConfirmPublishOpen] = useState(false)
   const [ytPoll, setYtPoll] = useState<{ question: string; options: string[] } | null>(null)
   const [ytGenerating, setYtGenerating] = useState(false)
@@ -1046,30 +1036,22 @@ export default function LongFormPage() {
     }
     let metaMap: Record<string, { instagram: boolean; facebook: boolean }> = {}
     try {
-      const [ytRes, metaRes] = await Promise.all([
-        fetch('/api/auth/youtube?action=status'),
-        fetch('/api/auth/meta?action=status'),
-      ])
-      const ytSt = ytRes.ok ? await ytRes.json() : {}
+      const metaRes = await fetch('/api/auth/meta?action=status')
       const metaSt = metaRes.ok ? await metaRes.json() : {}
-      const ytMap: Record<string, boolean> = {}
       for (const ch of CHANNELS) {
-        ytMap[ch] = !!ytSt[ch]?.connected
         metaMap[ch] = { instagram: !!metaSt[ch]?.instagram, facebook: !!metaSt[ch]?.facebook }
       }
-      setYtConnected(ytMap)
       setMetaConnected(metaMap)
     } catch { /* non-fatal */ }
 
-    // Default: current channel selected, yt always on (requires login anyway), ig/fb per connection
+    // Default: current channel selected, ig/fb per connection status
     setChannelPlatforms(prev => {
-      const platforms: Record<string, { yt: boolean; ig: boolean; fb: boolean }> = {}
+      const platforms: Record<string, { ig: boolean; fb: boolean }> = {}
       for (const ch of CHANNELS) {
-        platforms[ch] = prev[ch] || { yt: false, ig: false, fb: false }
+        platforms[ch] = prev[ch] || { ig: false, fb: false }
       }
-      if (!prev[channel] || (!prev[channel].yt && !prev[channel].ig && !prev[channel].fb)) {
+      if (!prev[channel] || (!prev[channel].ig && !prev[channel].fb)) {
         platforms[channel] = {
-          yt: true,
           ig: !!metaMap[channel]?.instagram,
           fb: !!metaMap[channel]?.facebook,
         }
@@ -1090,11 +1072,8 @@ export default function LongFormPage() {
       }
       return meta
     })
-    setYtStatus({})
     setMetaStatus({})
-    setYtError({})
     setMetaError({})
-    setYtPublishedUrl({})
     setPublishPanelOpen(true)
 
     // Generate Claude-powered tags and poll in background
@@ -1124,76 +1103,7 @@ export default function LongFormPage() {
     }
   }
 
-  // Open YouTube OAuth popup for one channel; auto-upload after successful login
-  const loginAndUploadYouTube = (ch: string) => {
-    // If already connected, skip OAuth and upload directly
-    if (ytConnected[ch]) {
-      uploadToYouTube(ch)
-      return
-    }
-    setYtStatus(prev => ({ ...prev, [ch]: 'connecting' }))
-    const popup = window.open(
-      `/api/auth/youtube?channel=${encodeURIComponent(ch)}`,
-      `yt_auth_${ch.replace(/\s/g, '_')}`,
-      'width=600,height=700,left=200,top=100',
-    )
-    const poll = setInterval(async () => {
-      if (!popup || popup.closed) {
-        clearInterval(poll)
-        try {
-          const res = await fetch('/api/auth/youtube?action=status')
-          const st = await res.json()
-          const ok = !!st[ch]?.connected
-          setYtConnected(prev => ({ ...prev, [ch]: ok }))
-          if (ok) {
-            uploadToYouTube(ch)
-          } else {
-            setYtStatus(prev => ({ ...prev, [ch]: 'idle' }))
-          }
-        } catch {
-          setYtStatus(prev => ({ ...prev, [ch]: 'error' }))
-          setYtError(prev => ({ ...prev, [ch]: 'Connection check failed' }))
-        }
-      }
-    }, 1000)
-  }
-
-  // Upload video to YouTube only (no Meta)
-  const uploadToYouTube = async (ch: string) => {
-    const jobId = currentJobId || videoUrl?.match(/\/download\/([^/?]+)/)?.[1]
-    if (!jobId) return
-    setYtStatus(prev => ({ ...prev, [ch]: 'uploading' }))
-    setYtError(prev => { const n = { ...prev }; delete n[ch]; return n })
-    try {
-      const meta = publishMeta[ch] || { title: script?.title || '', description: '', ytTags: '', igTags: '' }
-      const tags = meta.ytTags.split(',').map(t => t.trim()).filter(Boolean)
-      const res = await fetch('/api/story-video/publish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobId,
-          channelName: ch,
-          title: meta.title,
-          description: meta.description,
-          tags,
-          format: 'youtube',
-          thumbnailBase64: thumbnailUrl || undefined,
-          publishInstagram: false,
-          publishFacebook: false,
-          storyTopic: script?.title,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Upload failed')
-      setYtStatus(prev => ({ ...prev, [ch]: 'done' }))
-      if (data.videoUrl) setYtPublishedUrl(prev => ({ ...prev, [ch]: data.videoUrl }))
-    } catch (e: unknown) {
-      setYtStatus(prev => ({ ...prev, [ch]: 'error' }))
-      setYtError(prev => ({ ...prev, [ch]: e instanceof Error ? e.message : 'Upload failed' }))
-    }
-  }
-
-  // Publish to Instagram and/or Facebook for one channel (no YouTube)
+  // Publish to Instagram and/or Facebook for one channel
   const publishMetaForChannel = async (ch: string) => {
     const jobId = currentJobId || videoUrl?.match(/\/download\/([^/?]+)/)?.[1]
     if (!jobId) return
@@ -1241,12 +1151,12 @@ export default function LongFormPage() {
 
   // Show confirmation dialog before publishing anything
   const handlePublishButton = () => {
-    const hasAny = CHANNELS.some(ch => channelPlatforms[ch]?.yt || channelPlatforms[ch]?.ig || channelPlatforms[ch]?.fb)
+    const hasAny = CHANNELS.some(ch => channelPlatforms[ch]?.ig || channelPlatforms[ch]?.fb)
     if (!hasAny) { showToast('Select at least one platform to publish', 'error'); return }
     setConfirmPublishOpen(true)
   }
 
-  // Execute after user confirms: publish Meta immediately, start YT login flows
+  // Execute after user confirms: publish to Meta platforms
   const executePublish = async () => {
     setConfirmPublishOpen(false)
     for (const ch of CHANNELS) {
@@ -1254,10 +1164,6 @@ export default function LongFormPage() {
       if (!plat) continue
       if ((plat.ig || plat.fb) && metaStatus[ch] !== 'done' && metaStatus[ch] !== 'uploading') {
         publishMetaForChannel(ch)
-      }
-      // Hard guard: YouTube only runs for Gentlemen of Fuel
-      if (plat.yt && ch === 'Gentlemen of Fuel' && ytStatus[ch] !== 'done' && ytStatus[ch] !== 'uploading' && ytStatus[ch] !== 'connecting') {
-        loginAndUploadYouTube(ch)
       }
     }
   }
@@ -1652,13 +1558,10 @@ export default function LongFormPage() {
                   <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
                     <div className="p-4 space-y-3">
                       {CHANNELS.map(ch => {
-                        const plat = channelPlatforms[ch] || { yt: false, ig: false, fb: false }
-                        const anySelected = plat.yt || plat.ig || plat.fb
+                        const plat = channelPlatforms[ch] || { ig: false, fb: false }
+                        const anySelected = plat.ig || plat.fb
                         const igOk = !!metaConnected[ch]?.instagram
                         const fbOk = !!metaConnected[ch]?.facebook
-                        const ytAlready = !!ytConnected[ch]
-                        const ytEnabled = ch === 'Gentlemen of Fuel'
-                        const yt = ytStatus[ch] || 'idle'
                         const meta = metaStatus[ch] || 'idle'
                         return (
                           <div key={ch} className="rounded-xl border border-stone-100 overflow-hidden">
@@ -1666,13 +1569,6 @@ export default function LongFormPage() {
                             <div className="flex items-center gap-3 px-3 py-2.5">
                               <span className="text-[13px] font-medium text-stone-800 min-w-0 flex-1">{ch}</span>
                               <div className="flex gap-1.5 shrink-0">
-                                {ytEnabled && (
-                                  <button
-                                    onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], yt: !plat.yt } }))}
-                                    title={ytAlready ? 'YouTube — already connected, will upload directly' : 'YouTube — login required'}
-                                    className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.yt ? 'bg-red-50 text-red-600 border-red-300' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300'}`}
-                                  >YT</button>
-                                )}
                                 <button
                                   onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], ig: !plat.ig } }))}
                                   title={igOk ? 'Instagram' : 'Instagram — connect via Accounts page first'}
@@ -1702,7 +1598,7 @@ export default function LongFormPage() {
                                   rows={2}
                                   className="w-full px-2.5 py-1.5 text-[12px] border border-stone-200 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-300 resize-none bg-white"
                                 />
-                                {/* YouTube tags always visible — useful for manual uploads even when YT publish is disabled */}
+                                {/* YouTube tags — for manual copy-paste into YouTube Studio */}
                                 <input
                                   value={publishMeta[ch]?.ytTags || ''}
                                   onChange={e => setPublishMeta(p => ({ ...p, [ch]: { ...p[ch], ytTags: e.target.value } }))}
@@ -1718,8 +1614,8 @@ export default function LongFormPage() {
                                   />
                                 )}
 
-                                {/* YouTube Poll Card suggestion */}
-                                {plat.yt && (
+                                {/* YouTube Poll Card — copy into YouTube Studio manually */}
+                                {anySelected && (ytPoll || ytGenerating) && (
                                   <div className="bg-red-50 border border-red-100 rounded-lg p-2.5 space-y-1.5">
                                     <div className="flex items-center justify-between">
                                       <p className="text-[10px] font-semibold text-red-700 uppercase tracking-wide">YouTube Poll Card</p>
@@ -1746,38 +1642,13 @@ export default function LongFormPage() {
                                           >{copiedPoll ? '✓ Copied' : 'Copy'}</button>
                                         </div>
                                       </>
-                                    ) : ytGenerating ? (
+                                    ) : (
                                       <p className="text-[11px] text-stone-400 italic">Generating poll suggestion...</p>
-                                    ) : (
-                                      <p className="text-[11px] text-stone-400 italic">No poll suggestion yet</p>
                                     )}
                                   </div>
                                 )}
 
-                                {/* YouTube per-channel action — GoF only */}
-                                {plat.yt && (
-                                  <div className="pt-0.5">
-                                    {yt === 'done' ? (
-                                      <a href={ytPublishedUrl[ch] || '#'} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[12px] text-emerald-600 font-medium">✓ YouTube uploaded ↗</a>
-                                    ) : yt === 'uploading' ? (
-                                      <span className="flex items-center gap-1.5 text-[12px] text-stone-500"><Spinner className="w-3.5 h-3.5" /> Uploading to YouTube...</span>
-                                    ) : yt === 'connecting' ? (
-                                      <span className="flex items-center gap-1.5 text-[12px] text-stone-500"><Spinner className="w-3.5 h-3.5" /> Logging in to YouTube...</span>
-                                    ) : (
-                                      <div>
-                                        {yt === 'error' && <p className="text-[11px] text-red-500 mb-1.5">{ytError[ch]}</p>}
-                                        <button
-                                          onClick={() => ytAlready ? uploadToYouTube(ch) : loginAndUploadYouTube(ch)}
-                                          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[12px] font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
-                                        >
-                                          {YT_ICON} {ytAlready ? 'Upload to YouTube' : 'Login & Upload'}
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-
-                                {/* Meta status */}
+                                {/* Meta publish status */}
                                 {(plat.ig || plat.fb) && (
                                   <div className="text-[11px]">
                                     {meta === 'done' && <p className="text-emerald-600 font-medium">✓ Published to {[plat.ig && 'Instagram', plat.fb && 'Facebook'].filter(Boolean).join(' & ')}</p>}
@@ -1795,14 +1666,13 @@ export default function LongFormPage() {
                       {/* Publish button */}
                       <button
                         onClick={handlePublishButton}
-                        disabled={!CHANNELS.some(ch => channelPlatforms[ch]?.yt || channelPlatforms[ch]?.ig || channelPlatforms[ch]?.fb)}
+                        disabled={!CHANNELS.some(ch => channelPlatforms[ch]?.ig || channelPlatforms[ch]?.fb)}
                         className="w-full flex items-center justify-center gap-2 px-4 py-3 text-[13px] font-semibold bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors disabled:opacity-40"
                       >
-                        {CHANNELS.some(ch => ytStatus[ch] === 'uploading' || metaStatus[ch] === 'uploading')
+                        {CHANNELS.some(ch => metaStatus[ch] === 'uploading')
                           ? <><Spinner className="w-3.5 h-3.5" /> Publishing...</>
                           : 'Publish selected platforms'}
                       </button>
-                      {thumbnailUrl && <p className="text-[11px] text-stone-400 text-center">Generated thumbnail will be applied to YouTube uploads</p>}
                     </div>
                   </div>
                 )}
@@ -2134,26 +2004,16 @@ export default function LongFormPage() {
                     <div className="rounded-lg border border-stone-200 bg-white overflow-hidden">
                       <div className="p-2 space-y-2">
                       {CHANNELS.map(ch => {
-                        const plat = channelPlatforms[ch] || { yt: false, ig: false, fb: false }
-                        const anySelected = plat.yt || plat.ig || plat.fb
+                        const plat = channelPlatforms[ch] || { ig: false, fb: false }
+                        const anySelected = plat.ig || plat.fb
                         const igOk = !!metaConnected[ch]?.instagram
                         const fbOk = !!metaConnected[ch]?.facebook
-                        const ytAlready = !!ytConnected[ch]
-                        const ytEnabled = ch === 'Gentlemen of Fuel'
-                        const yt = ytStatus[ch] || 'idle'
                         const meta = metaStatus[ch] || 'idle'
                         return (
                           <div key={ch} className="rounded-xl border border-stone-100 overflow-hidden">
                             <div className="flex items-center gap-3 px-3 py-2.5">
                               <span className="text-[12px] font-medium text-stone-800 min-w-0 flex-1">{ch}</span>
                               <div className="flex gap-1.5 shrink-0">
-                                {ytEnabled && (
-                                  <button
-                                    onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], yt: !plat.yt } }))}
-                                    title={ytAlready ? 'YouTube — already connected, will upload directly' : 'YouTube — login required'}
-                                    className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.yt ? 'bg-red-50 text-red-600 border-red-300' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300'}`}
-                                  >YT</button>
-                                )}
                                 <button
                                   onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], ig: !plat.ig } }))}
                                   title={igOk ? 'Instagram' : 'Instagram — connect via Accounts page first'}
@@ -2181,7 +2041,7 @@ export default function LongFormPage() {
                                   rows={2}
                                   className="w-full px-2.5 py-1.5 text-[12px] border border-stone-200 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-300 resize-none bg-white"
                                 />
-                                {/* YouTube tags always visible — useful for manual uploads even when YT publish is disabled */}
+                                {/* YouTube tags — for manual copy-paste into YouTube Studio */}
                                 <input
                                   value={publishMeta[ch]?.ytTags || ''}
                                   onChange={e => setPublishMeta(p => ({ ...p, [ch]: { ...p[ch], ytTags: e.target.value } }))}
@@ -2196,8 +2056,8 @@ export default function LongFormPage() {
                                     className="w-full px-2.5 py-1.5 text-[12px] border border-pink-100 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-pink-200 bg-white"
                                   />
                                 )}
-                                {/* YouTube Poll Card suggestion */}
-                                {plat.yt && (
+                                {/* YouTube Poll Card — copy into YouTube Studio manually */}
+                                {anySelected && (ytPoll || ytGenerating) && (
                                   <div className="bg-red-50 border border-red-100 rounded-lg p-2.5 space-y-1.5">
                                     <div className="flex items-center justify-between">
                                       <p className="text-[10px] font-semibold text-red-700 uppercase tracking-wide">YouTube Poll Card</p>
@@ -2224,32 +2084,8 @@ export default function LongFormPage() {
                                           >{copiedPoll ? '✓ Copied' : 'Copy'}</button>
                                         </div>
                                       </>
-                                    ) : ytGenerating ? (
+                                    ) : (
                                       <p className="text-[11px] text-stone-400 italic">Generating poll suggestion...</p>
-                                    ) : (
-                                      <p className="text-[11px] text-stone-400 italic">No poll suggestion yet</p>
-                                    )}
-                                  </div>
-                                )}
-                                {/* YouTube upload action — GoF only */}
-                                {plat.yt && (
-                                  <div className="pt-0.5">
-                                    {yt === 'done' ? (
-                                      <a href={ytPublishedUrl[ch] || '#'} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[12px] text-emerald-600 font-medium">✓ YouTube uploaded ↗</a>
-                                    ) : yt === 'uploading' ? (
-                                      <span className="flex items-center gap-1.5 text-[12px] text-stone-500"><Spinner className="w-3.5 h-3.5" /> Uploading to YouTube...</span>
-                                    ) : yt === 'connecting' ? (
-                                      <span className="flex items-center gap-1.5 text-[12px] text-stone-500"><Spinner className="w-3.5 h-3.5" /> Logging in to YouTube...</span>
-                                    ) : (
-                                      <div>
-                                        {yt === 'error' && <p className="text-[11px] text-red-500 mb-1.5">{ytError[ch]}</p>}
-                                        <button
-                                          onClick={() => ytAlready ? uploadToYouTube(ch) : loginAndUploadYouTube(ch)}
-                                          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[12px] font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
-                                        >
-                                          {YT_ICON} {ytAlready ? 'Upload to YouTube' : 'Login & Upload'}
-                                        </button>
-                                      </div>
                                     )}
                                   </div>
                                 )}
@@ -2268,9 +2104,9 @@ export default function LongFormPage() {
                       })}
                       <button
                         onClick={handlePublishButton}
-                        disabled={!CHANNELS.some(ch => channelPlatforms[ch]?.yt || channelPlatforms[ch]?.ig || channelPlatforms[ch]?.fb)}
+                        disabled={!CHANNELS.some(ch => channelPlatforms[ch]?.ig || channelPlatforms[ch]?.fb)}
                         className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-40">
-                        {CHANNELS.some(ch => ytStatus[ch] === 'uploading' || metaStatus[ch] === 'uploading')
+                        {CHANNELS.some(ch => metaStatus[ch] === 'uploading')
                           ? <><Spinner className="w-3 h-3" /> Publishing...</>
                           : 'Publish selected platforms'}
                       </button>
@@ -2500,15 +2336,12 @@ export default function LongFormPage() {
             <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full mx-4">
               <h2 className="text-[15px] font-semibold text-stone-900 mb-1">Confirm publish</h2>
               <p className="text-[13px] text-stone-500 mb-4">
-                This will publish to the selected platforms. YouTube uploads will each require a login popup.
-                {CHANNELS.some(ch => channelPlatforms[ch]?.ig || channelPlatforms[ch]?.fb) && (
-                  <> Instagram/Facebook posts cannot be undone from here.</>
-                )}
+                This will publish to the selected platforms. Instagram/Facebook posts cannot be undone from here.
               </p>
               <div className="mb-4 space-y-1">
-                {CHANNELS.filter(ch => channelPlatforms[ch]?.yt || channelPlatforms[ch]?.ig || channelPlatforms[ch]?.fb).map(ch => {
+                {CHANNELS.filter(ch => channelPlatforms[ch]?.ig || channelPlatforms[ch]?.fb).map(ch => {
                   const plat = channelPlatforms[ch]
-                  const platforms = [plat.yt && 'YT', plat.ig && 'IG', plat.fb && 'FB'].filter(Boolean).join(' + ')
+                  const platforms = [plat.ig && 'IG', plat.fb && 'FB'].filter(Boolean).join(' + ')
                   return (
                     <div key={ch} className="flex items-center justify-between text-[12px]">
                       <span className="text-stone-700 font-medium truncate">{ch}</span>

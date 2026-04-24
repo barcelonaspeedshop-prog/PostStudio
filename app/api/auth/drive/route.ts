@@ -1,35 +1,26 @@
 /**
- * Drive auth endpoint — Drive access is now bundled with YouTube OAuth.
+ * Drive auth status endpoint — Drive access uses a service account key file,
+ * not user OAuth. This endpoint reports whether the key file is present.
  *
  * GET /api/auth/drive?action=status
- *   Returns { connected: boolean } — true when the DRIVE_AUTH_CHANNEL YouTube
- *   token exists (and therefore can be used for Drive API calls).
- *
- * GET /api/auth/drive
- *   Redirects to the YouTube OAuth flow for DRIVE_AUTH_CHANNEL so the user
- *   can (re-)connect and pick up the drive.file scope.
+ *   Returns { connected: boolean }
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { loadTokens } from '@/lib/youtube'
+import { existsSync } from 'fs'
 
 export const dynamic = 'force-dynamic'
 
-const DRIVE_AUTH_CHANNEL = process.env.DRIVE_AUTH_CHANNEL || 'Gentlemen of Fuel'
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
+const KEY_FILE = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE || '/data/service-account.json'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const action = searchParams.get('action')
 
   if (action === 'status') {
-    const tokens = await loadTokens()
-    const connected = Boolean(tokens[DRIVE_AUTH_CHANNEL])
-    return NextResponse.json({ connected, channel: DRIVE_AUTH_CHANNEL })
+    const connected = existsSync(KEY_FILE)
+    return NextResponse.json({ connected })
   }
 
-  // Redirect to YouTube OAuth for the Drive auth channel so it picks up
-  // the drive.file scope that was added to the YouTube consent screen.
-  const youtubeAuthUrl = `${BASE_URL}/api/auth/youtube?channel=${encodeURIComponent(DRIVE_AUTH_CHANNEL)}`
-  return NextResponse.redirect(youtubeAuthUrl)
+  return NextResponse.json({ error: 'Drive uses a service account — no OAuth flow required' }, { status: 400 })
 }
