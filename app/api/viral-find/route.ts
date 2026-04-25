@@ -14,6 +14,16 @@ const MAX_USED_PER_CHANNEL = 30
 
 const ACTIVE_CHANNELS = ['Gentlemen of Fuel', 'Omnira F1', 'Omnira Football', 'Omnira Food']
 
+const CHANNEL_ACCENT: Record<string, string> = {
+  'Gentlemen of Fuel': 'amber',
+  'Omnira F1': 'red',
+  'Omnira Football': 'green',
+  'Omnira Food': 'teal',
+}
+
+const SLIDE_TAGS = ['THE HOOK', 'THE STORY', 'THE FACTS', 'THE IMPACT', 'THE VERDICT', 'JOIN US']
+const SLIDE_BADGES = ['VIRAL PICK', 'KEY DETAIL', 'FAST FACT', 'DID YOU KNOW', 'DEBATE THIS', 'FOLLOW US']
+
 // ─── Change 1: Era-varied search prompt rotation ──────────────────────────────
 // 5 templates, each ~20% probability. Only one template searches current news.
 // The other four steer Claude toward iconic/historical content.
@@ -249,12 +259,100 @@ Search, evaluate what you find, then pick ONE specific iconic angle. Return the 
     await updateUsedViral(channel, parsed.campaign.title, parsed.campaign.search_ref)
     console.log(`[viral-find] [${channel}] Picked: "${parsed.campaign.title}"`)
 
+    // ── Save drafts to approvals queue ────────────────────────────────────────
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com'
+    const accent = CHANNEL_ACCENT[channel] || 'blue'
+    const drafts: { reel?: string; carousel?: string } = {}
+
+    if (formats.includes('carousel')) {
+      try {
+        const slideCount = channel === 'Omnira Food' ? 8 : undefined
+        const cgRes = await fetch(`${baseUrl}/api/carousel-generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic: parsed.campaign.angle,
+            channel,
+            ...(slideCount !== undefined ? { slideCount } : {}),
+            hook: parsed.carousel_tiles[0]?.headline,
+          }),
+        })
+        if (cgRes.ok) {
+          const { slides } = await cgRes.json() as { slides: unknown[] }
+          const appRes = await fetch(`${baseUrl}/api/approvals`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              channel,
+              headline: parsed.carousel_tiles[0]?.headline || parsed.campaign.title,
+              topic: parsed.campaign.title,
+              slides,
+              platforms: channel === 'Omnira Food' ? ['instagram', 'facebook'] : ['instagram'],
+              format: 'carousel',
+            }),
+          })
+          if (appRes.ok) {
+            const { id } = await appRes.json() as { id: string }
+            drafts.carousel = id
+            console.log(`[viral-find] [${channel}] Carousel draft saved: ${id}`)
+          } else {
+            console.warn(`[viral-find] [${channel}] Approvals POST failed (${appRes.status})`)
+          }
+        } else {
+          console.warn(`[viral-find] [${channel}] carousel-generate failed (${cgRes.status})`)
+        }
+      } catch (e) {
+        console.warn('[viral-find] carousel draft error:', e instanceof Error ? e.message : e)
+      }
+    }
+
+    if (formats.includes('reel')) {
+      try {
+        const scriptText = [
+          parsed.reel_script.hook,
+          ...parsed.reel_script.beats,
+          parsed.reel_script.cta,
+        ].join('\n')
+        const slides = [{
+          num: '01',
+          tag: SLIDE_TAGS[0],
+          headline: parsed.reel_script.hook,
+          body: parsed.reel_script.beats.join(' · '),
+          badge: SLIDE_BADGES[0],
+          accent,
+        }]
+        const appRes = await fetch(`${baseUrl}/api/approvals`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            channel,
+            headline: parsed.reel_script.hook,
+            topic: parsed.campaign.title,
+            slides,
+            tiktokCaption: scriptText,
+            platforms: ['instagram', 'tiktok'],
+            format: 'reel',
+          }),
+        })
+        if (appRes.ok) {
+          const { id } = await appRes.json() as { id: string }
+          drafts.reel = id
+          console.log(`[viral-find] [${channel}] Reel draft saved: ${id}`)
+        } else {
+          console.warn(`[viral-find] [${channel}] Reel approvals POST failed (${appRes.status})`)
+        }
+      } catch (e) {
+        console.warn('[viral-find] reel draft error:', e instanceof Error ? e.message : e)
+      }
+    }
+
     return NextResponse.json({
       channel,
       formats,
       campaign: parsed.campaign,
       reel_script: parsed.reel_script,
       carousel_tiles: parsed.carousel_tiles,
+      drafts,
     })
 
   } catch (err: unknown) {

@@ -48,6 +48,7 @@ type ApprovalItem = {
   cta?: string
   includeCta?: boolean
   hashtags?: string[]
+  format?: 'reel' | 'carousel'
   createdAt: string
   status: 'pending' | 'approved' | 'rejected' | 'published'
   reviewedAt?: string
@@ -959,7 +960,9 @@ export default function ApprovalsPage() {
                           </div>
                           <div className="flex items-center gap-2 mt-1.5">
                             <p className="text-[10px] text-stone-400">{item.slides.length} slides · {formatDate(item.createdAt)}</p>
-                            {hasVideo ? (
+                            {item.format === 'reel' ? (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded">Reel script</span>
+                            ) : hasVideo ? (
                               <span className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-600 rounded">Video ready</span>
                             ) : (
                               <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded">No video</span>

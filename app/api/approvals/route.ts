@@ -38,6 +38,7 @@ export type ApprovalItem = {
   hashtags?: string[]
   restaurantMeta?: RestaurantMeta
   restaurantMetas?: RestaurantMeta[]
+  format?: 'reel' | 'carousel'
   createdAt: string
   status: 'pending' | 'approved' | 'rejected' | 'published'
   reviewedAt?: string
@@ -148,7 +149,7 @@ export async function GET() {
 // POST — add new item to queue
 export async function POST(req: NextRequest) {
   try {
-    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, articleBody, articleExcerpt, articleSlug, cta, hashtags, restaurantMeta, restaurantMetas } = await req.json()
+    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, articleBody, articleExcerpt, articleSlug, cta, hashtags, restaurantMeta, restaurantMetas, format } = await req.json()
 
     if (!channel || !slides || !Array.isArray(slides)) {
       return NextResponse.json({ error: 'channel and slides are required' }, { status: 400 })
@@ -174,6 +175,7 @@ export async function POST(req: NextRequest) {
       hashtags: Array.isArray(hashtags) ? hashtags : undefined,
       restaurantMeta: restaurantMeta || undefined,
       restaurantMetas: Array.isArray(restaurantMetas) ? restaurantMetas : undefined,
+      format: format === 'reel' || format === 'carousel' ? format : undefined,
       createdAt: new Date().toISOString(),
       status: 'pending',
     }
