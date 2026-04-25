@@ -1145,6 +1145,9 @@ export default function LongFormPage() {
       // Warn about partial failures (e.g. IG ok but FB failed)
       const partialErr = (plat?.ig && igErr) ? igErr : (plat?.fb && fbErr) ? fbErr : null
       if (partialErr) showToast(`${ch}: ${partialErr}`, 'error')
+      // Warn if article failed to queue
+      const articleErr = (data.article as { success: boolean; error?: string } | null)?.error
+      if (articleErr) showToast(`Article not queued for ${ch}: ${articleErr}`, 'error')
     } catch (e: unknown) {
       setMetaStatus(prev => ({ ...prev, [ch]: 'error' }))
       setMetaError(prev => ({ ...prev, [ch]: e instanceof Error ? e.message : 'Publish failed' }))

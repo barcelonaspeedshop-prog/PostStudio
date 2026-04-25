@@ -217,40 +217,42 @@ export async function POST(req: NextRequest) {
     }
 
     // Auto-publish article to website with 15-min hold window
+    let articleResult: { success: boolean; error?: string } | null = null
     if (anySuccess) {
-      void (async () => {
-        try {
-          const articleBody = await expandScriptToArticle({ title, description, tags, channelName })
-          const excerpt = articleBody.replace(/^#+[^\n]*\n?/gm, '').replace(/\n+/g, ' ').trim().slice(0, 250)
-          const slug = slugify(title)
-          const goLiveAt = new Date(Date.now() + 15 * 60 * 1000).toISOString()
-          const result = await publishToWebsite({
-            id: crypto.randomUUID(),
-            channel: channelName,
-            headline: title,
-            ytTitle: title,
-            articleBody,
-            articleExcerpt: excerpt,
-            articleSlug: slug,
-            hashtags: tags,
-            goLiveAt,
-            youtubeUrl,
-          })
-          if (result.success) {
-            console.log(`[publish] Article queued: ${slug} (live at ${goLiveAt})`)
-          } else {
-            console.warn(`[publish] Article write failed: ${result.error}`)
-          }
-        } catch (e) {
-          console.warn('[publish] Article auto-publish failed (non-fatal):', e instanceof Error ? e.message : e)
+      try {
+        const articleBody = await expandScriptToArticle({ title, description, tags, channelName })
+        const excerpt = articleBody.replace(/^#+[^\n]*\n?/gm, '').replace(/\n+/g, ' ').trim().slice(0, 250)
+        const slug = slugify(title)
+        const goLiveAt = new Date(Date.now() + 15 * 60 * 1000).toISOString()
+        articleResult = await publishToWebsite({
+          id: crypto.randomUUID(),
+          channel: channelName,
+          headline: title,
+          ytTitle: title,
+          articleBody,
+          articleExcerpt: excerpt,
+          articleSlug: slug,
+          hashtags: tags,
+          goLiveAt,
+          youtubeUrl,
+        })
+        if (articleResult.success) {
+          console.log(`[publish] Article queued: ${slug} (live at ${goLiveAt})`)
+        } else {
+          console.error(`[publish] Article write failed: ${articleResult.error}`)
         }
-      })()
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        console.error('[publish] Article auto-publish failed:', msg)
+        articleResult = { success: false, error: msg }
+      }
     }
 
     return NextResponse.json({
       ...results,
       channelName,
       ok: anySuccess,
+      article: articleResult,
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
