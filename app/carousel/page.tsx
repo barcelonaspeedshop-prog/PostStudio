@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 
 type Slide = {
@@ -73,6 +74,7 @@ function SlidePreview({ slide, index }: { slide: Slide; index: number }) {
 }
 
 export default function CarouselPage() {
+  const router = useRouter()
   const [topic, setTopic] = useState('')
   const [channel, setChannel] = useState('Gentlemen of Fuel')
   const [slideCount, setSlideCount] = useState(6)
@@ -100,6 +102,9 @@ export default function CarouselPage() {
   const [mobilePanel, setMobilePanel] = useState<'controls' | 'slides' | 'detail'>('slides')
   const slideStripRef = useRef<HTMLDivElement>(null)
   const [sendingApproval, setSendingApproval] = useState(false)
+  const [viralChannel, setViralChannel] = useState('Gentlemen of Fuel')
+  const [viralFormats, setViralFormats] = useState<'both' | 'reel' | 'carousel'>('both')
+  const [viralLoading, setViralLoading] = useState(false)
   const [ytTitle, setYtTitle] = useState('')
   const [ytDescription, setYtDescription] = useState('')
   const [ytTags, setYtTags] = useState('')
@@ -165,6 +170,8 @@ export default function CarouselPage() {
       setYtTags(generateYtTags())
     }
   }, [slides, channel])
+
+  useEffect(() => { setViralChannel(channel) }, [channel])
 
   const DRAFT_KEY = 'draft_carousel'
 
@@ -304,6 +311,25 @@ export default function CarouselPage() {
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 2800)
+  }
+
+  const findViralPost = async () => {
+    setViralLoading(true)
+    try {
+      const formats = viralFormats === 'both' ? ['reel', 'carousel'] : [viralFormats]
+      const res = await fetch('/api/viral-find', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: viralChannel, formats }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Viral find failed')
+      router.push('/approvals')
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Error finding viral post', 'error')
+    } finally {
+      setViralLoading(false)
+    }
   }
 
   const generateSlides = async () => {
@@ -909,6 +935,48 @@ export default function CarouselPage() {
                 </button>
               </div>
             )}
+
+            {/* Find Viral Post */}
+            <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 flex flex-col gap-3">
+              <p className="text-[10px] font-medium text-violet-700 uppercase tracking-widest">🔥 Find Viral Post</p>
+              <select
+                value={viralChannel}
+                onChange={(e) => setViralChannel(e.target.value)}
+                className="w-full text-[16px] md:text-[13px] border border-violet-200 rounded-lg px-3 py-2.5 min-h-[44px] bg-white focus:outline-none focus:border-violet-400 text-stone-900"
+              >
+                {CHANNELS.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(['both', 'reel', 'carousel'] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setViralFormats(f)}
+                    className={`py-2 rounded-lg text-[11px] font-medium border transition-all capitalize ${viralFormats === f ? 'bg-violet-700 text-white border-violet-700' : 'bg-white text-stone-600 border-stone-200 hover:border-violet-300'}`}
+                  >
+                    {f === 'both' ? 'Both' : f === 'reel' ? 'Reel' : 'Carousel'}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={findViralPost}
+                disabled={viralLoading}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] bg-violet-700 text-white text-[14px] md:text-[13px] font-medium rounded-xl hover:bg-violet-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {viralLoading ? (
+                  <>
+                    <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                      <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                    </svg>
+                    Finding viral post…
+                  </>
+                ) : (
+                  'Find Viral Post →'
+                )}
+              </button>
+            </div>
 
             {/* Load today's news */}
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col gap-2.5">
