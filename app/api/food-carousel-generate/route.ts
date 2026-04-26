@@ -147,6 +147,8 @@ Return ONLY this JSON (plain text, no HTML tags):
   const payment = stripHtml(meta.payment || '')
   const proTips: string[] = (meta.proTips || []).map((t: string) => stripHtml(t))
   const restName = stripHtml(meta.name || restaurant.name)
+  const city = stripHtml(meta.city || restaurant.city)
+  const cuisine = stripHtml(meta.cuisine || '')
 
   // Tile 3: must-order body — "Name — Price — Desc. Name2 — Price2 — Desc2."
   // ── Tile 2: story split — hook sentence as headline, rest as body ─────────────
