@@ -255,7 +255,7 @@ export async function publishCarouselToInstagram(
       console.log(`[meta] Creating child container ${i + 1}/${publicUrls.length} for ${channelName}`)
       const data = await graphPost(
         `/${igId}/media`,
-        { image_url: url, is_carousel_item: 'true' },
+        { image_url: url, is_carousel_item: 'true', media_type: 'IMAGE' },
         token,
       )
       const childId = data.id as string

@@ -137,7 +137,7 @@ async function saveApprovals(items: ApprovalItem[]): Promise<void> {
   if (!existsSync(DATA_DIR)) {
     await mkdir(DATA_DIR, { recursive: true })
   }
-  const tmp = `${APPROVALS_PATH}.tmp`
+  const tmp = `${APPROVALS_PATH}.tmp-${crypto.randomUUID()}`
   await writeFile(tmp, JSON.stringify(items, null, 2))
   await rename(tmp, APPROVALS_PATH)
 }
