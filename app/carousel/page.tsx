@@ -238,7 +238,8 @@ export default function CarouselPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           content: caption,
-          mediaUrl: videoUrl,
+          videoBase64: videoUrl || undefined,
+          slides,
           platforms: publishPlatforms,
           firstSlideHeadline: slides[0]?.headline || '',
           channel,
