@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readFile, writeFile, mkdir } from 'fs/promises'
+import { readFile, writeFile, rename, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
 import crypto from 'crypto'
@@ -137,7 +137,9 @@ async function saveApprovals(items: ApprovalItem[]): Promise<void> {
   if (!existsSync(DATA_DIR)) {
     await mkdir(DATA_DIR, { recursive: true })
   }
-  await writeFile(APPROVALS_PATH, JSON.stringify(items, null, 2))
+  const tmp = `${APPROVALS_PATH}.tmp`
+  await writeFile(tmp, JSON.stringify(items, null, 2))
+  await rename(tmp, APPROVALS_PATH)
 }
 
 // GET — return all approval items
