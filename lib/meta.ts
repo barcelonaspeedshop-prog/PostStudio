@@ -2,6 +2,7 @@ import { readFile, writeFile, unlink, mkdir, copyFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
 import { randomUUID } from 'crypto'
+import { isR2Configured, uploadToR2 } from '@/lib/r2'
 
 const DATA_DIR = process.env.TOKEN_STORAGE_PATH || '/data'
 const META_TOKENS_PATH = path.join(DATA_DIR, 'meta-tokens.json')
@@ -123,43 +124,55 @@ async function waitForContainer(
  * Returns null if a URL fetch fails (caller should skip that slide).
  */
 export async function saveBase64ToTempFile(image: string): Promise<{ publicUrl: string; filePath: string } | null> {
-  if (!existsSync(TEMP_IMAGE_DIR)) {
-    await mkdir(TEMP_IMAGE_DIR, { recursive: true })
-  }
-
-  const filename = `${randomUUID()}.jpg`
-  const filePath = path.join(TEMP_IMAGE_DIR, filename)
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com').replace(/\/$/, '')
-  const publicUrl = `${appUrl}/api/temp-image/${filename}`
+  // Resolve the raw buffer first (shared by both R2 and temp-file paths)
+  let buffer: Buffer
 
   if (image.startsWith('http://') || image.startsWith('https://')) {
-    // Fetch the remote image and save locally — Meta cannot access 403/referer-restricted URLs
+    // Fetch the remote image — Meta cannot access 403/referer-restricted URLs
     try {
       const res = await fetch(image, { headers: { 'User-Agent': 'PostStudio/1.0' } })
       if (!res.ok) {
         console.warn(`[meta] Cannot fetch image URL (HTTP ${res.status}): ${image.slice(0, 100)}`)
         return null
       }
-      const buffer = Buffer.from(await res.arrayBuffer())
-      await writeFile(filePath, buffer)
-      return { publicUrl, filePath }
+      buffer = Buffer.from(await res.arrayBuffer())
     } catch (e) {
       console.warn(`[meta] Failed to fetch image URL: ${image.slice(0, 100)} —`, e instanceof Error ? e.message : e)
       return null
     }
+  } else {
+    // Strip data URI header if present, then decode base64
+    const b64 = image.startsWith('data:')
+      ? image.replace(/^data:image\/\w+;base64,/, '')
+      : image
+    buffer = Buffer.from(b64, 'base64')
   }
 
-  // Strip data URI header if present
-  const b64 = image.startsWith('data:')
-    ? image.replace(/^data:image\/\w+;base64,/, '')
-    : image
+  // Upload to R2 when configured — gives Instagram's fetchers a CDN URL they can reach
+  if (isR2Configured()) {
+    try {
+      const publicUrl = await uploadToR2(buffer, 'image/jpeg')
+      console.log(`[meta] Uploaded to R2: ${publicUrl}`)
+      return { publicUrl, filePath: '' } // empty filePath = no local cleanup needed
+    } catch (e) {
+      console.warn('[meta] R2 upload failed, falling back to temp file:', e instanceof Error ? e.message : e)
+    }
+  }
 
-  const buffer = Buffer.from(b64, 'base64')
+  // Fallback: write to local temp-images and serve via /api/temp-image
+  if (!existsSync(TEMP_IMAGE_DIR)) {
+    await mkdir(TEMP_IMAGE_DIR, { recursive: true })
+  }
+  const filename = `${randomUUID()}.jpg`
+  const filePath = path.join(TEMP_IMAGE_DIR, filename)
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com').replace(/\/$/, '')
+  const publicUrl = `${appUrl}/api/temp-image/${filename}`
   await writeFile(filePath, buffer)
   return { publicUrl, filePath }
 }
 
 export async function deleteTempFile(filePath: string): Promise<void> {
+  if (!filePath) return // R2 path — no local file to delete
   try { await unlink(filePath) } catch { /* already gone — ignore */ }
 }
 

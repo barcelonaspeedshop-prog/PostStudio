@@ -44,6 +44,13 @@ services:
       # Preview token for pending article previews on premirafirst.com
       PREVIEW_TOKEN: ${PREVIEW_TOKEN:-}
 
+      # Cloudflare R2 — image CDN for Meta carousel publishing
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
+      R2_BUCKET: ${R2_BUCKET:-}
+
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.poststudio.rule=Host(`app.premirafirst.com`)"
