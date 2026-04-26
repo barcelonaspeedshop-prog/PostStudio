@@ -149,74 +149,97 @@ Return ONLY this JSON (plain text, no HTML tags):
   const restName = stripHtml(meta.name || restaurant.name)
 
   // Tile 3: must-order body — "Name — Price — Desc. Name2 — Price2 — Desc2."
-  const mustOrderBody = mustOrderList.length > 0
-    ? mustOrderList.map(d => [d.name, d.price, d.description].filter(Boolean).join(' — ')).join('. ')
+  // ── Tile 2: story split — hook sentence as headline, rest as body ─────────────
+  const storyText = stripHtml(meta.story || '')
+  const firstPeriodIdx = storyText.indexOf('. ')
+  const storyHookLine = firstPeriodIdx > 0
+    ? storyText.slice(0, firstPeriodIdx + 1)
+    : storyText.slice(0, 120).trim()
+  const storyBodyText = firstPeriodIdx > 0
+    ? storyText.slice(firstPeriodIdx + 2, firstPeriodIdx + 320).trim()
     : ''
 
-  // Tile 5: find-us body — address · hours · price · payment
+  // ── Tile 3: signature dish image tile ────────────────────────────────────────
+  const dish1 = mustOrderList[0]
+
+  // ── Tile 4: all must-order dishes on dark bg ──────────────────────────────────
+  const allDishesHeadline = mustOrderList.slice(0, 3).map(d => d.name).join(' · ')
+  const allDishesBody = mustOrderList
+    .map(d => [d.name, d.price, d.description].filter(Boolean).join(' — '))
+    .join('. ')
+
+  // ── Tile 5: vibe/ambiance image tile ─────────────────────────────────────────
+  const vibeHeadline = stripHtml(hookHeadlines.h6 || hookHeadlines.h4 || restName)
+  const vibeTag = [neighbourhood, cuisine].filter(Boolean).join(' · ') || city
+  const vibeBody = [cuisine, city].filter(Boolean).join(' · ')
+
+  // ── Tile 6: logistics on dark bg ─────────────────────────────────────────────
   const fullAddress = [address, neighbourhood].filter(Boolean).join(', ')
   const priceDisplay = [priceRange, priceContext].filter(Boolean).join(' · ')
-  const findUsBody = [fullAddress, hoursNote, priceDisplay, payment].filter(Boolean).join(' · ')
+  const detailsBody = [fullAddress, hoursNote, priceDisplay, payment].filter(Boolean).join('. ')
 
-  // Tile 7: pro tips body
-  const tipsBody = proTips.length > 0 ? proTips.slice(0, 3).join('. ') : ''
-
-  // Try Google Maps Static API for tile 5
-  let findUsMapImage: string | undefined
-  const GMAPS_KEY = process.env.GOOGLE_MAPS_API_KEY
-  if (GMAPS_KEY && (fullAddress || restName)) {
-    try {
-      const q = encodeURIComponent(`${fullAddress || restName}, ${restaurant.city}`)
-      const mapUrl =
-        `https://maps.googleapis.com/maps/api/staticmap` +
-        `?center=${q}&zoom=15&size=540x290&scale=2&maptype=roadmap` +
-        `&style=feature:all|element:geometry|color:0x0d1520` +
-        `&style=feature:road|element:geometry|color:0x2d3748` +
-        `&style=feature:road.arterial|element:geometry|color:0xea580c` +
-        `&style=feature:poi|visibility:off` +
-        `&style=feature:transit|visibility:off` +
-        `&style=feature:water|element:geometry|color:0x0a0f1e` +
-        `&markers=color:0xFF8C00|${q}` +
-        `&key=${GMAPS_KEY}`
-      const mapRes = await fetch(mapUrl, { signal: AbortSignal.timeout(8000) })
-      if (mapRes.ok) {
-        const mapBuf = await mapRes.arrayBuffer()
-        findUsMapImage = `data:image/png;base64,${Buffer.from(mapBuf).toString('base64')}`
-      }
-    } catch { /* fall through to SVG placeholder */ }
-  }
+  // ── Tile 7: pro tips on dark bg ──────────────────────────────────────────────
+  const tipsBody = proTips.slice(0, 3).join('. ')
 
   const accent = 'amber'
 
   // Fixed 8-slide structure
   const slides: SlideResult[] = [
-    // 1: THUMBNAIL — no text, image placeholder
-    { num: '01', tag: '', headline: '', body: '', badge: '', accent, tileType: 'thumbnail' },
-
-    // 2: IMAGE HOOK
-    { num: '02', tag: '', headline: stripHtml(hookHeadlines.h2 || restName), body: '', badge: '', accent, tileType: 'hook' },
-
-    // 3: MUST ORDER INFO (dark bg, no image)
-    { num: '03', tag: 'MUST ORDER', headline: mustOrderList[0]?.name || 'Must Order', body: mustOrderBody, badge: 'SIGNATURE DISHES', accent, tileType: 'story-text' },
-
-    // 4: IMAGE HOOK
-    { num: '04', tag: '', headline: stripHtml(hookHeadlines.h4 || (mustOrderList[0]?.name || restName)), body: '', badge: '', accent, tileType: 'hook' },
-
-    // 5: FIND US MAP
+    // 1: HOOK — full-bleed photo with cuisine/name/city overlay
     {
-      num: '05', tag: 'FIND US', headline: restName, body: findUsBody,
-      badge: '', accent, tileType: 'find-us-map',
-      ...(findUsMapImage ? { image: findUsMapImage } : {}),
+      num: '01', tag: cuisine, headline: restName,
+      body: `${city} · ${priceDisplay || priceRange}`,
+      badge: '', accent, tileType: 'hook',
     },
 
-    // 6: IMAGE HOOK
-    { num: '06', tag: '', headline: stripHtml(hookHeadlines.h6 || restName), body: '', badge: '', accent, tileType: 'hook' },
+    // 2: THE STORY — dark bg, hook sentence + supporting copy (buildStoryTextSvg)
+    {
+      num: '02', tag: 'THE STORY', headline: storyHookLine,
+      body: storyBodyText,
+      badge: '', accent, tileType: 'story-text',
+    },
 
-    // 7: PRO TIPS INFO (dark bg, no image)
-    { num: '07', tag: 'PRO TIPS', headline: 'Insider Tips', body: tipsBody, badge: 'INSIDER', accent, tileType: 'story-text' },
+    // 3: SIGNATURE DISH — full-bleed photo, "MUST ORDER" overlay
+    {
+      num: '03', tag: 'MUST ORDER',
+      headline: dish1?.name || restName,
+      body: dish1?.description || '',
+      badge: '', accent, tileType: 'story',
+    },
 
-    // 8: OUTRO
-    { num: '08', tag: 'FOLLOW FOR MORE', headline: 'Follow for more hidden gems', body: '', badge: '', accent, tileType: 'cta' },
+    // 4: ALL MUST-ORDER — dark bg, all dishes listed (buildStoryTextSvg)
+    {
+      num: '04', tag: 'MUST ORDER', headline: allDishesHeadline,
+      body: allDishesBody,
+      badge: '', accent, tileType: 'story-text',
+    },
+
+    // 5: AMBIANCE — full-bleed photo, neighbourhood/vibe overlay
+    {
+      num: '05', tag: vibeTag, headline: vibeHeadline,
+      body: vibeBody,
+      badge: '', accent, tileType: 'story',
+    },
+
+    // 6: THE DETAILS — dark bg, logistics (buildStoryTextSvg)
+    {
+      num: '06', tag: 'THE DETAILS', headline: restName,
+      body: detailsBody,
+      badge: '', accent, tileType: 'story-text',
+    },
+
+    // 7: PRO TIPS — dark bg (buildStoryTextSvg)
+    {
+      num: '07', tag: 'PRO TIPS', headline: 'Before You Go',
+      body: tipsBody,
+      badge: '', accent, tileType: 'story-text',
+    },
+
+    // 8: CTA
+    {
+      num: '08', tag: 'FOLLOW FOR MORE', headline: 'Follow for more hidden gems',
+      body: '', badge: '', accent, tileType: 'cta',
+    },
   ]
 
   const restaurantMeta: RestaurantMeta = {
