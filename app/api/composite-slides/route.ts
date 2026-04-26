@@ -33,6 +33,24 @@ type SlideInput = {
   foodInfoItems?: FoodInfoItem[]
   foodRestaurantName?: string
   foodProTips?: string[]
+  brandMark?: boolean
+}
+
+// Gold gradient M monogram — bottom-centre sign-off for text-only food tiles.
+// cx/cy = centre, r = radius.
+function monogramSvg(cx: number, cy: number, r: number): string {
+  const fontSize = Math.round(r * 0.9)
+  return `
+    <defs>
+      <radialGradient id="mGold" cx="50%" cy="35%" r="65%">
+        <stop offset="0%" stop-color="#C9A961"/>
+        <stop offset="100%" stop-color="#B8923E"/>
+      </radialGradient>
+    </defs>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#mGold)"/>
+    <text x="${cx}" y="${cy + Math.round(fontSize * 0.35)}"
+          font-family="${FONT_STACK}" font-size="${fontSize}" font-weight="700"
+          fill="rgba(10,10,10,0.85)" text-anchor="middle" letter-spacing="-2">M</text>`
 }
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -381,6 +399,11 @@ function buildStoryTextSvg(slide: SlideInput, primary: string, bg: string): stri
     const chartY = 520 + bodyLines.length * bodyLineH + 60
     const { svg: chartSvg } = renderChart(slide.chartData, 72, chartY, pr, pg, pb)
     svg += chartSvg
+  }
+
+  // Brand mark — M monogram bottom-centre, lower-third sign-off
+  if (slide.brandMark) {
+    svg += monogramSvg(W / 2, 1220, 70)
   }
 
   return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`

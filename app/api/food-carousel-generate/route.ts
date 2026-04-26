@@ -40,6 +40,7 @@ type SlideResult = {
   accent: string
   image?: string
   tileType: 'hook' | 'story' | 'story-text' | 'cta' | 'thumbnail' | 'find-us-map' | 'food-image' | 'food-magazine'
+  brandMark?: boolean
 }
 
 function slugify(name: string): string {
@@ -198,7 +199,7 @@ Return ONLY this JSON (plain text, no HTML tags):
     {
       num: '02', tag: 'THE STORY', headline: storyHookLine,
       body: storyBodyText,
-      badge: '', accent, tileType: 'story-text',
+      badge: '', accent, tileType: 'story-text', brandMark: true,
     },
 
     // 3: SIGNATURE DISH — full-bleed photo, "MUST ORDER" overlay
@@ -213,7 +214,7 @@ Return ONLY this JSON (plain text, no HTML tags):
     {
       num: '04', tag: 'MUST ORDER', headline: allDishesHeadline,
       body: allDishesBody,
-      badge: '', accent, tileType: 'story-text',
+      badge: '', accent, tileType: 'story-text', brandMark: true,
     },
 
     // 5: AMBIANCE — full-bleed photo, neighbourhood/vibe overlay
@@ -227,14 +228,14 @@ Return ONLY this JSON (plain text, no HTML tags):
     {
       num: '06', tag: 'THE DETAILS', headline: restName,
       body: detailsBody,
-      badge: '', accent, tileType: 'story-text',
+      badge: '', accent, tileType: 'story-text', brandMark: true,
     },
 
     // 7: PRO TIPS — dark bg (buildStoryTextSvg)
     {
       num: '07', tag: 'PRO TIPS', headline: 'Before You Go',
       body: tipsBody,
-      badge: '', accent, tileType: 'story-text',
+      badge: '', accent, tileType: 'story-text', brandMark: true,
     },
 
     // 8: CTA
