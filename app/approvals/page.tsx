@@ -218,7 +218,7 @@ export default function ApprovalsPage() {
       const compRes = await fetch('/api/composite-slides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slides: item.slides, channel: item.channel }),
+        body: JSON.stringify({ slides: item.slides, channel: item.channel, reelMode: item.format === 'reel' }),
       })
       const compData = await compRes.json()
       if (!compRes.ok) throw new Error(compData.error || 'Compositing failed')
@@ -234,7 +234,7 @@ export default function ApprovalsPage() {
       const vidRes = await fetch('/api/video-export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slides: compositedSlides, slideDuration: 3 }),
+        body: JSON.stringify({ slides: compositedSlides, slideDuration: 3, reelMode: item.format === 'reel' }),
       })
       const vidData = await vidRes.json()
       if (!vidRes.ok) throw new Error(vidData.error || 'Video export failed')

@@ -884,11 +884,15 @@ function determineTileType(
 
 export async function POST(req: NextRequest) {
   try {
-    const { slides, channel } = await req.json()
+    const { slides, channel, reelMode = false } = await req.json()
 
     if (!slides || !Array.isArray(slides)) {
       return NextResponse.json({ error: 'slides array is required' }, { status: 400 })
     }
+
+    // For reels, use true 9:16 canvas height. SVG overlays are still designed at H (1350px)
+    // and composited at top: 0 — the extra height below is filled by the base background/image.
+    const frameH = reelMode ? 1920 : H
 
     const ch = getChannel(channel || '')
 
@@ -904,12 +908,12 @@ export async function POST(req: NextRequest) {
       if (tileType === 'brand' || tileType === 'story-text' || tileType === 'food-must-order' || tileType === 'food-info' || tileType === 'food-pro-tips') {
         // food-magazine, thumbnail, find-us-map are intentionally excluded — they use images
         base = sharp({
-          create: { width: W, height: H, channels: 3, background: { r: bgr, g: bgg, b: bgb } },
+          create: { width: W, height: frameH, channels: 3, background: { r: bgr, g: bgg, b: bgb } },
         })
       } else if (tileType === 'find-us-map') {
         // find-us-map: dark base; map image (if present) composited into top 580px only
         base = sharp({
-          create: { width: W, height: H, channels: 3, background: { r: 13, g: 13, b: 13 } },
+          create: { width: W, height: frameH, channels: 3, background: { r: 13, g: 13, b: 13 } },
         })
         if (slide.image && slide.image.startsWith('data:')) {
           const base64Data = slide.image.replace(/^data:image\/\w+;base64,/, '')
@@ -926,10 +930,10 @@ export async function POST(req: NextRequest) {
         // landscape images (wider than tall) → crop from centre
         const meta = await sharp(imgBuffer).metadata()
         const isPortrait = (meta.height ?? 0) >= (meta.width ?? 1)
-        base = sharp(imgBuffer).resize(W, H, { fit: 'cover', position: isPortrait ? 'top' : 'centre' })
+        base = sharp(imgBuffer).resize(W, frameH, { fit: 'cover', position: isPortrait ? 'top' : 'centre' })
       } else {
         base = sharp({
-          create: { width: W, height: H, channels: 3, background: { r: bgr, g: bgg, b: bgb } },
+          create: { width: W, height: frameH, channels: 3, background: { r: bgr, g: bgg, b: bgb } },
         })
       }
 

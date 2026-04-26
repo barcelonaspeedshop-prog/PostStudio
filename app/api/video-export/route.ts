@@ -32,9 +32,9 @@ export async function POST(req: NextRequest) {
   const tmpDir = `/tmp/carousel_${Date.now()}`
   
   try {
-    const { slides, slideDuration: rawDuration = 5 } = await req.json()
+    const { slides, slideDuration: rawDuration = 5, reelMode = false } = await req.json()
     const videoW = 1080
-    const videoH = 1350
+    const videoH = reelMode ? 1920 : 1350
     const scaleFilter = `scale=${videoW}:${videoH}:force_original_aspect_ratio=decrease,pad=${videoW}:${videoH}:(ow-iw)/2:(oh-ih)/2,setsar=1`
     // Enforce minimum 5 seconds per slide
     const slideDuration = Math.max(5, Number(rawDuration) || 5)
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       } else {
         // Generate solid color placeholder
         const color = getAccentColor(slide.accent || 'red')
-        await execAsync(`ffmpeg -f lavfi -i color=c=${color}:size=1080x1350:rate=1 -frames:v 1 ${imgPath}`)
+        await execAsync(`ffmpeg -f lavfi -i color=c=${color}:size=${videoW}x${videoH}:rate=1 -frames:v 1 ${imgPath}`)
       }
       imageFiles.push(imgPath)
     }
