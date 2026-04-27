@@ -295,12 +295,10 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Server-side validation for article publishing (skipped if publishToWebsite === false)
+    // series is intentionally not required here — publisher falls back to 'news'
     if (item.articleBody && item.publishToWebsite !== false) {
       if (!item.coverImageDirect) {
         return NextResponse.json({ error: 'Cover image is required to publish an article' }, { status: 400 })
-      }
-      if (!item.series) {
-        return NextResponse.json({ error: 'Series is required to publish an article' }, { status: 400 })
       }
     }
 

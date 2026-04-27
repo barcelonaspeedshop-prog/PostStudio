@@ -1387,9 +1387,8 @@ export default function ApprovalsPage() {
                           {(() => {
                             const needsArticleFields = !!item.articleBody && item.publishToWebsite !== false
                             const missingCover = needsArticleFields && !item.coverImageDirect
-                            const missingSeries = needsArticleFields && !item.series
-                            const articleBlocked = missingCover || missingSeries
-                            const blockReason = missingCover ? 'Cover image required for website article' : missingSeries ? 'Series required for website article' : ''
+                            const articleBlocked = missingCover
+                            const blockReason = missingCover ? 'Cover image required for website article' : ''
                             return (
                               <div className="flex-1 flex flex-col gap-1">
                                 <button
