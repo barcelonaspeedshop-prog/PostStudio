@@ -25,6 +25,7 @@ type SlideInput = {
   badge: string
   accent: string
   image?: string
+  imageOptions?: string[]
   tileType?: 'hook' | 'brand' | 'story' | 'story-text' | 'cta' | 'food-image' | 'food-must-order' | 'food-info' | 'food-pro-tips' | 'food-magazine' | 'thumbnail' | 'find-us-map'
   channel?: string
   chartData?: ChartData
@@ -926,6 +927,7 @@ export async function POST(req: NextRequest) {
       let base: sharp.Sharp
       const additionalLayers: sharp.OverlayOptions[] = []
       let hasMapImage = false
+      let hasImage = false
 
       // Solid-bg tiles: never use image
       if (tileType === 'brand' || tileType === 'story-text' || tileType === 'food-must-order' || tileType === 'food-info' || tileType === 'food-pro-tips') {
@@ -946,21 +948,55 @@ export async function POST(req: NextRequest) {
           hasMapImage = true
         }
       } else if (slide.image && slide.image.startsWith('data:')) {
+        // Manually-set base64 image (e.g. from image picker)
         const base64Data = slide.image.replace(/^data:image\/\w+;base64,/, '')
         const imgBuffer = Buffer.from(base64Data, 'base64')
-        // Detect orientation to choose crop anchor:
-        // portrait images (taller than wide) → crop from top third where subjects typically appear
-        // landscape images (wider than tall) → crop from centre
         const meta = await sharp(imgBuffer).metadata()
         const isPortrait = (meta.height ?? 0) >= (meta.width ?? 1)
         base = sharp(imgBuffer).resize(W, frameH, { fit: 'cover', position: isPortrait ? 'top' : 'centre' })
+        hasImage = true
       } else {
-        base = sharp({
-          create: { width: W, height: frameH, channels: 3, background: { r: bgr, g: bgg, b: bgb } },
-        })
-      }
+        // Try URL-based images: slide.image (if https) then imageOptions candidates in order
+        const urlCandidates: string[] = []
+        if (slide.image && (slide.image.startsWith('https://') || slide.image.startsWith('http://'))) {
+          urlCandidates.push(slide.image)
+        }
+        for (const opt of slide.imageOptions ?? []) {
+          if (opt && !urlCandidates.includes(opt)) urlCandidates.push(opt)
+        }
 
-      const hasImage = !!(slide.image && slide.image.startsWith('data:'))
+        let imgBuffer: Buffer | null = null
+        for (const url of urlCandidates) {
+          try {
+            const res = await fetch(url, {
+              headers: { 'User-Agent': 'PostStudio/1.0' },
+              signal: AbortSignal.timeout(5000),
+            })
+            if (res.ok) {
+              imgBuffer = Buffer.from(await res.arrayBuffer())
+              break
+            } else {
+              console.warn(`[composite-slides] failed to fetch image for slide ${idx}: ${url} — HTTP ${res.status}, trying next`)
+            }
+          } catch (e) {
+            console.warn(`[composite-slides] failed to fetch image for slide ${idx}: ${url} — ${e instanceof Error ? e.message : e}, trying next`)
+          }
+        }
+
+        if (imgBuffer) {
+          const meta = await sharp(imgBuffer).metadata()
+          const isPortrait = (meta.height ?? 0) >= (meta.width ?? 1)
+          base = sharp(imgBuffer).resize(W, frameH, { fit: 'cover', position: isPortrait ? 'top' : 'centre' })
+          hasImage = true
+        } else {
+          if (urlCandidates.length > 0) {
+            console.warn(`[composite-slides] all image URLs failed for slide ${idx} — falling back to solid background`)
+          }
+          base = sharp({
+            create: { width: W, height: frameH, channels: 3, background: { r: bgr, g: bgg, b: bgb } },
+          })
+        }
+      }
 
       const svgOverlay = (() => {
         switch (tileType) {
