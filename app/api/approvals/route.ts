@@ -144,8 +144,17 @@ async function saveApprovals(items: ApprovalItem[]): Promise<void> {
   if (!existsSync(DATA_DIR)) {
     await mkdir(DATA_DIR, { recursive: true })
   }
+  // Strip binary payloads from every item before writing — defense-in-depth so
+  // approvals.json never grows large regardless of which code path saved the item.
+  const stripped = items.map(item => {
+    const { videoBase64: _v, ...rest } = item
+    return {
+      ...rest,
+      slides: rest.slides.map(({ image: _img, imageOptions: _opts, ...slide }) => slide),
+    }
+  })
   const tmp = `${APPROVALS_PATH}.tmp-${crypto.randomUUID()}`
-  await writeFile(tmp, JSON.stringify(items, null, 2))
+  await writeFile(tmp, JSON.stringify(stripped, null, 2))
   await rename(tmp, APPROVALS_PATH)
 }
 
