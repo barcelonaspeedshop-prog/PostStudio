@@ -124,6 +124,12 @@ async function waitForContainer(
  * Returns null if a URL fetch fails (caller should skip that slide).
  */
 export async function saveBase64ToTempFile(image: string): Promise<{ publicUrl: string; filePath: string } | null> {
+  // If the image is already on our R2 CDN, return it directly — no re-upload needed
+  const r2Public = process.env.R2_PUBLIC_URL?.replace(/\/$/, '')
+  if (r2Public && image.startsWith(r2Public)) {
+    return { publicUrl: image, filePath: '' }
+  }
+
   // Resolve the raw buffer first (shared by both R2 and temp-file paths)
   let buffer: Buffer
 

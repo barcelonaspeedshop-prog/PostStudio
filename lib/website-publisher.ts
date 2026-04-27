@@ -20,13 +20,22 @@ const BLOCKED_DOMAINS = [
   'pinterest.com', 'pinimg.com', 'reddit.com', 'redd.it', 'whatsapp.com',
 ]
 
+const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'svg'])
+
 function usableImageUrl(url: string | undefined | null): string | null {
   if (!url) return null
   if (url.startsWith('data:') || (url.length > 500 && !url.startsWith('http'))) return null
   try {
-    const h = new URL(url).hostname.toLowerCase()
+    const parsed = new URL(url)
+    const h = parsed.hostname.toLowerCase()
     if (BLOCKED_DOMAINS.some(d => h === d || h.endsWith('.' + d))) return null
     if (h.startsWith('scontent.') || h.startsWith('scontent-')) return null
+    // Allow our own R2 CDN unconditionally
+    const r2Public = process.env.R2_PUBLIC_URL?.replace(/\/$/, '')
+    if (r2Public && url.startsWith(r2Public)) return url
+    // Require a recognised image extension — rejects HTML article page URLs
+    const ext = parsed.pathname.split('.').pop()?.toLowerCase() ?? ''
+    if (!IMAGE_EXTENSIONS.has(ext)) return null
     return url
   } catch {
     return null
@@ -66,7 +75,7 @@ type PublishableItem = {
   articleBody?: string
   articleExcerpt?: string
   articleSlug?: string
-  slides?: Array<{ imageOptions?: string[] }>
+  slides?: Array<{ image?: string; imageOptions?: string[] }>
   coverImageDirect?: string
   youtubeUrl?: string
   hashtags?: string[]
@@ -97,9 +106,9 @@ export async function publishToWebsite(item: PublishableItem): Promise<{ success
       return { success: false, error: `unknown channel: ${item.channel}` }
     }
 
-    const coverImage = usableImageUrl(item.coverImageDirect ?? item.slides?.[0]?.imageOptions?.[0])
+    const coverImage = usableImageUrl(item.coverImageDirect ?? item.slides?.[0]?.image ?? item.slides?.[0]?.imageOptions?.[0])
     const carouselImages = (item.slides || [])
-      .map(s => usableImageUrl(s.imageOptions?.[0]))
+      .map(s => usableImageUrl(s.image ?? s.imageOptions?.[0]))
       .filter((u): u is string => u !== null)
 
     const ytVideoId = extractYouTubeId(item.youtubeUrl ?? '')

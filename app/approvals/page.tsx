@@ -13,6 +13,21 @@ const BLOCKED_IMAGE_DOMAINS = [
   'reddit.com', 'redd.it', 'whatsapp.com',
 ]
 
+const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'svg'])
+
+function isImageUrl(url: string): boolean {
+  if (!url) return false
+  try {
+    const parsed = new URL(url)
+    // Always allow our R2 CDN
+    if (parsed.hostname.includes('r2.dev')) return true
+    const ext = parsed.pathname.split('.').pop()?.toLowerCase() ?? ''
+    return IMAGE_EXTENSIONS.has(ext)
+  } catch {
+    return false
+  }
+}
+
 function isBlockedImageUrl(url: string): boolean {
   try {
     const hostname = new URL(url).hostname.toLowerCase()
@@ -86,6 +101,7 @@ export default function ApprovalsPage() {
   const [publishPanelId, setPublishPanelId] = useState<string | null>(null)
   const [articleExpandedId, setArticleExpandedId] = useState<string | null>(null)
   const [regeneratingArticleId, setRegeneratingArticleId] = useState<string | null>(null)
+  const [coverImageErrors, setCoverImageErrors] = useState<Record<string, string>>({})
 
   type PendingArticle = {
     id: string; channel: string; slug: string; title: string
@@ -1330,6 +1346,11 @@ export default function ApprovalsPage() {
                                       defaultValue={item.coverImageDirect || ''}
                                       onBlur={e => {
                                         const val = e.target.value.trim()
+                                        if (val && !isImageUrl(val)) {
+                                          setCoverImageErrors(prev => ({ ...prev, [item.id]: 'This looks like a webpage, not an image. Paste a direct image URL (.jpg, .png, .webp).' }))
+                                          return
+                                        }
+                                        setCoverImageErrors(prev => { const n = { ...prev }; delete n[item.id]; return n })
                                         setItems(prev => prev.map(i => i.id === item.id ? { ...i, coverImageDirect: val || undefined } : i))
                                         fetch('/api/approvals', {
                                           method: 'PUT',
@@ -1337,9 +1358,12 @@ export default function ApprovalsPage() {
                                           body: JSON.stringify({ id: item.id, coverImageDirect: val || null }),
                                         }).catch(() => {})
                                       }}
-                                      className={`flex-1 text-[11px] border rounded-md px-2 py-1.5 focus:outline-none min-w-0 ${!item.coverImageDirect ? 'border-red-200 focus:border-red-400' : 'border-stone-200 focus:border-stone-400'}`}
+                                      className={`flex-1 text-[11px] border rounded-md px-2 py-1.5 focus:outline-none min-w-0 ${coverImageErrors[item.id] ? 'border-red-400 focus:border-red-500' : !item.coverImageDirect ? 'border-red-200 focus:border-red-400' : 'border-stone-200 focus:border-stone-400'}`}
                                     />
                                   </div>
+                                  {coverImageErrors[item.id] && (
+                                    <p className="text-[10px] text-red-500 mt-0.5">{coverImageErrors[item.id]}</p>
+                                  )}
                                 </div>
                               </div>
                             )}
