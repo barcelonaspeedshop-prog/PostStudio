@@ -286,7 +286,7 @@ export default function PublishPanel({ item, youtubeChannelId, onUpdate }: Props
               }`}
             />
             {!coverImageDirect.trim() && (
-              <p className="text-[10px] text-red-500 mt-0.5">Cover image required to publish</p>
+              <p className="text-[10px] text-red-500 mt-0.5">Cover image required for website article</p>
             )}
           </div>
 
@@ -372,7 +372,7 @@ export default function PublishPanel({ item, youtubeChannelId, onUpdate }: Props
           </button>
 
           {!articleValid && (
-            <p className="text-[10px] text-red-500 mt-2 text-center">Cover image and series required before publishing</p>
+            <p className="text-[10px] text-red-500 mt-2 text-center">Cover image and series required for website article</p>
           )}
         </div>
       )}
