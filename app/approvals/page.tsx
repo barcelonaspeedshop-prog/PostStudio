@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Sidebar from '@/components/Sidebar'
 import PublishPanel, { type PanelItem } from '@/components/PublishPanel'
 import { CHANNELS } from '@/lib/channels'
+import { getSeriesByChannel } from '@/lib/series'
 
 const BLOCKED_IMAGE_DOMAINS = [
   'instagram.com', 'lookaside.instagram.com', 'lookaside.fbsbx.com',
@@ -57,6 +58,7 @@ type ApprovalItem = {
   youtubeId?: string
   youtubeCredit?: string
   furtherReading?: Array<{ title: string; url: string; source?: string }>
+  publishToWebsite?: boolean
 }
 
 export default function ApprovalsPage() {
@@ -130,8 +132,22 @@ export default function ApprovalsPage() {
   const fetchItems = async () => {
     try {
       const res = await fetch('/api/approvals')
-      const data = await res.json()
+      const rawData: ApprovalItem[] = await res.json()
+      // Apply default series='news' locally for article items that haven't had it set yet
+      const data = rawData.map(i =>
+        i.articleBody && !i.series ? { ...i, series: 'news' } : i
+      )
       setItems(data)
+      // Persist defaults for any that needed them (fire-and-forget)
+      rawData
+        .filter(i => i.articleBody && !i.series)
+        .forEach(i => {
+          fetch('/api/approvals', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: i.id, series: 'news' }),
+          }).catch(() => {})
+        })
     } catch {
       showToast('Failed to load approvals', 'error')
     } finally {
@@ -1248,6 +1264,88 @@ export default function ApprovalsPage() {
                             )}
                           </button>
                         )}
+
+                        {/* Inline article fields — shown for items with articleBody */}
+                        {item.articleBody && (
+                          <div className="bg-stone-50 border border-stone-200 rounded-lg p-3 flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                              <p className="text-[10px] font-semibold text-stone-500 uppercase tracking-wide">Website article</p>
+                              <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                <span className="text-[10px] text-stone-400">Skip website</span>
+                                <input
+                                  type="checkbox"
+                                  checked={item.publishToWebsite === false}
+                                  onChange={e => {
+                                    const skip = e.target.checked
+                                    setItems(prev => prev.map(i => i.id === item.id ? { ...i, publishToWebsite: skip ? false : true } : i))
+                                    fetch('/api/approvals', {
+                                      method: 'PUT',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ id: item.id, publishToWebsite: skip ? false : true }),
+                                    }).catch(() => {})
+                                  }}
+                                  className="w-3.5 h-3.5 rounded cursor-pointer"
+                                />
+                              </label>
+                            </div>
+                            {item.publishToWebsite !== false && (
+                              <div className="flex gap-2 items-end">
+                                <div className="w-28 shrink-0">
+                                  <label className="text-[10px] text-stone-500 mb-1 block">Series <span className="text-red-400">*</span></label>
+                                  <select
+                                    value={item.series || 'news'}
+                                    onChange={e => {
+                                      const val = e.target.value
+                                      setItems(prev => prev.map(i => i.id === item.id ? { ...i, series: val } : i))
+                                      fetch('/api/approvals', {
+                                        method: 'PUT',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ id: item.id, series: val }),
+                                      }).catch(() => {})
+                                    }}
+                                    className="w-full text-[11px] border border-stone-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:border-stone-400"
+                                  >
+                                    {getSeriesByChannel(item.channel).map(s => (
+                                      <option key={s.slug} value={s.slug}>{s.name}</option>
+                                    ))}
+                                    {getSeriesByChannel(item.channel).length === 0 && (
+                                      <option value="news">News</option>
+                                    )}
+                                  </select>
+                                </div>
+                                <div className="flex-1">
+                                  <label className="text-[10px] text-stone-500 mb-1 block">Cover image URL <span className="text-red-400">*</span></label>
+                                  <div className="flex gap-1.5 items-center">
+                                    {item.coverImageDirect && (
+                                      <img
+                                        src={item.coverImageDirect}
+                                        alt=""
+                                        className="w-7 h-7 rounded object-cover border border-stone-200 shrink-0"
+                                        onError={e => { e.currentTarget.style.display = 'none' }}
+                                      />
+                                    )}
+                                    <input
+                                      type="url"
+                                      placeholder="https://..."
+                                      defaultValue={item.coverImageDirect || ''}
+                                      onBlur={e => {
+                                        const val = e.target.value.trim()
+                                        setItems(prev => prev.map(i => i.id === item.id ? { ...i, coverImageDirect: val || undefined } : i))
+                                        fetch('/api/approvals', {
+                                          method: 'PUT',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ id: item.id, coverImageDirect: val || null }),
+                                        }).catch(() => {})
+                                      }}
+                                      className={`flex-1 text-[11px] border rounded-md px-2 py-1.5 focus:outline-none min-w-0 ${!item.coverImageDirect ? 'border-red-200 focus:border-red-400' : 'border-stone-200 focus:border-stone-400'}`}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         <div className="flex gap-2">
                           {hasVideo && (
                             <button
@@ -1287,7 +1385,7 @@ export default function ApprovalsPage() {
                             ) : '↺ Regen'}
                           </button>
                           {(() => {
-                            const needsArticleFields = !!item.articleBody
+                            const needsArticleFields = !!item.articleBody && item.publishToWebsite !== false
                             const missingCover = needsArticleFields && !item.coverImageDirect
                             const missingSeries = needsArticleFields && !item.series
                             const articleBlocked = missingCover || missingSeries

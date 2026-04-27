@@ -49,6 +49,7 @@ export type ApprovalItem = {
   youtubeId?: string
   youtubeCredit?: string
   furtherReading?: FurtherReadingItem[]
+  publishToWebsite?: boolean
 }
 
 const AI_RESTAURANTS_FILE = path.join(DATA_DIR, 'restaurants-ai.json')
@@ -218,7 +219,7 @@ export async function POST(req: NextRequest) {
 // PUT — update an item (e.g. attach video after generation, or regenerate with fresh content)
 export async function PUT(req: NextRequest) {
   try {
-    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, articleBody, articleExcerpt, articleSlug, manualUploaded, cta, includeCta, hashtags, musicEnabled, series, coverImageDirect, youtubeId, youtubeCredit, furtherReading } = await req.json()
+    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, articleBody, articleExcerpt, articleSlug, manualUploaded, cta, includeCta, hashtags, musicEnabled, series, coverImageDirect, youtubeId, youtubeCredit, furtherReading, publishToWebsite } = await req.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
     const items = await loadApprovals()
@@ -256,6 +257,7 @@ export async function PUT(req: NextRequest) {
     if (youtubeId !== undefined) item.youtubeId = youtubeId || undefined
     if (youtubeCredit !== undefined) item.youtubeCredit = youtubeCredit || undefined
     if (furtherReading !== undefined) item.furtherReading = Array.isArray(furtherReading) && furtherReading.length ? furtherReading : undefined
+    if (publishToWebsite !== undefined) item.publishToWebsite = typeof publishToWebsite === 'boolean' ? publishToWebsite : undefined
     await saveApprovals(items)
 
     return NextResponse.json({ id: item.id, hasVideo: !!item.videoBase64, status: item.status })
@@ -292,8 +294,8 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ id: item.id, status: 'rejected' })
     }
 
-    // Server-side validation for article publishing
-    if (item.articleBody) {
+    // Server-side validation for article publishing (skipped if publishToWebsite === false)
+    if (item.articleBody && item.publishToWebsite !== false) {
       if (!item.coverImageDirect) {
         return NextResponse.json({ error: 'Cover image is required to publish an article' }, { status: 400 })
       }
@@ -429,14 +431,16 @@ export async function PATCH(req: NextRequest) {
       )
     }
 
-    // Publish article to website (before stripping imageOptions — publisher needs them for coverImage)
-    const websiteResult = await publishToWebsite(item)
-    if (websiteResult.success) {
-      item.websitePublished = true
-      console.log(`[approvals] Website published "${item.headline}" → ${websiteResult.path}`)
-    } else {
-      item.websitePublished = false
-      console.warn(`[approvals] Website publish failed for "${item.headline}": ${websiteResult.error}`)
+    // Publish article to website (skipped if publishToWebsite === false)
+    if (item.publishToWebsite !== false) {
+      const websiteResult = await publishToWebsite(item)
+      if (websiteResult.success) {
+        item.websitePublished = true
+        console.log(`[approvals] Website published "${item.headline}" → ${websiteResult.path}`)
+      } else {
+        item.websitePublished = false
+        console.warn(`[approvals] Website publish failed for "${item.headline}": ${websiteResult.error}`)
+      }
     }
 
     // Strip binary payload now that publishing is done — keeps approvals.json lean
