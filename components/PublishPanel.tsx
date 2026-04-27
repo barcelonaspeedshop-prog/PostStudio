@@ -1,8 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { getSeriesByChannel } from '@/lib/series'
 
 export type ManualUploaded = { youtube?: string; tiktok?: string; x?: string }
+
+export type FurtherReadingRow = { title: string; url: string; source: string }
 
 export type PanelItem = {
   id: string
@@ -17,6 +20,12 @@ export type PanelItem = {
   tiktokCaption?: string
   xCaption?: string
   manualUploaded?: ManualUploaded
+  articleBody?: string
+  series?: string
+  coverImageDirect?: string
+  youtubeId?: string
+  youtubeCredit?: string
+  furtherReading?: Array<{ title: string; url: string; source?: string }>
 }
 
 type Props = {
@@ -59,6 +68,67 @@ function CopyButton({ label, text }: { label: string; text: string }) {
 
 export default function PublishPanel({ item, youtubeChannelId, onUpdate }: Props) {
   const [regenLoading, setRegenLoading] = useState<Record<string, boolean>>({})
+  const [articleSaving, setArticleSaving] = useState(false)
+  const [articleSaved, setArticleSaved] = useState(false)
+
+  // Article metadata local state
+  const [series, setSeries] = useState(item.series || 'news')
+  const [coverImageDirect, setCoverImageDirect] = useState(item.coverImageDirect || '')
+  const [youtubeId, setYoutubeId] = useState(item.youtubeId || '')
+  const [youtubeCredit, setYoutubeCredit] = useState(item.youtubeCredit || '')
+  const [furtherReading, setFurtherReading] = useState<FurtherReadingRow[]>(
+    item.furtherReading?.map(r => ({ title: r.title, url: r.url, source: r.source || '' })) ?? []
+  )
+
+  const seriesOptions = getSeriesByChannel(item.channel)
+
+  const addFurtherReadingRow = () => {
+    if (furtherReading.length >= 5) return
+    setFurtherReading(prev => [...prev, { title: '', url: '', source: '' }])
+  }
+
+  const removeFurtherReadingRow = (i: number) => {
+    setFurtherReading(prev => prev.filter((_, j) => j !== i))
+  }
+
+  const updateFurtherReadingRow = (i: number, field: keyof FurtherReadingRow, value: string) => {
+    setFurtherReading(prev => prev.map((r, j) => j === i ? { ...r, [field]: value } : r))
+  }
+
+  const saveArticleMeta = async () => {
+    setArticleSaving(true)
+    try {
+      const payload = {
+        id: item.id,
+        series,
+        coverImageDirect: coverImageDirect.trim() || undefined,
+        youtubeId: youtubeId.trim() || undefined,
+        youtubeCredit: youtubeCredit.trim() || undefined,
+        furtherReading: furtherReading.filter(r => r.title.trim() && r.url.trim()).map(r => ({
+          title: r.title.trim(),
+          url: r.url.trim(),
+          ...(r.source.trim() ? { source: r.source.trim() } : {}),
+        })),
+      }
+      const res = await fetch('/api/approvals', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (res.ok) {
+        onUpdate({
+          series,
+          coverImageDirect: coverImageDirect.trim() || undefined,
+          youtubeId: youtubeId.trim() || undefined,
+          youtubeCredit: youtubeCredit.trim() || undefined,
+          furtherReading: payload.furtherReading,
+        })
+        setArticleSaved(true)
+        setTimeout(() => setArticleSaved(false), 2000)
+      }
+    } catch { /* non-fatal */ }
+    setArticleSaving(false)
+  }
 
   const uploaded = item.manualUploaded || {}
   const allDone = !!(uploaded.youtube && uploaded.tiktok && uploaded.x)
@@ -173,8 +243,139 @@ export default function PublishPanel({ item, youtubeChannelId, onUpdate }: Props
 
   const ytTagsString = (item.ytTags || []).join(', ')
 
+  const articleValid = !item.articleBody || (!!coverImageDirect.trim() && !!series)
+
   return (
     <div className="border-t border-stone-100 divide-y divide-stone-50">
+
+      {/* ── Article metadata (shown when item has article content) ── */}
+      {item.articleBody && (
+        <div className="px-4 pt-3 pb-4 bg-stone-50/50">
+          <p className="text-[10px] font-semibold text-stone-500 uppercase tracking-widest mb-3">Website Article</p>
+
+          {/* Series */}
+          <div className="mb-3">
+            <label className="flex items-center gap-1 text-[10px] font-semibold text-stone-400 uppercase tracking-wide mb-1">
+              Series <span className="text-red-500 text-[11px]">*</span>
+            </label>
+            <select
+              value={series}
+              onChange={e => setSeries(e.target.value)}
+              className="w-full text-[13px] border border-stone-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:border-stone-400"
+            >
+              {seriesOptions.map(s => (
+                <option key={s.slug} value={s.slug}>{s.name}</option>
+              ))}
+              {seriesOptions.length === 0 && <option value="news">News</option>}
+            </select>
+            <p className="text-[10px] text-stone-400 mt-0.5">What kind of article is this?</p>
+          </div>
+
+          {/* Cover image */}
+          <div className="mb-4">
+            <label className="flex items-center gap-1 text-[10px] font-semibold text-stone-400 uppercase tracking-wide mb-1">
+              Cover image <span className="text-red-500 text-[11px]">*</span>
+            </label>
+            <input
+              type="url"
+              value={coverImageDirect}
+              onChange={e => setCoverImageDirect(e.target.value)}
+              placeholder="https://..."
+              className={`w-full text-[12px] border rounded-lg px-2.5 py-2 bg-white focus:outline-none placeholder:text-stone-400 ${
+                !coverImageDirect.trim() ? 'border-red-200 focus:border-red-400' : 'border-stone-200 focus:border-stone-400'
+              }`}
+            />
+            {!coverImageDirect.trim() && (
+              <p className="text-[10px] text-red-500 mt-0.5">Cover image required to publish</p>
+            )}
+          </div>
+
+          {/* Watch section */}
+          <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide mb-2">Watch section (optional)</p>
+          <p className="text-[10px] text-stone-400 mb-2 -mt-1">Adds a Watch section below the article body — different from the inline video above.</p>
+          <div className="mb-2">
+            <label className="text-[10px] font-medium text-stone-500 mb-1 block">YouTube video ID</label>
+            <input
+              type="text"
+              value={youtubeId}
+              onChange={e => setYoutubeId(e.target.value)}
+              placeholder="e.g. CQgJ1lWgI3g"
+              className="w-full text-[12px] border border-stone-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:border-stone-400 placeholder:text-stone-400"
+            />
+          </div>
+          <div className="mb-4">
+            <label className="text-[10px] font-medium text-stone-500 mb-1 block">Credit</label>
+            <input
+              type="text"
+              value={youtubeCredit}
+              onChange={e => setYoutubeCredit(e.target.value)}
+              placeholder="e.g. via Vagabrothers"
+              className="w-full text-[12px] border border-stone-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:border-stone-400 placeholder:text-stone-400"
+            />
+          </div>
+
+          {/* Further reading */}
+          <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide mb-1">Further reading (optional)</p>
+          <p className="text-[10px] text-stone-400 mb-2">External articles or sources worth reading.</p>
+          <div className="flex flex-col gap-2 mb-2">
+            {furtherReading.map((row, i) => (
+              <div key={i} className="flex flex-col gap-1 p-2 bg-white border border-stone-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-stone-400">Link {i + 1}</span>
+                  <button
+                    onClick={() => removeFurtherReadingRow(i)}
+                    className="text-[10px] text-red-400 hover:text-red-600 transition-colors"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={row.title}
+                  onChange={e => updateFurtherReadingRow(i, 'title', e.target.value)}
+                  placeholder="Title"
+                  className="w-full text-[12px] border border-stone-200 rounded px-2 py-1 bg-white focus:outline-none focus:border-stone-400 placeholder:text-stone-400"
+                />
+                <input
+                  type="url"
+                  value={row.url}
+                  onChange={e => updateFurtherReadingRow(i, 'url', e.target.value)}
+                  placeholder="URL"
+                  className="w-full text-[12px] border border-stone-200 rounded px-2 py-1 bg-white focus:outline-none focus:border-stone-400 placeholder:text-stone-400"
+                />
+                <input
+                  type="text"
+                  value={row.source}
+                  onChange={e => updateFurtherReadingRow(i, 'source', e.target.value)}
+                  placeholder="Source (optional, e.g. The Guardian)"
+                  className="w-full text-[12px] border border-stone-200 rounded px-2 py-1 bg-white focus:outline-none focus:border-stone-400 placeholder:text-stone-400"
+                />
+              </div>
+            ))}
+          </div>
+          {furtherReading.length < 5 && (
+            <button
+              onClick={addFurtherReadingRow}
+              className="w-full py-1.5 text-[11px] font-medium border border-dashed border-stone-300 text-stone-500 rounded-lg hover:border-stone-400 hover:text-stone-700 transition-colors mb-3"
+            >
+              + Add link
+            </button>
+          )}
+
+          {/* Save button */}
+          <button
+            onClick={saveArticleMeta}
+            disabled={articleSaving}
+            className="w-full py-2 text-[12px] font-medium rounded-lg border border-stone-300 text-stone-700 hover:bg-stone-100 transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5"
+          >
+            {articleSaving ? <><Spinner /> Saving…</> : articleSaved ? '✓ Saved' : 'Save article details'}
+          </button>
+
+          {!articleValid && (
+            <p className="text-[10px] text-red-500 mt-2 text-center">Cover image and series required before publishing</p>
+          )}
+        </div>
+      )}
 
       {/* ── YouTube ── */}
       {uploaded.youtube ? (

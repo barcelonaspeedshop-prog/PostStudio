@@ -15,6 +15,8 @@ export const maxDuration = 300
 const DATA_DIR = process.env.TOKEN_STORAGE_PATH || '/data'
 const APPROVALS_PATH = path.join(DATA_DIR, 'approvals.json')
 
+export type FurtherReadingItem = { title: string; url: string; source?: string }
+
 export type ApprovalItem = {
   id: string
   channel: string
@@ -42,6 +44,11 @@ export type ApprovalItem = {
   createdAt: string
   status: 'pending' | 'approved' | 'rejected' | 'published'
   reviewedAt?: string
+  series?: string
+  coverImageDirect?: string
+  youtubeId?: string
+  youtubeCredit?: string
+  furtherReading?: FurtherReadingItem[]
 }
 
 const AI_RESTAURANTS_FILE = path.join(DATA_DIR, 'restaurants-ai.json')
@@ -151,7 +158,7 @@ export async function GET() {
 // POST — add new item to queue
 export async function POST(req: NextRequest) {
   try {
-    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, articleBody, articleExcerpt, articleSlug, cta, hashtags, restaurantMeta, restaurantMetas, format } = await req.json()
+    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, articleBody, articleExcerpt, articleSlug, cta, hashtags, restaurantMeta, restaurantMetas, format, series, coverImageDirect, youtubeId, youtubeCredit, furtherReading } = await req.json()
 
     if (!channel || !slides || !Array.isArray(slides)) {
       return NextResponse.json({ error: 'channel and slides are required' }, { status: 400 })
@@ -180,6 +187,11 @@ export async function POST(req: NextRequest) {
       format: format === 'reel' || format === 'carousel' ? format : undefined,
       createdAt: new Date().toISOString(),
       status: 'pending',
+      series: series || undefined,
+      coverImageDirect: coverImageDirect || undefined,
+      youtubeId: youtubeId || undefined,
+      youtubeCredit: youtubeCredit || undefined,
+      furtherReading: Array.isArray(furtherReading) && furtherReading.length ? furtherReading : undefined,
     }
 
     const items = await loadApprovals()
@@ -197,7 +209,7 @@ export async function POST(req: NextRequest) {
 // PUT — update an item (e.g. attach video after generation, or regenerate with fresh content)
 export async function PUT(req: NextRequest) {
   try {
-    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, articleBody, articleExcerpt, articleSlug, manualUploaded, cta, includeCta, hashtags, musicEnabled } = await req.json()
+    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, articleBody, articleExcerpt, articleSlug, manualUploaded, cta, includeCta, hashtags, musicEnabled, series, coverImageDirect, youtubeId, youtubeCredit, furtherReading } = await req.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
     const items = await loadApprovals()
@@ -230,6 +242,11 @@ export async function PUT(req: NextRequest) {
     if (includeCta !== undefined) item.includeCta = includeCta
     if (hashtags !== undefined) item.hashtags = Array.isArray(hashtags) ? hashtags : item.hashtags
     if (musicEnabled !== undefined) (item as Record<string, unknown>).musicEnabled = musicEnabled
+    if (series !== undefined) item.series = series || undefined
+    if (coverImageDirect !== undefined) item.coverImageDirect = coverImageDirect || undefined
+    if (youtubeId !== undefined) item.youtubeId = youtubeId || undefined
+    if (youtubeCredit !== undefined) item.youtubeCredit = youtubeCredit || undefined
+    if (furtherReading !== undefined) item.furtherReading = Array.isArray(furtherReading) && furtherReading.length ? furtherReading : undefined
     await saveApprovals(items)
 
     return NextResponse.json({ id: item.id, hasVideo: !!item.videoBase64, status: item.status })
@@ -264,6 +281,16 @@ export async function PATCH(req: NextRequest) {
       item.slides = item.slides.map(({ image: _img, imageOptions: _opts, ...rest }) => rest as typeof item.slides[0])
       await saveApprovals(items)
       return NextResponse.json({ id: item.id, status: 'rejected' })
+    }
+
+    // Server-side validation for article publishing
+    if (item.articleBody) {
+      if (!item.coverImageDirect) {
+        return NextResponse.json({ error: 'Cover image is required to publish an article' }, { status: 400 })
+      }
+      if (!item.series) {
+        return NextResponse.json({ error: 'Series is required to publish an article' }, { status: 400 })
+      }
     }
 
     await saveApprovals(items)

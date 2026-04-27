@@ -33,6 +33,8 @@ function usableImageUrl(url: string | undefined | null): string | null {
   }
 }
 
+export type FurtherReadingItem = { title: string; url: string; source?: string }
+
 export type ArticleMeta = {
   id: string
   channel: string
@@ -41,6 +43,7 @@ export type ArticleMeta = {
   excerpt: string
   publishedAt: string
   coverImage: string | null
+  series?: string
   goLiveAt?: string
 }
 
@@ -50,6 +53,9 @@ export type Article = ArticleMeta & {
   ytVideoId: string | null
   hashtags: string[]
   status?: 'pending' | 'live'
+  youtubeId?: string
+  youtubeCredit?: string
+  furtherReading?: FurtherReadingItem[]
 }
 
 type PublishableItem = {
@@ -65,6 +71,10 @@ type PublishableItem = {
   youtubeUrl?: string
   hashtags?: string[]
   goLiveAt?: string
+  series?: string
+  youtubeId?: string
+  youtubeCredit?: string
+  furtherReading?: FurtherReadingItem[]
 }
 
 async function loadIndex(): Promise<ArticleMeta[]> {
@@ -109,6 +119,10 @@ export async function publishToWebsite(item: PublishableItem): Promise<{ success
       carouselImages,
       ytVideoId,
       hashtags: item.hashtags || [],
+      series: item.series || 'news',
+      ...(item.youtubeId ? { youtubeId: item.youtubeId } : {}),
+      ...(item.youtubeCredit ? { youtubeCredit: item.youtubeCredit } : {}),
+      ...(item.furtherReading?.length ? { furtherReading: item.furtherReading } : {}),
       ...(goLiveAt ? { goLiveAt, status: 'pending' as const } : {}),
     }
 
@@ -126,6 +140,7 @@ export async function publishToWebsite(item: PublishableItem): Promise<{ success
       excerpt: article.excerpt,
       publishedAt: article.publishedAt,
       coverImage,
+      series: article.series,
       ...(goLiveAt ? { goLiveAt } : {}),
     }
 

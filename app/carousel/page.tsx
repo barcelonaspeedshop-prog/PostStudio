@@ -84,6 +84,7 @@ export default function CarouselPage() {
   // Food Guide Builder state
   const [foodMode, setFoodMode] = useState<'no-frills' | 'top5'>('no-frills')
   const [foodRestaurants, setFoodRestaurants] = useState([{ name: '', city: '' }, { name: '', city: '' }, { name: '', city: '' }, { name: '', city: '' }, { name: '', city: '' }])
+  const [top5Location, setTop5Location] = useState('')
   const [buildingFood, setBuildingFood] = useState(false)
   const [foodBuildStatus, setFoodBuildStatus] = useState('')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -622,10 +623,14 @@ export default function CarouselPage() {
   const buildFoodCarousel = async () => {
     const valid = foodMode === 'no-frills'
       ? foodRestaurants.slice(0, 1).filter(r => r.name.trim() && r.city.trim())
-      : foodRestaurants.filter(r => r.name.trim() && r.city.trim()).slice(0, 5)
+      : foodRestaurants.filter(r => r.name.trim()).slice(0, 5)
 
     if (!valid.length) {
-      showToast('Enter at least one restaurant name and city', 'error')
+      showToast(foodMode === 'top5' ? 'Enter at least one restaurant name' : 'Enter at least one restaurant name and city', 'error')
+      return
+    }
+    if (foodMode === 'top5' && !top5Location.trim()) {
+      showToast('Enter a location for the Top 5', 'error')
       return
     }
 
@@ -639,7 +644,7 @@ export default function CarouselPage() {
       const genRes = await fetch('/api/food-carousel-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: foodMode, restaurants: valid, channel }),
+        body: JSON.stringify({ mode: foodMode, restaurants: valid.map(r => foodMode === 'top5' ? { name: r.name, city: top5Location.trim() } : r), channel }),
       })
       const genData = await genRes.json()
       if (!genRes.ok) throw new Error(genData.error || 'Slide generation failed')
@@ -649,7 +654,7 @@ export default function CarouselPage() {
       setSelectedSlide(0)
       setTopic(foodMode === 'no-frills'
         ? `${valid[0].name} — ${valid[0].city} (No Frills But Kills)`
-        : `Top ${valid.length} Eats — ${valid.map(r => r.city).filter((c, i, a) => a.indexOf(c) === i).join(', ')}`)
+        : `Top ${valid.length} Eats — ${top5Location.trim()}`)
 
       // Store restaurant metadata for the approval workflow + website auto-publish
       const metas = genData.restaurantMetas || (genData.restaurantMeta ? [genData.restaurantMeta] : [])
@@ -890,12 +895,26 @@ export default function CarouselPage() {
                   >🍽️ Top 5</button>
                 </div>
 
+                {/* Top 5: shared location field */}
+                {foodMode === 'top5' && (
+                  <div>
+                    <p className="text-[9px] font-medium text-amber-600 uppercase tracking-wider mb-1">Location</p>
+                    <input
+                      type="text"
+                      value={top5Location}
+                      onChange={e => setTop5Location(e.target.value)}
+                      placeholder="e.g. Barcelona, Boston Back Bay, Catalonia coast"
+                      className="w-full text-[14px] font-medium border-2 border-amber-300 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:border-amber-500 placeholder:text-stone-400"
+                    />
+                  </div>
+                )}
+
                 {/* Restaurant inputs */}
                 <div className="flex flex-col gap-2">
                   {(foodMode === 'no-frills' ? foodRestaurants.slice(0, 1) : foodRestaurants).map((r, i) => (
                     <div key={i} className="flex flex-col gap-1">
                       {foodMode === 'top5' && (
-                        <p className="text-[9px] font-medium text-amber-600 uppercase tracking-wider">Restaurant {i + 1}</p>
+                        <p className="text-[9px] font-medium text-amber-600 uppercase tracking-wider">{i + 1}.</p>
                       )}
                       <input
                         type="text"
@@ -904,13 +923,15 @@ export default function CarouselPage() {
                         placeholder="Restaurant name"
                         className="w-full text-[13px] border border-amber-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:border-amber-400 placeholder:text-stone-400"
                       />
-                      <input
-                        type="text"
-                        value={r.city}
-                        onChange={e => setFoodRestaurants(prev => prev.map((x, j) => j === i ? { ...x, city: e.target.value } : x))}
-                        placeholder="City"
-                        className="w-full text-[13px] border border-amber-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:border-amber-400 placeholder:text-stone-400"
-                      />
+                      {foodMode === 'no-frills' && (
+                        <input
+                          type="text"
+                          value={r.city}
+                          onChange={e => setFoodRestaurants(prev => prev.map((x, j) => j === i ? { ...x, city: e.target.value } : x))}
+                          placeholder="City"
+                          className="w-full text-[13px] border border-amber-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:border-amber-400 placeholder:text-stone-400"
+                        />
+                      )}
                     </div>
                   ))}
                 </div>

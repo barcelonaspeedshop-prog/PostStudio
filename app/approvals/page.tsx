@@ -52,6 +52,11 @@ type ApprovalItem = {
   createdAt: string
   status: 'pending' | 'approved' | 'rejected' | 'published'
   reviewedAt?: string
+  series?: string
+  coverImageDirect?: string
+  youtubeId?: string
+  youtubeCredit?: string
+  furtherReading?: Array<{ title: string; url: string; source?: string }>
 }
 
 export default function ApprovalsPage() {
@@ -1281,21 +1286,36 @@ export default function ApprovalsPage() {
                               </>
                             ) : '↺ Regen'}
                           </button>
-                          <button
-                            onClick={() => handleAction(item.id, 'approve')}
-                            disabled={isActing}
-                            className="flex-1 px-4 py-2.5 min-h-[44px] text-[13px] font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2 bg-green-600 text-white hover:bg-green-700"
-                          >
-                            {isActing ? (
-                              <>
-                                <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
-                                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-                                </svg>
-                                {actingLabel}
-                              </>
-                            ) : 'Approve & Post'}
-                          </button>
+                          {(() => {
+                            const needsArticleFields = !!item.articleBody
+                            const missingCover = needsArticleFields && !item.coverImageDirect
+                            const missingSeries = needsArticleFields && !item.series
+                            const articleBlocked = missingCover || missingSeries
+                            const blockReason = missingCover ? 'Cover image required — open Publish panel' : missingSeries ? 'Series required — open Publish panel' : ''
+                            return (
+                              <div className="flex-1 flex flex-col gap-1">
+                                <button
+                                  onClick={() => handleAction(item.id, 'approve')}
+                                  disabled={isActing || articleBlocked}
+                                  title={blockReason}
+                                  className="w-full px-4 py-2.5 min-h-[44px] text-[13px] font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 bg-green-600 text-white hover:bg-green-700"
+                                >
+                                  {isActing ? (
+                                    <>
+                                      <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                                      </svg>
+                                      {actingLabel}
+                                    </>
+                                  ) : 'Approve & Post'}
+                                </button>
+                                {articleBlocked && (
+                                  <p className="text-[10px] text-red-500 text-center">{blockReason}</p>
+                                )}
+                              </div>
+                            )
+                          })()}
                           <button
                             onClick={() => handleAction(item.id, 'reject')}
                             disabled={isActing}

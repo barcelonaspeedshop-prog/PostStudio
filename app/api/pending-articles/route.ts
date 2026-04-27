@@ -23,6 +23,10 @@ type StoredArticle = {
   ytVideoId?: string | null
   goLiveAt?: string
   status?: string
+  series?: string
+  youtubeId?: string
+  youtubeCredit?: string
+  furtherReading?: Array<{ title: string; url: string; source?: string }>
 }
 
 export async function GET() {
