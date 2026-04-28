@@ -40,7 +40,7 @@ function isBlockedImageUrl(url: string): boolean {
 }
 
 type Slide = {
-  num: string; tag: string; headline: string; body: string; badge: string; accent: string; image?: string; imageOptions?: string[]
+  num: string; tag: string; headline: string; body: string; badge: string; accent: string; image?: string; imageOptions?: string[]; imageUrl?: string
 }
 
 type ApprovalItem = {
@@ -139,6 +139,10 @@ export default function ApprovalsPage() {
   const [imageLoadError, setImageLoadError] = useState(false)
   const [uploadTarget, setUploadTarget] = useState<{ itemId: string; slideIndex: number } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const coverFileInputRef = useRef<HTMLInputElement>(null)
+  const [coverUploadTarget, setCoverUploadTarget] = useState<string | null>(null)
+  const [coverUploading, setCoverUploading] = useState<Record<string, boolean>>({})
+  const [coverDragOver, setCoverDragOver] = useState<Record<string, boolean>>({})
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -737,6 +741,60 @@ export default function ApprovalsPage() {
     setUploadTarget(null)
   }
 
+  const saveCoverImage = useCallback(async (itemId: string, url: string) => {
+    setItems(prev => prev.map(i => i.id === itemId ? { ...i, coverImageDirect: url } : i))
+    setCoverImageErrors(prev => { const n = { ...prev }; delete n[itemId]; return n })
+    await fetch('/api/approvals', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: itemId, coverImageDirect: url }),
+    }).catch(() => {})
+  }, [])
+
+  const clearCoverImage = useCallback(async (itemId: string) => {
+    setItems(prev => prev.map(i => i.id === itemId ? { ...i, coverImageDirect: undefined } : i))
+    await fetch('/api/approvals', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: itemId, coverImageDirect: null }),
+    }).catch(() => {})
+  }, [])
+
+  const uploadCoverImage = useCallback(async (itemId: string, file: File) => {
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select an image file', 'error')
+      return
+    }
+    setCoverUploading(prev => ({ ...prev, [itemId]: true }))
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      const res = await fetch('/api/cover-image-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64, mimeType: file.type }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Upload failed')
+      await saveCoverImage(itemId, data.url)
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Cover image upload failed', 'error')
+    } finally {
+      setCoverUploading(prev => { const n = { ...prev }; delete n[itemId]; return n })
+    }
+  }, [saveCoverImage])
+
+  const handleCoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && coverUploadTarget) uploadCoverImage(coverUploadTarget, file)
+    e.target.value = ''
+    setCoverUploadTarget(null)
+  }
+
   const handleAction = async (id: string, action: 'approve' | 'reject') => {
     setActing(id)
     setActingLabel(action === 'approve' ? 'Publishing...' : 'Rejecting...')
@@ -1305,7 +1363,7 @@ export default function ApprovalsPage() {
                               </label>
                             </div>
                             {item.publishToWebsite !== false && (
-                              <div className="flex gap-2 items-end">
+                              <div className="flex gap-2 items-start">
                                 <div className="w-28 shrink-0">
                                   <label className="text-[10px] text-stone-500 mb-1 block">Series <span className="text-red-400">*</span></label>
                                   <select
@@ -1329,38 +1387,72 @@ export default function ApprovalsPage() {
                                     )}
                                   </select>
                                 </div>
-                                <div className="flex-1">
-                                  <label className="text-[10px] text-stone-500 mb-1 block">Cover image URL <span className="text-red-400">*</span></label>
-                                  <div className="flex gap-1.5 items-center">
-                                    {item.coverImageDirect && (
+                                <div className="flex-1 min-w-0">
+                                  <label className="text-[10px] text-stone-500 mb-1 block">Cover image <span className="text-red-400">*</span></label>
+                                  {item.coverImageDirect && isImageUrl(item.coverImageDirect) ? (
+                                    <div className="flex items-center gap-2 p-1.5 bg-white border border-stone-200 rounded-lg">
                                       <img
                                         src={item.coverImageDirect}
                                         alt=""
-                                        className="w-7 h-7 rounded object-cover border border-stone-200 shrink-0"
+                                        className="w-12 h-8 object-cover rounded shrink-0"
                                         onError={e => { e.currentTarget.style.display = 'none' }}
                                       />
-                                    )}
-                                    <input
-                                      type="url"
-                                      placeholder="https://..."
-                                      defaultValue={item.coverImageDirect || ''}
-                                      onBlur={e => {
-                                        const val = e.target.value.trim()
-                                        if (val && !isImageUrl(val)) {
-                                          setCoverImageErrors(prev => ({ ...prev, [item.id]: 'This looks like a webpage, not an image. Paste a direct image URL (.jpg, .png, .webp).' }))
-                                          return
-                                        }
-                                        setCoverImageErrors(prev => { const n = { ...prev }; delete n[item.id]; return n })
-                                        setItems(prev => prev.map(i => i.id === item.id ? { ...i, coverImageDirect: val || undefined } : i))
-                                        fetch('/api/approvals', {
-                                          method: 'PUT',
-                                          headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify({ id: item.id, coverImageDirect: val || null }),
-                                        }).catch(() => {})
+                                      <p className="flex-1 text-[10px] text-stone-500 truncate">{item.coverImageDirect.split('/').pop()}</p>
+                                      <button
+                                        onClick={() => clearCoverImage(item.id)}
+                                        className="shrink-0 w-5 h-5 flex items-center justify-center text-stone-300 hover:text-red-500 transition-colors rounded text-[16px] leading-none"
+                                        title="Remove cover image"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div
+                                      onDragOver={e => { e.preventDefault(); e.stopPropagation(); setCoverDragOver(p => ({ ...p, [item.id]: true })) }}
+                                      onDragLeave={e => { e.stopPropagation(); setCoverDragOver(p => ({ ...p, [item.id]: false })) }}
+                                      onDrop={e => {
+                                        e.preventDefault(); e.stopPropagation()
+                                        setCoverDragOver(p => ({ ...p, [item.id]: false }))
+                                        const file = e.dataTransfer.files[0]
+                                        if (file) uploadCoverImage(item.id, file)
                                       }}
-                                      className={`flex-1 text-[11px] border rounded-md px-2 py-1.5 focus:outline-none min-w-0 ${coverImageErrors[item.id] ? 'border-red-400 focus:border-red-500' : !item.coverImageDirect ? 'border-red-200 focus:border-red-400' : 'border-stone-200 focus:border-stone-400'}`}
-                                    />
-                                  </div>
+                                      onClick={() => { setCoverUploadTarget(item.id); coverFileInputRef.current?.click() }}
+                                      className={`flex items-center justify-center gap-1.5 py-2 px-3 border-2 border-dashed rounded-lg cursor-pointer transition-colors text-[11px] select-none ${
+                                        coverDragOver[item.id] ? 'border-stone-400 bg-stone-50 text-stone-600' : 'border-red-200 hover:border-stone-300 text-stone-400 hover:text-stone-600'
+                                      }`}
+                                    >
+                                      {coverUploading[item.id] ? (
+                                        <>
+                                          <svg className="w-3 h-3 animate-spin shrink-0" viewBox="0 0 24 24" fill="none">
+                                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                                          </svg>
+                                          Uploading…
+                                        </>
+                                      ) : (
+                                        <>↑ Drop or click to upload</>
+                                      )}
+                                    </div>
+                                  )}
+                                  {/* Slide source image shortcuts */}
+                                  {(() => {
+                                    const slideUrls = item.slides
+                                      .map((s, idx) => ({ idx, url: s.imageUrl }))
+                                      .filter(({ url }) => url && isImageUrl(url) && !isBlockedImageUrl(url))
+                                    return slideUrls.length > 0 ? (
+                                      <div className="flex flex-wrap gap-1 mt-1.5">
+                                        {slideUrls.map(({ idx, url }) => (
+                                          <button
+                                            key={idx}
+                                            onClick={() => saveCoverImage(item.id, url!)}
+                                            className="px-1.5 py-0.5 text-[9px] bg-stone-100 text-stone-500 rounded hover:bg-stone-200 hover:text-stone-800 transition-colors"
+                                          >
+                                            Use slide {idx + 1}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    ) : null
+                                  })()}
                                   {coverImageErrors[item.id] && (
                                     <p className="text-[10px] text-red-500 mt-0.5">{coverImageErrors[item.id]}</p>
                                   )}
@@ -1410,7 +1502,7 @@ export default function ApprovalsPage() {
                           </button>
                           {(() => {
                             const needsArticleFields = !!item.articleBody && item.publishToWebsite !== false
-                            const missingCover = needsArticleFields && !item.coverImageDirect
+                            const missingCover = needsArticleFields && (!item.coverImageDirect || !isImageUrl(item.coverImageDirect))
                             const articleBlocked = missingCover
                             const blockReason = missingCover ? 'Cover image required for website article' : ''
                             return (
@@ -1945,6 +2037,15 @@ export default function ApprovalsPage() {
         accept="image/jpeg,image/png,image/webp"
         className="hidden"
         onChange={handleFileChange}
+      />
+
+      {/* Hidden file input for cover image upload */}
+      <input
+        ref={coverFileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+        className="hidden"
+        onChange={handleCoverFileChange}
       />
 
       {/* Video preview modal */}

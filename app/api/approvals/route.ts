@@ -16,6 +16,21 @@ export const maxDuration = 300
 const DATA_DIR = process.env.TOKEN_STORAGE_PATH || '/data'
 const APPROVALS_PATH = path.join(DATA_DIR, 'approvals.json')
 
+const COVER_IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'svg'])
+
+function isCoverImageUsable(url: string | undefined): boolean {
+  if (!url) return false
+  try {
+    const parsed = new URL(url)
+    const r2Public = process.env.R2_PUBLIC_URL?.replace(/\/$/, '')
+    if (r2Public && url.startsWith(r2Public)) return true
+    const ext = parsed.pathname.split('.').pop()?.toLowerCase() ?? ''
+    return COVER_IMAGE_EXTENSIONS.has(ext)
+  } catch {
+    return false
+  }
+}
+
 export type FurtherReadingItem = { title: string; url: string; source?: string }
 
 export type ApprovalItem = {
@@ -298,7 +313,7 @@ export async function PATCH(req: NextRequest) {
     // Server-side validation for article publishing (skipped if publishToWebsite === false)
     // series is intentionally not required here — publisher falls back to 'news'
     if (item.articleBody && item.publishToWebsite !== false) {
-      if (!item.coverImageDirect) {
+      if (!isCoverImageUsable(item.coverImageDirect)) {
         return NextResponse.json({ error: 'Cover image is required to publish an article' }, { status: 400 })
       }
     }
