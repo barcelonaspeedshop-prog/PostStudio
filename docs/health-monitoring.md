@@ -54,10 +54,10 @@ Create `/etc/poststudio-health.env`:
 
 ```bash
 POSTSTUDIO_APP_URL=https://app.premirafirst.com
-PREVIEW_TOKEN=<value from /docker/poststudio/docker-compose.yml>
-ALERT_EMAIL=<mike's email>
+PREVIEW_TOKEN=<value from /var/www/poststudio/docker-compose.yml>
+ALERT_EMAIL_TO=<alert recipient email>
+ALERT_EMAIL_FROM=onboarding@resend.dev
 RESEND_API_KEY=<resend.com API key>
-ALERT_FROM_EMAIL=alerts@premirafirst.com
 ALERT_COOLDOWN_SECONDS=14400
 HEALTH_LOG_FILE=/var/log/poststudio-health.log
 HEALTH_STATE_FILE=/var/log/poststudio-health-state.json
@@ -122,9 +122,22 @@ Canary URL: `https://pub-05204aab4f2d4cbeb3d786b0f03d35c0.r2.dev/health/canary.j
 
 ### 6. Resend email setup
 
-1. Create account at https://resend.com (free tier: 3,000 emails/month)
-2. Add and verify your sending domain (or use the resend.dev sandbox for testing)
-3. Create an API key and add it to `/etc/poststudio-health.env` as `RESEND_API_KEY`
+Email alerts are sent via [Resend](https://resend.com) (free tier: 3,000 emails/month — well above our usage of ~96/month at 15-min intervals).
+
+**Account:** Sign in at https://resend.com with the barcelonaspeedshop Gmail account.
+
+**Sender address:** `onboarding@resend.dev` — Resend's shared sandbox address, no domain verification needed. Works immediately.
+
+**API key location:** The live key is stored in `/etc/poststudio-health.env` on the VPS as `RESEND_API_KEY`. It is not in this repository (the file is on the VPS only, not committed to git).
+
+**If the API key is compromised:**
+1. Go to https://resend.com → API Keys
+2. Delete the compromised key
+3. Create a new key
+4. Update on VPS: `nano /etc/poststudio-health.env` → replace `RESEND_API_KEY=...`
+5. The cron script reads the file on each run, so no restart needed
+
+**Free tier limits:** 3,000 emails/month, 100/day. At 15-minute intervals and a 4-hour cooldown, worst-case usage is 6 alert emails per outage + 1 recovery = well within limits.
 
 ---
 
@@ -137,13 +150,15 @@ curl -s -H "Authorization: Bearer $TOKEN" https://app.premirafirst.com/api/healt
 ```
 
 ### Force a failure (test alerting)
-Temporarily rename the canary to simulate public read failure:
+Temporarily swap in a bad token so the endpoint returns 401 and curl fails:
 ```bash
-# Break it
-docker exec poststudio-app-1 env R2_PUBLIC_URL=https://broken.example.com \
-  /usr/local/bin/poststudio-health-check
-
-# Or temporarily set a wrong token in the config and re-run
+cp /etc/poststudio-health.env /etc/poststudio-health.env.bak
+sed -i 's/PREVIEW_TOKEN=.*/PREVIEW_TOKEN=wrongtoken/' /etc/poststudio-health.env
+/usr/local/bin/poststudio-health-check || true
+cp /etc/poststudio-health.env.bak /etc/poststudio-health.env
+# Reset state to ok after testing
+echo '{"last_status":"ok","last_alerted":0,"updated":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}' \
+  > /var/log/poststudio-health-state.json
 ```
 
 ### Check logs
