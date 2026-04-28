@@ -9,27 +9,13 @@ import { isR2Configured, uploadToR2 } from '@/lib/r2'
 import type { RestaurantMeta } from '@/app/api/food-carousel-generate/route'
 import { restaurants as staticRestaurants } from '@/lib/restaurants'
 import type { Restaurant } from '@/lib/restaurants'
+import { isUsableImageUrl } from '@/lib/image-url'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 const DATA_DIR = process.env.TOKEN_STORAGE_PATH || '/data'
 const APPROVALS_PATH = path.join(DATA_DIR, 'approvals.json')
-
-const COVER_IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'svg'])
-
-function isCoverImageUsable(url: string | undefined): boolean {
-  if (!url) return false
-  try {
-    const parsed = new URL(url)
-    const r2Public = process.env.R2_PUBLIC_URL?.replace(/\/$/, '')
-    if (r2Public && url.startsWith(r2Public)) return true
-    const ext = parsed.pathname.split('.').pop()?.toLowerCase() ?? ''
-    return COVER_IMAGE_EXTENSIONS.has(ext)
-  } catch {
-    return false
-  }
-}
 
 export type FurtherReadingItem = { title: string; url: string; source?: string }
 
@@ -313,7 +299,7 @@ export async function PATCH(req: NextRequest) {
     // Server-side validation for article publishing (skipped if publishToWebsite === false)
     // series is intentionally not required here — publisher falls back to 'news'
     if (item.articleBody && item.publishToWebsite !== false) {
-      if (!isCoverImageUsable(item.coverImageDirect)) {
+      if (!await isUsableImageUrl(item.coverImageDirect)) {
         return NextResponse.json({ error: 'Cover image is required to publish an article' }, { status: 400 })
       }
     }

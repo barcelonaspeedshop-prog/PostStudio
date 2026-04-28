@@ -2,6 +2,7 @@ import { writeFile, readFile, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
 import { extractYouTubeId } from './youtube-url'
+import { isUsableImageUrl, isUsableImageUrlSync } from './image-url'
 
 const DATA_DIR = process.env.TOKEN_STORAGE_PATH || '/data'
 const PUBLISHED_DIR = path.join(DATA_DIR, 'published')
@@ -12,34 +13,6 @@ const CHANNEL_MAP: Record<string, string> = {
   'Omnira F1': 'f1',
   'Omnira Football': 'football',
   'Omnira Food': 'food',
-}
-
-const BLOCKED_DOMAINS = [
-  'instagram.com', 'lookaside.fbsbx.com', 'lookaside.facebook.com', 'fbcdn.net', 'facebook.com',
-  'twitter.com', 'twimg.com', 'pbs.twimg.com', 'tiktok.com', 'tiktokcdn.com',
-  'pinterest.com', 'pinimg.com', 'reddit.com', 'redd.it', 'whatsapp.com',
-]
-
-const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'svg'])
-
-function usableImageUrl(url: string | undefined | null): string | null {
-  if (!url) return null
-  if (url.startsWith('data:') || (url.length > 500 && !url.startsWith('http'))) return null
-  try {
-    const parsed = new URL(url)
-    const h = parsed.hostname.toLowerCase()
-    if (BLOCKED_DOMAINS.some(d => h === d || h.endsWith('.' + d))) return null
-    if (h.startsWith('scontent.') || h.startsWith('scontent-')) return null
-    // Allow our own R2 CDN unconditionally
-    const r2Public = process.env.R2_PUBLIC_URL?.replace(/\/$/, '')
-    if (r2Public && url.startsWith(r2Public)) return url
-    // Require a recognised image extension — rejects HTML article page URLs
-    const ext = parsed.pathname.split('.').pop()?.toLowerCase() ?? ''
-    if (!IMAGE_EXTENSIONS.has(ext)) return null
-    return url
-  } catch {
-    return null
-  }
 }
 
 export type FurtherReadingItem = { title: string; url: string; source?: string }
@@ -106,9 +79,10 @@ export async function publishToWebsite(item: PublishableItem): Promise<{ success
       return { success: false, error: `unknown channel: ${item.channel}` }
     }
 
-    const coverImage = usableImageUrl(item.coverImageDirect ?? item.slides?.[0]?.image ?? item.slides?.[0]?.imageOptions?.[0])
+    const rawCover = item.coverImageDirect ?? item.slides?.[0]?.image ?? item.slides?.[0]?.imageOptions?.[0]
+    const coverImage = rawCover && await isUsableImageUrl(rawCover) ? rawCover : null
     const carouselImages = (item.slides || [])
-      .map(s => usableImageUrl(s.image ?? s.imageOptions?.[0]))
+      .map(s => { const u = s.image ?? s.imageOptions?.[0]; return u && isUsableImageUrlSync(u) ? u : null })
       .filter((u): u is string => u !== null)
 
     const ytVideoId = extractYouTubeId(item.youtubeUrl ?? '')

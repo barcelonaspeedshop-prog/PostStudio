@@ -4,6 +4,7 @@ import { existsSync } from 'fs'
 import path from 'path'
 import crypto from 'crypto'
 import { extractYouTubeId } from '@/lib/youtube-url'
+import { isUsableImageUrl } from '@/lib/image-url'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,20 +12,6 @@ const DATA_DIR = process.env.TOKEN_STORAGE_PATH || '/data'
 const PUBLISHED_DIR = path.join(DATA_DIR, 'published')
 
 const VALID_CHANNELS = new Set(['food', 'f1', 'football', 'fuel'])
-const COVER_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'svg'])
-
-function isCoverImageUsable(url: string | undefined | null): boolean {
-  if (!url) return false
-  try {
-    const parsed = new URL(url)
-    const r2Public = process.env.R2_PUBLIC_URL?.replace(/\/$/, '')
-    if (r2Public && url.startsWith(r2Public)) return true
-    const ext = parsed.pathname.split('.').pop()?.toLowerCase() ?? ''
-    return COVER_EXTENSIONS.has(ext)
-  } catch {
-    return false
-  }
-}
 
 async function atomicWrite(filePath: string, content: string): Promise<void> {
   const tmp = `${filePath}.tmp-${crypto.randomUUID()}`
@@ -83,7 +70,7 @@ export async function POST(req: NextRequest) {
 
     // Validate cover image if being set (null = explicit clear, which is allowed)
     if (coverImage !== undefined && coverImage !== null) {
-      if (!isCoverImageUsable(coverImage)) {
+      if (!await isUsableImageUrl(coverImage)) {
         return NextResponse.json(
           { error: 'Cover image must be a direct image URL (.jpg, .png, .webp, etc.) or an R2 CDN URL' },
           { status: 400 }
