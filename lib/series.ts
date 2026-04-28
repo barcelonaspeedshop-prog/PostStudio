@@ -1,31 +1,22 @@
 export type SeriesEntry = { slug: string; name: string; description: string }
 
 export const SERIES: Record<string, SeriesEntry[]> = {
-  food: [
-    { slug: 'news', name: 'News', description: 'Standard news/feature article' },
-    { slug: 'no-frills', name: 'No Frills', description: 'Honest reviews of unfussy restaurants that punch above their weight' },
-    { slug: 'top-5', name: 'Top 5', description: 'Top 5 places in a given location' },
-  ],
   f1: [
-    { slug: 'news', name: 'News', description: 'Standard news/feature article' },
-    { slug: 'the-archive', name: 'The Archive', description: 'Historic race deep-dives' },
-    { slug: 'pit-lane', name: 'Pit Lane', description: 'Race weekend tactical breakdowns' },
-    { slug: 'paddock-notes', name: 'Paddock Notes', description: 'Mid-week analysis' },
-    { slug: 'off-the-line', name: 'Off The Line', description: 'One overtake, one moment' },
+    { slug: 'the-archive', name: 'The Archive', description: 'Historic race deep-dives. The moments that defined the sport.' },
+    { slug: 'pit-lane', name: 'Pit Lane', description: 'Race weekend tactical breakdowns and strategy reads.' },
   ],
   fuel: [
-    { slug: 'news', name: 'News', description: 'Standard news/feature article' },
-    { slug: 'driven', name: 'Driven', description: 'First-person classic car drives' },
-    { slug: 'garage-finds', name: 'Garage Finds', description: 'Featured classic car of the week' },
-    { slug: 'the-auction-block', name: 'The Auction Block', description: "What sold, what didn't" },
-    { slug: 'workshop-stories', name: 'Workshop Stories', description: 'Restoration journeys' },
+    { slug: 'barn-find', name: 'Barn Find', description: 'Forgotten cars, recovered and remembered.' },
+    { slug: 'the-auction-room', name: 'The Auction Room', description: 'Notable cars at auction. What sold, what it means.' },
   ],
   football: [
-    { slug: 'news', name: 'News', description: 'Standard news/feature article' },
-    { slug: 'match-day', name: 'Match Day', description: 'One big match, broken down' },
-    { slug: 'tactical-board', name: 'Tactical Board', description: 'Formation and tactics analysis' },
-    { slug: 'transfer-files', name: 'Transfer Files', description: 'Deep dives on transfers' },
-    { slug: 'the-manager', name: 'The Manager', description: "A manager's decisions and methods" },
+    { slug: 'the-window', name: 'The Window', description: 'Transfer market analysis. Deals, rumours, and what they mean.' },
+    { slug: 'matchday', name: 'Matchday', description: 'Game-by-game tactical reads from the weekend.' },
+  ],
+  food: [
+    { slug: 'no-frills', name: 'No Frills', description: 'Hole-in-the-wall greatness. The places that matter without trying.' },
+    { slug: 'the-pass', name: 'The Pass', description: "Chef profiles. Who's making the food that matters right now." },
+    { slug: 'openings', name: 'Openings', description: "New restaurants. What's launching, where, and why it matters." },
   ],
 }
 

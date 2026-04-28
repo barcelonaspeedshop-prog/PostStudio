@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import Sidebar from '@/components/Sidebar'
+import { getSeriesByChannel } from '@/lib/series'
 
 type Chapter = { id: number; title: string; type: string; narration: string; visual: string }
 type Script = { title: string; summary: string; chapters: Chapter[] }
@@ -127,6 +128,7 @@ export default function LongFormPage() {
   const [longformCoverUrl, setLongformCoverUrl] = useState<string | null>(null)
   const [longformCoverUploading, setLongformCoverUploading] = useState(false)
   const [longformCoverDragOver, setLongformCoverDragOver] = useState(false)
+  const [longformSeries, setLongformSeries] = useState('')
   const longformCoverFileRef = useRef<HTMLInputElement>(null)
 
   // ─── Restore draft ───
@@ -1135,6 +1137,7 @@ export default function LongFormPage() {
           storyTopic: script?.title,
           youtubeUrl: ytUrl || undefined,
           coverImageDirect: longformCoverUrl || undefined,
+          series: longformSeries || undefined,
         }),
       })
       const data = await res.json()
@@ -1728,6 +1731,21 @@ export default function LongFormPage() {
                         )}
                       </div>
 
+                      {/* Series */}
+                      <div className="px-1 space-y-1">
+                        <label className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Series (optional)</label>
+                        <select
+                          value={longformSeries}
+                          onChange={e => setLongformSeries(e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-[12px] border border-stone-200 rounded-lg text-stone-800 focus:outline-none focus:ring-1 focus:ring-stone-300 bg-white"
+                        >
+                          <option value="">— None —</option>
+                          {getSeriesByChannel(channel).map(s => (
+                            <option key={s.slug} value={s.slug}>{s.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
                       {/* YouTube URL — paste after uploading to Studio */}
                       <div className="px-1 space-y-1">
                         <label className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">YouTube URL (optional)</label>
@@ -2207,6 +2225,21 @@ export default function LongFormPage() {
                             }
                           </div>
                         )}
+                      </div>
+
+                      {/* Series */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Series (optional)</label>
+                        <select
+                          value={longformSeries}
+                          onChange={e => setLongformSeries(e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-[12px] border border-stone-200 rounded-lg text-stone-800 focus:outline-none focus:ring-1 focus:ring-stone-300 bg-white"
+                        >
+                          <option value="">— None —</option>
+                          {getSeriesByChannel(channel).map(s => (
+                            <option key={s.slug} value={s.slug}>{s.name}</option>
+                          ))}
+                        </select>
                       </div>
 
                       {/* YouTube URL — paste after uploading to Studio */}

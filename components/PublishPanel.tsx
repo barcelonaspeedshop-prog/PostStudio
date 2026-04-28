@@ -72,7 +72,7 @@ export default function PublishPanel({ item, youtubeChannelId, onUpdate }: Props
   const [articleSaved, setArticleSaved] = useState(false)
 
   // Article metadata local state
-  const [series, setSeries] = useState(item.series || 'news')
+  const [series, setSeries] = useState(item.series && item.series !== 'news' ? item.series : '')
   const [coverImageDirect, setCoverImageDirect] = useState(item.coverImageDirect || '')
   const [youtubeId, setYoutubeId] = useState(item.youtubeId || '')
   const [youtubeCredit, setYoutubeCredit] = useState(item.youtubeCredit || '')
@@ -100,7 +100,7 @@ export default function PublishPanel({ item, youtubeChannelId, onUpdate }: Props
     try {
       const payload = {
         id: item.id,
-        series,
+        series: series || null,
         coverImageDirect: coverImageDirect.trim() || undefined,
         youtubeId: youtubeId.trim() || undefined,
         youtubeCredit: youtubeCredit.trim() || undefined,
@@ -117,7 +117,7 @@ export default function PublishPanel({ item, youtubeChannelId, onUpdate }: Props
       })
       if (res.ok) {
         onUpdate({
-          series,
+          series: series || undefined,
           coverImageDirect: coverImageDirect.trim() || undefined,
           youtubeId: youtubeId.trim() || undefined,
           youtubeCredit: youtubeCredit.trim() || undefined,
@@ -243,7 +243,7 @@ export default function PublishPanel({ item, youtubeChannelId, onUpdate }: Props
 
   const ytTagsString = (item.ytTags || []).join(', ')
 
-  const articleValid = !item.articleBody || (!!coverImageDirect.trim() && !!series)
+  const articleValid = !item.articleBody || !!coverImageDirect.trim()
 
   return (
     <div className="border-t border-stone-100 divide-y divide-stone-50">
@@ -263,12 +263,12 @@ export default function PublishPanel({ item, youtubeChannelId, onUpdate }: Props
               onChange={e => setSeries(e.target.value)}
               className="w-full text-[13px] border border-stone-200 rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:border-stone-400"
             >
+              <option value="">— None —</option>
               {seriesOptions.map(s => (
                 <option key={s.slug} value={s.slug}>{s.name}</option>
               ))}
-              {seriesOptions.length === 0 && <option value="news">News</option>}
             </select>
-            <p className="text-[10px] text-stone-400 mt-0.5">What kind of article is this?</p>
+            <p className="text-[10px] text-stone-400 mt-0.5">Which series does this article belong to?</p>
           </div>
 
           {/* Cover image */}
@@ -372,7 +372,7 @@ export default function PublishPanel({ item, youtubeChannelId, onUpdate }: Props
           </button>
 
           {!articleValid && (
-            <p className="text-[10px] text-red-500 mt-2 text-center">Cover image and series required for website article</p>
+            <p className="text-[10px] text-red-500 mt-2 text-center">Cover image required for website article</p>
           )}
         </div>
       )}
