@@ -5,6 +5,13 @@ import PublishPanel, { type PanelItem } from '@/components/PublishPanel'
 import { CHANNELS } from '@/lib/channels'
 import { getSeriesByChannel } from '@/lib/series'
 
+const CHANNEL_SLUG_MAP: Record<string, string> = {
+  'Omnira Food': 'food',
+  'Omnira F1': 'f1',
+  'Omnira Football': 'football',
+  'Gentlemen of Fuel': 'fuel',
+}
+
 const BLOCKED_IMAGE_DOMAINS = [
   'instagram.com', 'lookaside.instagram.com', 'lookaside.fbsbx.com',
   'lookaside.facebook.com', 'fbcdn.net', 'facebook.com',
@@ -143,6 +150,24 @@ export default function ApprovalsPage() {
   const [coverUploadTarget, setCoverUploadTarget] = useState<string | null>(null)
   const [coverUploading, setCoverUploading] = useState<Record<string, boolean>>({})
   const [coverDragOver, setCoverDragOver] = useState<Record<string, boolean>>({})
+
+  type MediaEdit = {
+    itemId: string
+    channelSlug: string
+    articleSlug: string
+    currentCover: string | null
+    currentYtVideoId: string | null
+    newCover: string | null | undefined  // undefined = unchanged, null = cleared, string = new URL
+    newYtUrl: string
+    fetching: boolean
+    coverUploading: boolean
+    coverDragOver: boolean
+    ytEditing: boolean
+    saving: boolean
+    error: string | null
+  }
+  const [mediaEdit, setMediaEdit] = useState<MediaEdit | null>(null)
+  const editCoverFileRef = useRef<HTMLInputElement>(null)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -794,6 +819,93 @@ export default function ApprovalsPage() {
     e.target.value = ''
     setCoverUploadTarget(null)
   }
+
+  const openEditMedia = useCallback(async (item: ApprovalItem) => {
+    const channelSlug = CHANNEL_SLUG_MAP[item.channel]
+    const articleSlug = item.articleSlug!
+    setMediaEdit({
+      itemId: item.id, channelSlug, articleSlug,
+      currentCover: null, currentYtVideoId: null,
+      newCover: undefined, newYtUrl: '',
+      fetching: true, coverUploading: false, coverDragOver: false,
+      ytEditing: false, saving: false, error: null,
+    })
+    try {
+      const res = await fetch(`/api/articles/update-media?slug=${encodeURIComponent(articleSlug)}&channel=${encodeURIComponent(channelSlug)}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch article media')
+      setMediaEdit(prev => prev ? {
+        ...prev,
+        currentCover: data.coverImage,
+        currentYtVideoId: data.ytVideoId,
+        fetching: false,
+      } : null)
+    } catch (e: unknown) {
+      setMediaEdit(prev => prev ? { ...prev, fetching: false, error: e instanceof Error ? e.message : 'Failed to load' } : null)
+    }
+  }, [])
+
+  const uploadEditCover = useCallback(async (file: File) => {
+    if (!file.type.startsWith('image/')) { showToast('Please select an image file', 'error'); return }
+    setMediaEdit(prev => prev ? { ...prev, coverUploading: true, error: null } : null)
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      const res = await fetch('/api/cover-image-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64, mimeType: file.type }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Upload failed')
+      setMediaEdit(prev => prev ? { ...prev, newCover: data.url, coverUploading: false } : null)
+    } catch (e: unknown) {
+      setMediaEdit(prev => prev ? { ...prev, coverUploading: false, error: e instanceof Error ? e.message : 'Upload failed' } : null)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleEditCoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) uploadEditCover(file)
+    e.target.value = ''
+  }
+
+  const saveEditMedia = useCallback(async () => {
+    if (!mediaEdit) return
+    setMediaEdit(prev => prev ? { ...prev, saving: true, error: null } : null)
+    try {
+      const payload: Record<string, unknown> = {
+        articleSlug: mediaEdit.articleSlug,
+        channel: mediaEdit.channelSlug,
+      }
+      if (mediaEdit.newCover !== undefined) payload.coverImage = mediaEdit.newCover
+      const ytShouldUpdate = mediaEdit.ytEditing || (!mediaEdit.currentYtVideoId && mediaEdit.newYtUrl !== '')
+      if (ytShouldUpdate) payload.youtubeUrl = mediaEdit.newYtUrl || null
+      if (payload.coverImage === undefined && payload.youtubeUrl === undefined) {
+        showToast('No changes to save')
+        setMediaEdit(null)
+        return
+      }
+      const res = await fetch('/api/articles/update-media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Save failed')
+      if (data.updated.coverImage !== undefined) {
+        setItems(prev => prev.map(i => i.id === mediaEdit.itemId ? { ...i, coverImageDirect: data.updated.coverImage } : i))
+      }
+      showToast('Media updated!')
+      setMediaEdit(null)
+    } catch (e: unknown) {
+      setMediaEdit(prev => prev ? { ...prev, saving: false, error: e instanceof Error ? e.message : 'Save failed' } : null)
+    }
+  }, [mediaEdit]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAction = async (id: string, action: 'approve' | 'reject') => {
     setActing(id)
@@ -1649,33 +1761,205 @@ export default function ApprovalsPage() {
             {reviewed.length > 0 && (
               <div className="flex flex-col gap-3">
                 <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Recently reviewed</p>
-                {reviewed.slice(0, 20).map(item => (
-                  <div key={item.id} className="flex items-center gap-3 p-3 bg-white border border-stone-100 rounded-xl">
-                    {item.slides[0]?.image && (
-                      <div
-                        className="w-10 h-12 rounded-md bg-stone-100 shrink-0 bg-cover bg-center"
-                        style={{ backgroundImage: `url(${item.slides[0].image})` }}
-                      />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[12px] font-medium text-stone-800 truncate">{item.headline}</p>
-                      <p className="text-[10px] text-stone-400">{item.channel} · {formatDate(item.reviewedAt || item.createdAt)}</p>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {item.status === 'approved' && item.websitePublished === true && (
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">✅ Website</span>
+                {reviewed.slice(0, 20).map(item => {
+                  const isEditOpen = mediaEdit?.itemId === item.id
+                  const channelSlug = CHANNEL_SLUG_MAP[item.channel]
+                  const isWebsiteArticle = item.status === 'approved' && item.websitePublished === true && !!item.articleBody && !!item.articleSlug && !!channelSlug
+                  const hasMissingCover = isWebsiteArticle && (!item.coverImageDirect || !isImageUrl(item.coverImageDirect))
+                  const editState = isEditOpen ? mediaEdit! : null
+                  const displayCover = editState
+                    ? (editState.newCover !== undefined ? editState.newCover : editState.currentCover)
+                    : null
+                  return (
+                    <div key={item.id} className="bg-white border border-stone-100 rounded-xl overflow-hidden">
+                      {/* Card row */}
+                      <div className="flex items-center gap-3 p-3">
+                        {item.slides[0]?.image && (
+                          <div
+                            className="w-10 h-12 rounded-md bg-stone-100 shrink-0 bg-cover bg-center"
+                            style={{ backgroundImage: `url(${item.slides[0].image})` }}
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <p className="text-[12px] font-medium text-stone-800 truncate">{item.headline}</p>
+                            {hasMissingCover && (
+                              <span className="shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">⚠ cover</span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-stone-400">{item.channel} · {formatDate(item.reviewedAt || item.createdAt)}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {isWebsiteArticle && (
+                            <button
+                              onClick={() => isEditOpen ? setMediaEdit(null) : openEditMedia(item)}
+                              className={`text-[10px] font-medium px-2 py-0.5 rounded-full transition-colors ${isEditOpen ? 'bg-stone-200 text-stone-700' : 'bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-800'}`}
+                            >
+                              {isEditOpen ? 'Close' : 'Edit media'}
+                            </button>
+                          )}
+                          {item.status === 'approved' && item.websitePublished === true && (
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">✅ Website</span>
+                          )}
+                          {item.status === 'approved' && item.websitePublished === false && (
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">⚠ Website</span>
+                          )}
+                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                            item.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                          }`}>
+                            {item.status}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Inline edit media panel */}
+                      {isEditOpen && editState && (
+                        <div className="border-t border-stone-100 p-3 bg-stone-50/60 flex flex-col gap-3">
+                          {editState.fetching ? (
+                            <div className="flex items-center gap-2 text-[11px] text-stone-400 py-2">
+                              <svg className="w-3.5 h-3.5 animate-spin shrink-0" viewBox="0 0 24 24" fill="none">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                              </svg>
+                              Loading current media…
+                            </div>
+                          ) : (
+                            <>
+                              {/* Cover image */}
+                              <div>
+                                <p className="text-[10px] font-semibold text-stone-500 uppercase tracking-wide mb-1.5">Cover image</p>
+                                {displayCover ? (
+                                  <div className="flex items-center gap-2 p-1.5 bg-white border border-stone-200 rounded-lg">
+                                    <img
+                                      src={displayCover}
+                                      alt=""
+                                      className="w-14 h-10 object-cover rounded shrink-0"
+                                      onError={e => { e.currentTarget.style.display = 'none' }}
+                                    />
+                                    <p className="flex-1 text-[10px] text-stone-500 truncate">
+                                      {editState.newCover !== undefined ? 'New upload' : 'Current'}
+                                    </p>
+                                    <button
+                                      onClick={() => setMediaEdit(p => p ? { ...p, newCover: null } : null)}
+                                      className="w-5 h-5 flex items-center justify-center text-stone-300 hover:text-red-500 transition-colors text-[16px] leading-none"
+                                      title="Clear cover image"
+                                    >×</button>
+                                  </div>
+                                ) : (
+                                  <div
+                                    onDragOver={e => { e.preventDefault(); e.stopPropagation(); setMediaEdit(p => p ? { ...p, coverDragOver: true } : null) }}
+                                    onDragLeave={e => { e.stopPropagation(); setMediaEdit(p => p ? { ...p, coverDragOver: false } : null) }}
+                                    onDrop={e => {
+                                      e.preventDefault(); e.stopPropagation()
+                                      setMediaEdit(p => p ? { ...p, coverDragOver: false } : null)
+                                      const file = e.dataTransfer.files[0]
+                                      if (file) uploadEditCover(file)
+                                    }}
+                                    onClick={() => editCoverFileRef.current?.click()}
+                                    className={`flex items-center justify-center gap-1.5 py-2.5 px-3 border-2 border-dashed rounded-lg cursor-pointer transition-colors text-[11px] select-none ${
+                                      editState.coverDragOver ? 'border-stone-400 bg-stone-50 text-stone-600' : 'border-stone-200 hover:border-stone-300 text-stone-400 hover:text-stone-600'
+                                    }`}
+                                  >
+                                    {editState.coverUploading ? (
+                                      <>
+                                        <svg className="w-3 h-3 animate-spin shrink-0" viewBox="0 0 24 24" fill="none">
+                                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                          <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                                        </svg>
+                                        Uploading…
+                                      </>
+                                    ) : <>↑ Drop or click to upload</>}
+                                  </div>
+                                )}
+                                {displayCover && (
+                                  <button
+                                    onClick={() => editCoverFileRef.current?.click()}
+                                    disabled={editState.coverUploading}
+                                    className="mt-1.5 text-[10px] text-stone-400 hover:text-stone-700 transition-colors disabled:opacity-50"
+                                  >
+                                    {editState.coverUploading ? 'Uploading…' : '↑ Upload different image'}
+                                  </button>
+                                )}
+                                {/* Slide source shortcuts */}
+                                {(() => {
+                                  const slideUrls = item.slides
+                                    .map((s, idx) => ({ idx, url: s.imageUrl }))
+                                    .filter(({ url }) => url && isImageUrl(url) && !isBlockedImageUrl(url))
+                                  return slideUrls.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                      {slideUrls.map(({ idx, url }) => (
+                                        <button
+                                          key={idx}
+                                          onClick={() => setMediaEdit(p => p ? { ...p, newCover: url! } : null)}
+                                          className="px-1.5 py-0.5 text-[9px] bg-stone-100 text-stone-500 rounded hover:bg-stone-200 hover:text-stone-800 transition-colors"
+                                        >
+                                          Use slide {idx + 1}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  ) : null
+                                })()}
+                              </div>
+
+                              {/* YouTube URL */}
+                              <div>
+                                <p className="text-[10px] font-semibold text-stone-500 uppercase tracking-wide mb-1.5">YouTube video</p>
+                                {editState.currentYtVideoId && !editState.ytEditing ? (
+                                  <div className="flex items-center justify-between gap-2 p-1.5 bg-white border border-stone-200 rounded-lg">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <svg className="w-3 h-3 text-red-500 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                                      </svg>
+                                      <span className="text-[11px] text-stone-600 font-mono truncate">{editState.currentYtVideoId}</span>
+                                    </div>
+                                    <button
+                                      onClick={() => setMediaEdit(p => p ? { ...p, ytEditing: true, newYtUrl: `https://youtube.com/watch?v=${p.currentYtVideoId}` } : null)}
+                                      className="text-[10px] text-stone-400 hover:text-stone-600 shrink-0 transition-colors"
+                                    >Edit</button>
+                                  </div>
+                                ) : (
+                                  <input
+                                    type="url"
+                                    value={editState.newYtUrl}
+                                    onChange={e => setMediaEdit(p => p ? { ...p, newYtUrl: e.target.value } : null)}
+                                    placeholder="https://youtube.com/watch?v=..."
+                                    className="w-full px-2.5 py-1.5 text-[11px] border border-stone-200 rounded-lg focus:outline-none focus:border-stone-400 bg-white"
+                                  />
+                                )}
+                              </div>
+
+                              {editState.error && (
+                                <p className="text-[10px] text-red-500">{editState.error}</p>
+                              )}
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={saveEditMedia}
+                                  disabled={editState.saving || editState.coverUploading}
+                                  className="flex-1 py-1.5 text-[12px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
+                                >
+                                  {editState.saving ? (
+                                    <>
+                                      <svg className="w-3 h-3 animate-spin shrink-0" viewBox="0 0 24 24" fill="none">
+                                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                        <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                                      </svg>
+                                      Saving…
+                                    </>
+                                  ) : 'Save media'}
+                                </button>
+                                <button
+                                  onClick={() => setMediaEdit(null)}
+                                  disabled={editState.saving}
+                                  className="px-3 py-1.5 text-[12px] text-stone-500 border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
+                                >Cancel</button>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       )}
-                      {item.status === 'approved' && item.websitePublished === false && (
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">⚠ Website</span>
-                      )}
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                        item.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
-                      }`}>
-                        {item.status}
-                      </span>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -2046,6 +2330,15 @@ export default function ApprovalsPage() {
         accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
         className="hidden"
         onChange={handleCoverFileChange}
+      />
+
+      {/* Hidden file input for edit-media cover upload */}
+      <input
+        ref={editCoverFileRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+        className="hidden"
+        onChange={handleEditCoverFileChange}
       />
 
       {/* Video preview modal */}
