@@ -649,12 +649,45 @@ export default function CarouselPage() {
       const genData = await genRes.json()
       if (!genRes.ok) throw new Error(genData.error || 'Slide generation failed')
 
-      const rawSlides: Slide[] = genData.slides.map((s: Slide) => ({ ...s, image: undefined }))
-      setSlides(rawSlides)
+      const restaurantSlides: Slide[] = genData.slides.map((s: Slide) => ({ ...s, image: undefined }))
+
+      // Top 5 mode: wrap restaurant slides with a cover placeholder (slot 1) and outro placeholder (slot 7)
+      let allSlides: Slide[]
+      let slideOffset = 0
+      if (foodMode === 'top5') {
+        const location = top5Location.trim()
+        const coverSlide: Slide = {
+          num: '01',
+          tag: 'COVER',
+          headline: `The Five: ${location}`,
+          body: 'Replace this tile with your designed cover image. Update text fields if needed.',
+          badge: 'OMNIRA FOOD',
+          accent: 'amber',
+          tileType: 'story',
+        }
+        const outroSlide: Slide = {
+          num: '07',
+          tag: 'OUTRO',
+          headline: 'Follow @omnirafood',
+          body: 'Replace with the standard Omnira Food outro tile.',
+          badge: 'OMNIRA FOOD',
+          accent: 'amber',
+          tileType: 'cta',
+        }
+        const renamedRestaurantSlides = restaurantSlides.map((s, i) => ({
+          ...s, num: String(i + 2).padStart(2, '0'),
+        }))
+        allSlides = [coverSlide, ...renamedRestaurantSlides, outroSlide]
+        slideOffset = 1
+      } else {
+        allSlides = restaurantSlides
+      }
+
+      setSlides(allSlides)
       setSelectedSlide(0)
       setTopic(foodMode === 'no-frills'
         ? `${valid[0].name} — ${valid[0].city} (No Frills But Kills)`
-        : `Top ${valid.length} Eats — ${top5Location.trim()}`)
+        : `The Five: ${top5Location.trim()}`)
 
       // Store restaurant metadata for the approval workflow + website auto-publish
       const metas = genData.restaurantMetas || (genData.restaurantMeta ? [genData.restaurantMeta] : [])
@@ -662,12 +695,11 @@ export default function CarouselPage() {
 
       const imageQueries: string[] = genData.imageQueries || []
 
-      // Step 2: Auto-fetch images via Serper + proxy
-      setFoodBuildStatus(`Finding food photos (0/${rawSlides.length})…`)
-      const updatedSlides = [...rawSlides]
+      // Step 2: Auto-fetch images via Serper + proxy (restaurant slides only — placeholders have no query)
+      setFoodBuildStatus(`Finding food photos (0/${restaurantSlides.length})…`)
 
       await Promise.all(
-        rawSlides.map(async (_, idx) => {
+        restaurantSlides.map(async (_, idx) => {
           const query = imageQueries[idx]
           if (!query) return
 
@@ -693,10 +725,9 @@ export default function CarouselPage() {
                 if (!proxyRes.ok) continue
                 const proxyData = await proxyRes.json()
                 if (proxyData.base64) {
-                  updatedSlides[idx] = { ...updatedSlides[idx], image: proxyData.base64 }
                   setSlides(prev => {
                     const next = [...prev]
-                    next[idx] = { ...next[idx], image: proxyData.base64 }
+                    next[idx + slideOffset] = { ...next[idx + slideOffset], image: proxyData.base64 }
                     return next
                   })
                   break
@@ -707,7 +738,7 @@ export default function CarouselPage() {
         })
       )
 
-      showToast(`${rawSlides.length} slides built${imageQueries.length ? ' with images' : ''}!`)
+      showToast(`${allSlides.length} slides built${imageQueries.length ? ' with images' : ''}!`)
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Error building food carousel', 'error')
     } finally {
