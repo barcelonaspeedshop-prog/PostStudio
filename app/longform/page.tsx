@@ -124,6 +124,10 @@ export default function LongFormPage() {
   const [ytGenerating, setYtGenerating] = useState(false)
   const [ytUrl, setYtUrl] = useState('')
   const [copiedPoll, setCopiedPoll] = useState(false)
+  const [longformCoverUrl, setLongformCoverUrl] = useState<string | null>(null)
+  const [longformCoverUploading, setLongformCoverUploading] = useState(false)
+  const [longformCoverDragOver, setLongformCoverDragOver] = useState(false)
+  const longformCoverFileRef = useRef<HTMLInputElement>(null)
 
   // ─── Restore draft ───
   useEffect(() => {
@@ -1130,6 +1134,7 @@ export default function LongFormPage() {
           publishFacebook: !!plat?.fb,
           storyTopic: script?.title,
           youtubeUrl: ytUrl || undefined,
+          coverImageDirect: longformCoverUrl || undefined,
         }),
       })
       const data = await res.json()
@@ -1154,10 +1159,35 @@ export default function LongFormPage() {
     }
   }
 
+  const uploadLongformCover = async (file: File) => {
+    setLongformCoverUploading(true)
+    try {
+      const reader = new FileReader()
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = e => resolve(e.target?.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      const res = await fetch('/api/cover-image-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64, mimeType: file.type }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Upload failed')
+      setLongformCoverUrl(data.url)
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Cover upload failed', 'error')
+    } finally {
+      setLongformCoverUploading(false)
+    }
+  }
+
   // Show confirmation dialog before publishing anything
   const handlePublishButton = () => {
     const hasAny = CHANNELS.some(ch => channelPlatforms[ch]?.ig || channelPlatforms[ch]?.fb)
     if (!hasAny) { showToast('Select at least one platform to publish', 'error'); return }
+    if (!longformCoverUrl) { showToast('Add a cover image before publishing', 'error'); return }
     setConfirmPublishOpen(true)
   }
 
@@ -1668,6 +1698,36 @@ export default function LongFormPage() {
                         )
                       })}
 
+                      {/* Cover image (required for article) */}
+                      <div className="px-1 space-y-1.5">
+                        <label className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">
+                          Article cover image <span className="text-red-400 font-bold">*</span>
+                        </label>
+                        {longformCoverUrl ? (
+                          <div className="relative rounded-lg overflow-hidden border border-stone-200">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={longformCoverUrl} alt="Cover" className="w-full h-24 object-cover" />
+                            <button
+                              onClick={() => setLongformCoverUrl(null)}
+                              className="absolute top-1.5 right-1.5 w-5 h-5 bg-black/50 text-white rounded-full text-[10px] flex items-center justify-center hover:bg-black/70"
+                            >✕</button>
+                          </div>
+                        ) : (
+                          <div
+                            onDragOver={e => { e.preventDefault(); setLongformCoverDragOver(true) }}
+                            onDragLeave={() => setLongformCoverDragOver(false)}
+                            onDrop={e => { e.preventDefault(); setLongformCoverDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) uploadLongformCover(f) }}
+                            onClick={() => longformCoverFileRef.current?.click()}
+                            className={`w-full flex items-center justify-center gap-2 py-5 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${longformCoverDragOver ? 'border-red-400 bg-red-50' : 'border-stone-200 hover:border-stone-400 bg-white'}`}
+                          >
+                            {longformCoverUploading
+                              ? <span className="flex items-center gap-1.5 text-[11px] text-stone-500"><Spinner className="w-3.5 h-3.5" /> Uploading…</span>
+                              : <span className="text-[11px] text-stone-400">Drop image or click to upload</span>
+                            }
+                          </div>
+                        )}
+                      </div>
+
                       {/* YouTube URL — paste after uploading to Studio */}
                       <div className="px-1 space-y-1">
                         <label className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">YouTube URL (optional)</label>
@@ -1677,7 +1737,7 @@ export default function LongFormPage() {
                           placeholder="https://youtube.com/watch?v=..."
                           className="w-full px-2.5 py-1.5 text-[12px] border border-red-100 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-red-200 bg-white"
                         />
-                        <p className="text-[10px] text-stone-400">Paste the URL after uploading to YouTube. Can also be added later from the article preview.</p>
+                        {!ytUrl && <p className="text-[10px] text-amber-500">Publishing without a YouTube video — paste the URL here or add it later.</p>}
                       </div>
 
                       {/* Publish button */}
@@ -2119,6 +2179,36 @@ export default function LongFormPage() {
                           </div>
                         )
                       })}
+                      {/* Cover image (required for article) */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">
+                          Article cover image <span className="text-red-400 font-bold">*</span>
+                        </label>
+                        {longformCoverUrl ? (
+                          <div className="relative rounded-lg overflow-hidden border border-stone-200">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={longformCoverUrl} alt="Cover" className="w-full h-20 object-cover" />
+                            <button
+                              onClick={() => setLongformCoverUrl(null)}
+                              className="absolute top-1.5 right-1.5 w-5 h-5 bg-black/50 text-white rounded-full text-[10px] flex items-center justify-center hover:bg-black/70"
+                            >✕</button>
+                          </div>
+                        ) : (
+                          <div
+                            onDragOver={e => { e.preventDefault(); setLongformCoverDragOver(true) }}
+                            onDragLeave={() => setLongformCoverDragOver(false)}
+                            onDrop={e => { e.preventDefault(); setLongformCoverDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) uploadLongformCover(f) }}
+                            onClick={() => longformCoverFileRef.current?.click()}
+                            className={`w-full flex items-center justify-center gap-2 py-4 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${longformCoverDragOver ? 'border-red-400 bg-red-50' : 'border-stone-200 hover:border-stone-400 bg-white'}`}
+                          >
+                            {longformCoverUploading
+                              ? <span className="flex items-center gap-1.5 text-[11px] text-stone-500"><Spinner className="w-3 h-3" /> Uploading…</span>
+                              : <span className="text-[11px] text-stone-400">Drop image or click to upload</span>
+                            }
+                          </div>
+                        )}
+                      </div>
+
                       {/* YouTube URL — paste after uploading to Studio */}
                       <div className="space-y-1">
                         <label className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">YouTube URL (optional)</label>
@@ -2128,7 +2218,7 @@ export default function LongFormPage() {
                           placeholder="https://youtube.com/watch?v=..."
                           className="w-full px-2.5 py-1.5 text-[12px] border border-red-100 rounded-lg text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-red-200 bg-white"
                         />
-                        <p className="text-[10px] text-stone-400">Paste after uploading to YouTube. Can also be added later.</p>
+                        {!ytUrl && <p className="text-[10px] text-amber-500">Publishing without a YouTube video.</p>}
                       </div>
                       <button
                         onClick={handlePublishButton}
@@ -2357,6 +2447,15 @@ export default function LongFormPage() {
             {toast.msg}
           </div>
         )}
+
+        {/* Hidden file input for longform cover image */}
+        <input
+          ref={longformCoverFileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+          className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) uploadLongformCover(f) }}
+        />
 
         {/* Publish confirmation dialog */}
         {confirmPublishOpen && (

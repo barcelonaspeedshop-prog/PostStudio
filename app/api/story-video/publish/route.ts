@@ -104,16 +104,20 @@ export async function POST(req: NextRequest) {
       publishFacebook?: boolean
       storyTopic?: string
       youtubeUrl?: string
+      coverImageDirect?: string
     }
 
     const {
       jobId, channelName, title, description, tags,
-      publishInstagram, publishFacebook, storyTopic, youtubeUrl,
+      publishInstagram, publishFacebook, storyTopic, youtubeUrl, coverImageDirect,
     } = body
     const format = body.format || 'youtube'
 
     if (!jobId || !channelName || !title) {
       return NextResponse.json({ error: 'jobId, channelName, and title are required' }, { status: 400 })
+    }
+    if ((publishInstagram || publishFacebook) && !coverImageDirect) {
+      return NextResponse.json({ error: 'A cover image is required when publishing to social platforms' }, { status: 400 })
     }
 
     console.log(`[publish] Request — channel: "${channelName}", jobId: ${jobId}, publishInstagram: ${publishInstagram}, publishFacebook: ${publishFacebook}, format: ${format}`)
@@ -235,6 +239,7 @@ export async function POST(req: NextRequest) {
           hashtags: tags,
           goLiveAt,
           youtubeUrl,
+          coverImageDirect,
         })
         if (articleResult.success) {
           console.log(`[publish] Article queued: ${slug} (live at ${goLiveAt})`)

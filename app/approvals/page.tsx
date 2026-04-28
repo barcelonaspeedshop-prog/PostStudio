@@ -83,8 +83,25 @@ type ApprovalItem = {
   publishToWebsite?: boolean
 }
 
+type PublishedArticleMeta = {
+  id: string
+  channel: string  // slug: 'f1' | 'football' | 'food' | 'fuel'
+  slug: string
+  title: string
+  publishedAt: string
+  coverImage: string | null
+}
+
+const CHANNEL_DISPLAY_MAP: Record<string, string> = {
+  'f1': 'Omnira F1',
+  'football': 'Omnira Football',
+  'food': 'Omnira Food',
+  'fuel': 'Gentlemen of Fuel',
+}
+
 export default function ApprovalsPage() {
   const [items, setItems] = useState<ApprovalItem[]>([])
+  const [longFormArticles, setLongFormArticles] = useState<PublishedArticleMeta[]>([])
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState<string | null>(null)
   const [actingLabel, setActingLabel] = useState('')
@@ -207,7 +224,14 @@ export default function ApprovalsPage() {
     } catch { /* non-fatal */ }
   }
 
-  useEffect(() => { fetchItems(); fetchPendingArticles() }, [])
+  const fetchLongFormArticles = async () => {
+    try {
+      const res = await fetch('/api/articles')
+      if (res.ok) setLongFormArticles(await res.json())
+    } catch { /* non-fatal */ }
+  }
+
+  useEffect(() => { fetchItems(); fetchPendingArticles(); fetchLongFormArticles() }, [])
 
   const killArticle = async (channel: string, slug: string) => {
     const key = `${channel}/${slug}`
@@ -874,6 +898,37 @@ export default function ApprovalsPage() {
     e.target.value = ''
   }
 
+  const openEditMediaBySlug = useCallback(async (article: PublishedArticleMeta) => {
+    setMediaEdit({
+      itemId: article.id,
+      channelSlug: article.channel,
+      articleSlug: article.slug,
+      currentCover: article.coverImage,
+      currentYtVideoId: null,
+      newCover: undefined,
+      newYtUrl: '',
+      fetching: true,
+      coverUploading: false,
+      coverDragOver: false,
+      ytEditing: false,
+      saving: false,
+      error: null,
+    })
+    try {
+      const res = await fetch(`/api/articles/update-media?slug=${article.slug}&channel=${article.channel}`)
+      const data = await res.json()
+      setMediaEdit(prev => prev?.itemId === article.id ? {
+        ...prev,
+        currentCover: data.coverImage,
+        currentYtVideoId: data.ytVideoId,
+        newYtUrl: data.ytVideoId ? `https://www.youtube.com/watch?v=${data.ytVideoId}` : '',
+        fetching: false,
+      } : prev)
+    } catch {
+      setMediaEdit(prev => prev?.itemId === article.id ? { ...prev, fetching: false } : prev)
+    }
+  }, [])
+
   const saveEditMedia = useCallback(async () => {
     if (!mediaEdit) return
     setMediaEdit(prev => prev ? { ...prev, saving: true, error: null } : null)
@@ -899,6 +954,7 @@ export default function ApprovalsPage() {
       if (!res.ok) throw new Error(data.error || 'Save failed')
       if (data.updated.coverImage !== undefined) {
         setItems(prev => prev.map(i => i.id === mediaEdit.itemId ? { ...i, coverImageDirect: data.updated.coverImage } : i))
+        setLongFormArticles(prev => prev.map(a => a.id === mediaEdit.itemId ? { ...a, coverImage: data.updated.coverImage } : a))
       }
       showToast('Media updated!')
       setMediaEdit(null)
@@ -1086,6 +1142,9 @@ export default function ApprovalsPage() {
   const pending = items.filter(i => i.status === 'pending')
   const reviewed = items.filter(i => i.status !== 'pending')
   const previewItem = previewId ? items.find(i => i.id === previewId) : null
+
+  const approvalSlugs = new Set(items.map(i => i.articleSlug).filter((s): s is string => Boolean(s)))
+  const orphanedArticles = longFormArticles.filter(a => !approvalSlugs.has(a.slug))
 
   const formatDate = (iso: string) => {
     const d = new Date(iso)
@@ -1946,6 +2005,136 @@ export default function ApprovalsPage() {
                                       Saving…
                                     </>
                                   ) : 'Save media'}
+                                </button>
+                                <button
+                                  onClick={() => setMediaEdit(null)}
+                                  disabled={editState.saving}
+                                  className="px-3 py-1.5 text-[12px] text-stone-500 border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors"
+                                >Cancel</button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Published Long-Form */}
+            {orphanedArticles.length > 0 && (
+              <div className="flex flex-col gap-3">
+                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Published long-form</p>
+                {orphanedArticles.map(article => {
+                  const isEditOpen = mediaEdit?.itemId === article.id
+                  const hasMissingCover = !article.coverImage || !isImageUrl(article.coverImage)
+                  const editState = isEditOpen ? mediaEdit! : null
+                  const displayCover = editState
+                    ? (editState.newCover !== undefined ? editState.newCover : editState.currentCover)
+                    : null
+                  return (
+                    <div key={article.id} className="bg-white border border-stone-100 rounded-xl overflow-hidden">
+                      {/* Card row */}
+                      <div className="flex items-center gap-3 p-3">
+                        {article.coverImage && isImageUrl(article.coverImage) && (
+                          <div
+                            className="w-10 h-12 rounded-md bg-stone-100 shrink-0 bg-cover bg-center"
+                            style={{ backgroundImage: `url(${article.coverImage})` }}
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <p className="text-[12px] font-medium text-stone-800 truncate">{article.title}</p>
+                            {hasMissingCover && (
+                              <span className="shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">⚠ cover</span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-stone-400">{CHANNEL_DISPLAY_MAP[article.channel] ?? article.channel} · {formatDate(article.publishedAt)}</p>
+                        </div>
+                        <button
+                          onClick={() => isEditOpen ? setMediaEdit(null) : openEditMediaBySlug(article)}
+                          className={`text-[10px] font-medium px-2 py-0.5 rounded-full transition-colors shrink-0 ${isEditOpen ? 'bg-stone-200 text-stone-700' : 'bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-800'}`}
+                        >
+                          {isEditOpen ? 'Close' : 'Edit media'}
+                        </button>
+                      </div>
+
+                      {/* Edit panel */}
+                      {editState && (
+                        <div className="border-t border-stone-100 p-3 bg-stone-50 space-y-3">
+                          {editState.fetching ? (
+                            <p className="text-[11px] text-stone-400 text-center py-2">Loading…</p>
+                          ) : (
+                            <>
+                              {/* Cover image section */}
+                              <div className="space-y-1.5">
+                                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">Cover image</p>
+                                {displayCover ? (
+                                  <div className="relative rounded-lg overflow-hidden border border-stone-200">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={displayCover} alt="Cover" className="w-full h-28 object-cover" />
+                                    <button
+                                      onClick={() => setMediaEdit(prev => prev ? { ...prev, newCover: null } : null)}
+                                      className="absolute top-1.5 right-1.5 w-5 h-5 bg-black/50 text-white rounded-full text-[10px] flex items-center justify-center hover:bg-black/70"
+                                    >✕</button>
+                                  </div>
+                                ) : (
+                                  <div
+                                    onDragOver={e => { e.preventDefault(); setMediaEdit(prev => prev ? { ...prev, coverDragOver: true } : null) }}
+                                    onDragLeave={() => setMediaEdit(prev => prev ? { ...prev, coverDragOver: false } : null)}
+                                    onDrop={e => {
+                                      e.preventDefault()
+                                      setMediaEdit(prev => prev ? { ...prev, coverDragOver: false } : null)
+                                      const file = e.dataTransfer.files?.[0]
+                                      if (file) uploadEditCover(file)
+                                    }}
+                                    onClick={() => editCoverFileRef.current?.click()}
+                                    className={`w-full flex flex-col items-center justify-center gap-1.5 py-5 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${editState.coverDragOver ? 'border-stone-400 bg-stone-100' : 'border-stone-200 hover:border-stone-400 bg-white'}`}
+                                  >
+                                    {editState.coverUploading
+                                      ? <span className="text-[11px] text-stone-500">Uploading…</span>
+                                      : <span className="text-[11px] text-stone-400">Drop image or click to upload</span>
+                                    }
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* YouTube URL */}
+                              <div className="space-y-1">
+                                <p className="text-[10px] font-medium text-stone-500 uppercase tracking-widest">YouTube video</p>
+                                {editState.currentYtVideoId && !editState.ytEditing ? (
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <svg className="w-3 h-3 text-red-500 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                                      </svg>
+                                      <span className="text-[11px] text-stone-600 font-mono truncate">{editState.currentYtVideoId}</span>
+                                    </div>
+                                    <button
+                                      onClick={() => setMediaEdit(prev => prev ? { ...prev, ytEditing: true, newYtUrl: `https://www.youtube.com/watch?v=${prev.currentYtVideoId}` } : null)}
+                                      className="text-[10px] text-stone-400 hover:text-stone-600 shrink-0"
+                                    >Edit</button>
+                                  </div>
+                                ) : (
+                                  <input
+                                    type="url"
+                                    value={editState.newYtUrl}
+                                    onChange={e => setMediaEdit(prev => prev ? { ...prev, newYtUrl: e.target.value } : null)}
+                                    placeholder="https://youtube.com/watch?v=..."
+                                    className="w-full px-2.5 py-1.5 text-[12px] border border-stone-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-stone-400"
+                                  />
+                                )}
+                              </div>
+
+                              {editState.error && <p className="text-[11px] text-red-500">{editState.error}</p>}
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={saveEditMedia}
+                                  disabled={editState.saving}
+                                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-stone-900 text-white rounded-lg hover:bg-stone-800 disabled:opacity-50 transition-colors"
+                                >
+                                  {editState.saving ? 'Saving…' : 'Save media'}
                                 </button>
                                 <button
                                   onClick={() => setMediaEdit(null)}
