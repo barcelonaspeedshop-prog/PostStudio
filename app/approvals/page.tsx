@@ -195,21 +195,7 @@ export default function ApprovalsPage() {
     try {
       const res = await fetch('/api/approvals')
       const rawData: ApprovalItem[] = await res.json()
-      // Apply default series='news' locally for article items that haven't had it set yet
-      const data = rawData.map(i =>
-        i.articleBody && !i.series ? { ...i, series: 'news' } : i
-      )
-      setItems(data)
-      // Persist defaults for any that needed them (fire-and-forget)
-      rawData
-        .filter(i => i.articleBody && !i.series)
-        .forEach(i => {
-          fetch('/api/approvals', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: i.id, series: 'news' }),
-          }).catch(() => {})
-        })
+      setItems(rawData)
     } catch {
       showToast('Failed to load approvals', 'error')
     } finally {
@@ -1220,7 +1206,7 @@ export default function ApprovalsPage() {
                             <p className="text-[11px] text-stone-500">{item.channel}</p>
                           </div>
                           <div className="flex gap-1 mt-1.5 flex-wrap">
-                            {item.platforms.filter(p => p === 'instagram' || p === 'facebook').map(p => (
+                            {(item.platforms || []).filter(p => p === 'instagram' || p === 'facebook').map(p => (
                               <span key={p} className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded capitalize">{p}</span>
                             ))}
                           </div>
@@ -1538,7 +1524,7 @@ export default function ApprovalsPage() {
                                 <div className="w-28 shrink-0">
                                   <label className="text-[10px] text-stone-500 mb-1 block">Series <span className="text-red-400">*</span></label>
                                   <select
-                                    value={item.series || 'news'}
+                                    value={item.series || ''}
                                     onChange={e => {
                                       const val = e.target.value
                                       setItems(prev => prev.map(i => i.id === item.id ? { ...i, series: val } : i))
@@ -2556,7 +2542,7 @@ export default function ApprovalsPage() {
                 <p className="text-[14px] font-medium text-stone-900">{previewItem.headline}</p>
                 <p className="text-[12px] text-stone-500 mt-0.5">{previewItem.channel} · {previewItem.slides.length} slides</p>
                 <div className="flex gap-1 mt-1.5 flex-wrap">
-                  {previewItem.platforms.filter(p => p === 'instagram' || p === 'facebook').map(p => (
+                  {(previewItem.platforms || []).filter(p => p === 'instagram' || p === 'facebook').map(p => (
                     <span key={p} className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded capitalize">{p}</span>
                   ))}
                 </div>
