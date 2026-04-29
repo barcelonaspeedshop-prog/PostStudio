@@ -166,6 +166,7 @@ export default function ApprovalsPage() {
   const coverFileInputRef = useRef<HTMLInputElement>(null)
   const [coverUploadTarget, setCoverUploadTarget] = useState<string | null>(null)
   const [coverUploading, setCoverUploading] = useState<Record<string, boolean>>({})
+  const [slideUploading, setSlideUploading] = useState<Record<string, boolean>>({})
   const [coverDragOver, setCoverDragOver] = useState<Record<string, boolean>>({})
 
   type MediaEdit = {
@@ -739,6 +740,8 @@ export default function ApprovalsPage() {
   const uploadImageForSlide = useCallback(async (itemId: string, slideIndex: number, file: File) => {
     const item = items.find(i => i.id === itemId)
     if (!item) return
+    const key = `${itemId}-${slideIndex}`
+    setSlideUploading(prev => ({ ...prev, [key]: true }))
     try {
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
@@ -746,8 +749,16 @@ export default function ApprovalsPage() {
         reader.onerror = reject
         reader.readAsDataURL(file)
       })
+      const uploadRes = await fetch('/api/cover-image-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64, mimeType: file.type }),
+      })
+      const uploadData = await uploadRes.json()
+      if (!uploadRes.ok) throw new Error(uploadData.error || 'Upload failed')
+      const r2Url: string = uploadData.url
       const updatedSlides = item.slides.map((s, i) =>
-        i === slideIndex ? { ...s, image: base64 } : s
+        i === slideIndex ? { ...s, image: r2Url } : s
       )
       await fetch('/api/approvals', {
         method: 'PUT',
@@ -756,8 +767,10 @@ export default function ApprovalsPage() {
       })
       setItems(prev => prev.map(it => it.id === itemId ? { ...it, slides: updatedSlides, videoBase64: undefined } : it))
       showToast(`Slide ${slideIndex + 1} image uploaded — regenerate video when ready`)
-    } catch {
-      showToast('Upload failed', 'error')
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : 'Upload failed', 'error')
+    } finally {
+      setSlideUploading(prev => { const n = { ...prev }; delete n[key]; return n })
     }
   }, [items])
 

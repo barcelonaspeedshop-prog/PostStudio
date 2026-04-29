@@ -149,11 +149,16 @@ async function saveApprovals(items: ApprovalItem[]): Promise<void> {
   }
   // Strip binary payloads from every item before writing — defense-in-depth so
   // approvals.json never grows large regardless of which code path saved the item.
+  // Preserve https:// image URLs (R2-hosted slides); only discard base64 data blobs.
   const stripped = items.map(item => {
     const { videoBase64: _v, ...rest } = item
     return {
       ...rest,
-      slides: rest.slides.map(({ image: _img, imageOptions: _opts, ...slide }) => slide),
+      slides: rest.slides.map(s => {
+        const { image, imageOptions: _opts, ...slideRest } = s
+        const persistedImage = image && !image.startsWith('data:') ? image : undefined
+        return persistedImage ? { ...slideRest, image: persistedImage } : slideRest
+      }),
     }
   })
   const tmp = `${APPROVALS_PATH}.tmp-${crypto.randomUUID()}`

@@ -536,26 +536,43 @@ export default function CarouselPage() {
     }
   }
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (!files.length) return
-
-    files.forEach((file, i) => {
-      const reader = new FileReader()
-      reader.onload = (ev) => {
-        const dataUrl = ev.target?.result as string
-        setSlides((prev) => {
-          const updated = [...prev]
-          const targetIndex = selectedSlide !== null ? selectedSlide + i : i
+    showToast(`Uploading ${files.length} image${files.length > 1 ? 's' : ''}…`)
+    const settled = await Promise.allSettled(files.map(async (file, i) => {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      const res = await fetch('/api/cover-image-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64, mimeType: file.type }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `Upload failed for image ${i + 1}`)
+      return { index: i, url: data.url as string }
+    }))
+    const succeeded = settled.filter((r): r is PromiseFulfilledResult<{ index: number; url: string }> => r.status === 'fulfilled').map(r => r.value)
+    const failCount = settled.length - succeeded.length
+    if (succeeded.length > 0) {
+      setSlides(prev => {
+        const updated = [...prev]
+        for (const { index, url } of succeeded) {
+          const targetIndex = selectedSlide !== null ? selectedSlide + index : index
           if (updated[targetIndex]) {
-            updated[targetIndex] = { ...updated[targetIndex], image: dataUrl }
+            updated[targetIndex] = { ...updated[targetIndex], image: url }
           }
-          return updated
-        })
-      }
-      reader.readAsDataURL(file)
-    })
-    showToast(`${files.length} image${files.length > 1 ? 's' : ''} added`)
+        }
+        return updated
+      })
+      showToast(`${succeeded.length} image${succeeded.length > 1 ? 's' : ''} added${failCount > 0 ? ` (${failCount} failed)` : ''}`)
+    } else {
+      showToast('Image upload failed', 'error')
+    }
   }
 
   const downloadSlides = () => {
