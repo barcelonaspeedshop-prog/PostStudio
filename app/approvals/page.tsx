@@ -873,6 +873,36 @@ export default function ApprovalsPage() {
     a.click()
   }
 
+  const [downloadingSlides, setDownloadingSlides] = useState<string | null>(null)
+
+  const downloadSlides = async (item: ApprovalItem) => {
+    setDownloadingSlides(item.id)
+    try {
+      const slug = item.articleSlug
+        || item.topic.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+      const res = await fetch('/api/export-slides', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slides: item.slides, channel: item.channel, slug }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error || `Export failed (${res.status})`)
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${slug}-slides.zip`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert((err instanceof Error ? err.message : 'Failed to export slides'))
+    } finally {
+      setDownloadingSlides(null)
+    }
+  }
+
   const pending = items.filter(i => i.status === 'pending')
   const reviewed = items.filter(i => i.status !== 'pending')
   const previewItem = previewId ? items.find(i => i.id === previewId) : null
@@ -1454,6 +1484,25 @@ export default function ApprovalsPage() {
                               className="px-4 py-2.5 min-h-[44px] border border-stone-200 text-stone-700 text-[13px] font-medium rounded-lg hover:bg-stone-50 transition-colors flex items-center gap-1.5"
                             >
                               <span className="text-[11px]">↓</span> Download
+                            </button>
+                          )}
+                          {item.slides?.length > 0 && (
+                            <button
+                              onClick={() => downloadSlides(item)}
+                              disabled={downloadingSlides === item.id}
+                              className="px-4 py-2.5 min-h-[44px] border border-stone-200 text-stone-700 text-[13px] font-medium rounded-lg hover:bg-stone-50 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                              {downloadingSlides === item.id ? (
+                                <>
+                                  <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                    <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                                  </svg>
+                                  Generating...
+                                </>
+                              ) : (
+                                <><span className="text-[11px]">↓</span> Slides (.zip)</>
+                              )}
                             </button>
                           )}
                           <button

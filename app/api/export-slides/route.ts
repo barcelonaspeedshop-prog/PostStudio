@@ -17,7 +17,7 @@ type SlideInput = {
 
 export async function POST(req: NextRequest) {
   try {
-    const { slides, channel } = await req.json() as { slides: SlideInput[]; channel: string }
+    const { slides, channel, slug } = await req.json() as { slides: SlideInput[]; channel: string; slug?: string }
 
     if (!slides?.length) {
       return NextResponse.json({ error: 'slides are required' }, { status: 400 })
@@ -45,16 +45,16 @@ export async function POST(req: NextRequest) {
 
     // Build ZIP
     const zip = new AdmZip()
-    const safeName = (channel || 'carousel').replace(/[^a-z0-9]/gi, '_').toLowerCase()
+    const zipName = slug
+      ? `${slug}-slides`
+      : (channel || 'carousel').replace(/[^a-z0-9]/gi, '-').toLowerCase() + '-slides'
 
     for (let i = 0; i < frames.length; i++) {
       const dataUrl = frames[i]
       const base64 = dataUrl.split(',')[1]
       if (!base64) continue
       const buffer = Buffer.from(base64, 'base64')
-      const slideNum = String(i + 1).padStart(2, '0')
-      const label = slides[i]?.num || slideNum
-      zip.addFile(`${safeName}_slide_${label}.jpg`, buffer)
+      zip.addFile(`slide-${i + 1}.jpg`, buffer)
     }
 
     const zipBuffer = zip.toBuffer()
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/zip',
-        'Content-Disposition': `attachment; filename="${safeName}_slides.zip"`,
+        'Content-Disposition': `attachment; filename="${zipName}.zip"`,
         'Content-Length': String(zipBuffer.length),
       },
     })
