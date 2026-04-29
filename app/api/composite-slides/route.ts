@@ -26,7 +26,7 @@ type SlideInput = {
   accent: string
   image?: string
   imageOptions?: string[]
-  tileType?: 'hook' | 'brand' | 'story' | 'story-text' | 'cta' | 'food-image' | 'food-must-order' | 'food-info' | 'food-pro-tips' | 'food-magazine' | 'thumbnail' | 'find-us-map'
+  tileType?: 'hook' | 'brand' | 'story' | 'story-text' | 'cta' | 'food-image' | 'food-must-order' | 'food-info' | 'food-pro-tips' | 'food-magazine' | 'thumbnail' | 'find-us-map' | 'fullbleed'
   channel?: string
   chartData?: ChartData
   foodDishes?: { name: string; description: string; price?: string }[]
@@ -1012,6 +1012,7 @@ export async function POST(req: NextRequest) {
           case 'food-magazine': return buildFoodMagazineSvg(slide, ch.primary)
           case 'thumbnail': return buildThumbnailSvg(slide, ch.primary, ch.name, hasImage)
           case 'find-us-map': return buildFindUsMapSvg(slide, ch.primary, hasMapImage)
+          case 'fullbleed': return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg"></svg>`
           default: return buildStoryTextSvg(slide, ch.primary, ch.bg)
         }
       })()

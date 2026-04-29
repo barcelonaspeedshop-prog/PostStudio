@@ -11,7 +11,7 @@ type Slide = {
   badge: string
   accent: string
   image?: string // base64 data URL
-  tileType?: 'story' | 'story-text' | 'hook' | 'brand' | 'cta' | 'food-image' | 'food-must-order' | 'food-info' | 'food-pro-tips' | 'food-magazine' | 'thumbnail' | 'find-us-map'
+  tileType?: 'story' | 'story-text' | 'hook' | 'brand' | 'cta' | 'food-image' | 'food-must-order' | 'food-info' | 'food-pro-tips' | 'food-magazine' | 'thumbnail' | 'find-us-map' | 'fullbleed'
   foodDishes?: Array<{ name: string; description: string; price?: string }>
   foodMustOrder?: { name: string; description: string; priceRange?: string }
   foodInfoItems?: Array<{ icon: string; label: string; value: string }>
@@ -680,7 +680,7 @@ export default function CarouselPage() {
           body: 'Replace this tile with your designed cover image. Update text fields if needed.',
           badge: 'OMNIRA FOOD',
           accent: 'amber',
-          tileType: 'story',
+          tileType: 'fullbleed',
         }
         const outroSlide: Slide = {
           num: '07',
@@ -689,7 +689,7 @@ export default function CarouselPage() {
           body: 'Replace with the standard Omnira Food outro tile.',
           badge: 'OMNIRA FOOD',
           accent: 'amber',
-          tileType: 'cta',
+          tileType: 'fullbleed',
         }
         const renamedRestaurantSlides = restaurantSlides.map((s, i) => ({
           ...s, num: String(i + 2).padStart(2, '0'),
@@ -710,52 +710,7 @@ export default function CarouselPage() {
       const metas = genData.restaurantMetas || (genData.restaurantMeta ? [genData.restaurantMeta] : [])
       setFoodRestaurantMetas(metas)
 
-      const imageQueries: string[] = genData.imageQueries || []
-
-      // Step 2: Auto-fetch images via Serper + proxy (restaurant slides only — placeholders have no query)
-      setFoodBuildStatus(`Finding food photos (0/${restaurantSlides.length})…`)
-
-      await Promise.all(
-        restaurantSlides.map(async (_, idx) => {
-          const query = imageQueries[idx]
-          if (!query) return
-
-          try {
-            // Search Serper for image URLs
-            const searchRes = await fetch('/api/search-images', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ query, count: 5 }),
-            })
-            if (!searchRes.ok) return
-            const searchData = await searchRes.json()
-            const urls: { url: string }[] = searchData.images || []
-
-            // Try each URL until one proxies successfully
-            for (const { url } of urls.slice(0, 5)) {
-              try {
-                const proxyRes = await fetch('/api/fetch-image', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ url }),
-                })
-                if (!proxyRes.ok) continue
-                const proxyData = await proxyRes.json()
-                if (proxyData.base64) {
-                  setSlides(prev => {
-                    const next = [...prev]
-                    next[idx + slideOffset] = { ...next[idx + slideOffset], image: proxyData.base64 }
-                    return next
-                  })
-                  break
-                }
-              } catch { /* try next */ }
-            }
-          } catch { /* image fetch failed — slide stays text-only */ }
-        })
-      )
-
-      showToast(`${allSlides.length} slides built${imageQueries.length ? ' with images' : ''}!`)
+      showToast(`${allSlides.length} slides built!`)
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : 'Error building food carousel', 'error')
     } finally {
