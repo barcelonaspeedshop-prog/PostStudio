@@ -3,9 +3,9 @@ import { readFile, writeFile, rename, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
 import crypto from 'crypto'
+import { randomUUID } from 'crypto'
 import { trackHashtags } from '@/lib/hashtags'
 import { publishToWebsite } from '@/lib/website-publisher'
-import { isR2Configured, uploadToR2 } from '@/lib/r2'
 import type { RestaurantMeta } from '@/app/api/food-carousel-generate/route'
 import { restaurants as staticRestaurants } from '@/lib/restaurants'
 import type { Restaurant } from '@/lib/restaurants'
@@ -345,25 +345,32 @@ export async function PATCH(req: NextRequest) {
       if (compositeRes.ok) {
         const compositeData = await compositeRes.json() as { frames?: string[] }
         if (Array.isArray(compositeData.frames)) {
-          // Upload each composited frame to R2 immediately so downstream code
-          // (publishToWebsite, meta publisher) works with stable URLs not base64 blobs
-          const r2Urls: (string | null)[] = isR2Configured()
-            ? await Promise.all(compositeData.frames.map(async frame => {
-                if (!frame) return null
-                try {
-                  const b64 = frame.startsWith('data:') ? frame.replace(/^data:image\/\w+;base64,/, '') : frame
-                  const url = await uploadToR2(Buffer.from(b64, 'base64'), 'image/jpeg')
-                  console.log(`[approvals] Composite uploaded to R2: ${url}`)
-                  return url
-                } catch (e) {
-                  console.warn('[approvals] R2 upload for composite failed:', e instanceof Error ? e.message : e)
-                  return null
-                }
-              }))
-            : compositeData.frames.map(() => null)
+          // Save each composited frame to local disk and serve via /composites/<uuid>.jpg
+          // (R2 pub-*.r2.dev domain is blocked by Instagram's fetcher since March 2026)
+          const compositesDir = path.join(process.env.TOKEN_STORAGE_PATH || '/data', 'composites')
+          if (!existsSync(compositesDir)) await mkdir(compositesDir, { recursive: true })
+          const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com').replace(/\/$/, '')
+
+          const compositeUrls: (string | null)[] = await Promise.all(
+            compositeData.frames.map(async frame => {
+              if (!frame) return null
+              try {
+                const b64 = frame.startsWith('data:') ? frame.replace(/^data:image\/\w+;base64,/, '') : frame
+                const filename = `${randomUUID()}.jpg`
+                await writeFile(path.join(compositesDir, filename), Buffer.from(b64, 'base64'))
+                const url = `${appUrl}/api/composites/${filename}`
+                console.log(`[approvals] Composite saved locally: ${url}`)
+                return url
+              } catch (e) {
+                console.warn('[approvals] Composite save failed:', e instanceof Error ? e.message : e)
+                return null
+              }
+            })
+          )
+
           item.slides = item.slides.map((s, i) => ({
             ...s,
-            image: r2Urls[i] || compositeData.frames![i] || s.image,
+            image: compositeUrls[i] || compositeData.frames![i] || s.image,
           }))
         }
       } else {

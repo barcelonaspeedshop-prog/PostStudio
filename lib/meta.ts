@@ -132,6 +132,13 @@ export async function saveBase64ToTempFile(image: string): Promise<{ publicUrl: 
     return { publicUrl: image, filePath: '' }
   }
 
+  // If the image is already hosted on our app (e.g. /api/composites/), return directly.
+  // These are already publicly accessible; re-uploading to R2 would route back to a blocked domain.
+  const appPublic = (process.env.NEXT_PUBLIC_APP_URL || 'https://app.premirafirst.com').replace(/\/$/, '')
+  if (image.startsWith(`${appPublic}/`)) {
+    return { publicUrl: image, filePath: '' }
+  }
+
   // Resolve the raw buffer first (shared by both R2 and temp-file paths)
   let buffer: Buffer
 
