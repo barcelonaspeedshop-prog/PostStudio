@@ -687,6 +687,40 @@ ul { list-style: none; }
 }
 .dest-card-country { font-size: 0.8rem; color: var(--muted); }
 
+/* ── RESTAURANT LINKS ── */
+.restaurant-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+.restaurant-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gold);
+  text-decoration: none;
+  transition: background 0.2s, border-color 0.2s;
+}
+.restaurant-link:hover {
+  background: var(--surface);
+  border-color: var(--gold-light);
+}
+.restaurant-link svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+
 /* ── RESPONSIVE ── */
 @media (max-width: 768px) {
   .nav-links { display: none; }

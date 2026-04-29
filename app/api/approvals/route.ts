@@ -42,6 +42,7 @@ export type ApprovalItem = {
   hashtags?: string[]
   restaurantMeta?: RestaurantMeta
   restaurantMetas?: RestaurantMeta[]
+  socialDescription?: string
   format?: 'reel' | 'carousel'
   createdAt: string
   status: 'pending' | 'approved' | 'rejected' | 'published'
@@ -175,7 +176,7 @@ export async function GET() {
 // POST — add new item to queue
 export async function POST(req: NextRequest) {
   try {
-    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, articleBody, articleExcerpt, articleSlug, cta, hashtags, restaurantMeta, restaurantMetas, format, series, coverImageDirect, youtubeId, youtubeCredit, furtherReading } = await req.json()
+    const { channel, headline, topic, slides, videoBase64, platforms, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, articleBody, articleExcerpt, articleSlug, cta, hashtags, restaurantMeta, restaurantMetas, socialDescription, format, series, coverImageDirect, youtubeId, youtubeCredit, furtherReading } = await req.json()
 
     if (!channel || !slides || !Array.isArray(slides)) {
       return NextResponse.json({ error: 'channel and slides are required' }, { status: 400 })
@@ -201,6 +202,7 @@ export async function POST(req: NextRequest) {
       hashtags: Array.isArray(hashtags) ? hashtags : undefined,
       restaurantMeta: restaurantMeta || undefined,
       restaurantMetas: Array.isArray(restaurantMetas) ? restaurantMetas : undefined,
+      socialDescription: socialDescription || undefined,
       format: format === 'reel' || format === 'carousel' ? format : undefined,
       createdAt: new Date().toISOString(),
       status: 'pending',
@@ -226,7 +228,7 @@ export async function POST(req: NextRequest) {
 // PUT — update an item (e.g. attach video after generation, or regenerate with fresh content)
 export async function PUT(req: NextRequest) {
   try {
-    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, articleBody, articleExcerpt, articleSlug, manualUploaded, cta, includeCta, hashtags, musicEnabled, series, coverImageDirect, youtubeId, youtubeCredit, furtherReading, publishToWebsite } = await req.json()
+    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, articleBody, articleExcerpt, articleSlug, manualUploaded, cta, includeCta, hashtags, musicEnabled, series, coverImageDirect, youtubeId, youtubeCredit, furtherReading, publishToWebsite, restaurantMeta, restaurantMetas, socialDescription } = await req.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
     const items = await loadApprovals()
@@ -265,6 +267,9 @@ export async function PUT(req: NextRequest) {
     if (youtubeCredit !== undefined) item.youtubeCredit = youtubeCredit || undefined
     if (furtherReading !== undefined) item.furtherReading = Array.isArray(furtherReading) && furtherReading.length ? furtherReading : undefined
     if (publishToWebsite !== undefined) item.publishToWebsite = typeof publishToWebsite === 'boolean' ? publishToWebsite : undefined
+    if (restaurantMeta !== undefined) item.restaurantMeta = restaurantMeta || undefined
+    if (restaurantMetas !== undefined) item.restaurantMetas = Array.isArray(restaurantMetas) ? restaurantMetas : item.restaurantMetas
+    if (socialDescription !== undefined) item.socialDescription = socialDescription || undefined
     await saveApprovals(items)
 
     return NextResponse.json({ id: item.id, hasVideo: !!item.videoBase64, status: item.status })

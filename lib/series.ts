@@ -15,6 +15,7 @@ export const SERIES: Record<string, SeriesEntry[]> = {
   ],
   food: [
     { slug: 'no-frills', name: 'No Frills', description: 'Hole-in-the-wall greatness. The places that matter without trying.' },
+    { slug: 'the-5', name: 'The 5', description: 'Five essential restaurants in one city, neighbourhood, or category.' },
     { slug: 'the-pass', name: 'The Pass', description: "Chef profiles. Who's making the food that matters right now." },
     { slug: 'openings', name: 'Openings', description: "New restaurants. What's launching, where, and why it matters." },
   ],

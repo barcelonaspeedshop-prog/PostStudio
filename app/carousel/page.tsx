@@ -539,7 +539,7 @@ export default function CarouselPage() {
       const res = await fetch('/api/video-export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slides: compositedSlides, slideDuration }),
+        body: JSON.stringify({ slides: compositedSlides, slideDuration, isTop5: foodMode === 'top5' }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -627,6 +627,15 @@ export default function CarouselPage() {
           // Food Guide: pass restaurant metadata for auto-publish to website on approval
           ...(channel === 'Omnira Food' && foodRestaurantMetas.length === 1 && { restaurantMeta: foodRestaurantMetas[0] }),
           ...(channel === 'Omnira Food' && foodRestaurantMetas.length > 1 && { restaurantMetas: foodRestaurantMetas }),
+          // Social description for food guides — generated from restaurant metas
+          ...(channel === 'Omnira Food' && foodRestaurantMetas.length > 0 && {
+            socialDescription: foodMode === 'top5'
+              ? `The Five: ${top5Location.trim()}. ${foodRestaurantMetas.map(m => m.name).join(' · ')}. Follow @omnirafood for more.`
+              : (() => {
+                  const m = foodRestaurantMetas[0]
+                  return `${m.name}, ${m.city}. ${m.cuisine ? m.cuisine + '. ' : ''}${m.story ? m.story.slice(0, 120) + '…' : ''}`.trim()
+                })(),
+          }),
         }),
       })
       const data = await res.json()

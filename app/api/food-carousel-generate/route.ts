@@ -29,6 +29,8 @@ export type RestaurantMeta = {
   payment: string           // e.g. "Cash only" / "Cards accepted"
   proTips: string[]         // 3 insider tips
   bookingNote: string
+  reservationUrl?: string   // e.g. OpenTable / Resy / direct booking URL
+  youtubeUrl?: string       // YouTube video about the restaurant if available
 }
 
 type SlideResult = {
@@ -136,20 +138,22 @@ Return ONLY this JSON (plain text, no HTML tags):
     })
   )
 
+  const restName = stripHtml(meta.name || restaurant.name)
+  const city = stripHtml(meta.city || restaurant.city)
+  const cuisine = stripHtml(meta.cuisine || '')
   const priceRange = stripHtml(meta.priceRange || '')
   const priceContext = stripHtml(meta.priceContext || '')
   const address = stripHtml(meta.address || '')
   const neighbourhood = stripHtml(meta.neighbourhood || '')
   const hoursNote = stripHtml(meta.hoursNote || '')
-  const mapsUrl = stripHtml(meta.mapsUrl || '')
+  const mapsUrl = stripHtml(meta.mapsUrl || '') || `https://maps.google.com/search?q=${encodeURIComponent(restName + ' ' + city)}`
   const phone = stripHtml(meta.phone || '')
   const website = stripHtml(meta.website || '')
   const menuUrl = stripHtml(meta.menuUrl || '')
   const payment = stripHtml(meta.payment || '')
   const proTips: string[] = (meta.proTips || []).map((t: string) => stripHtml(t))
-  const restName = stripHtml(meta.name || restaurant.name)
-  const city = stripHtml(meta.city || restaurant.city)
-  const cuisine = stripHtml(meta.cuisine || '')
+  const reservationUrl = stripHtml(meta.reservationUrl || '')
+  const youtubeUrl = stripHtml(meta.youtubeUrl || '')
 
   // Tile 3: must-order body — "Name — Price — Desc. Name2 — Price2 — Desc2."
   // ── Tile 2: story split — hook sentence as headline, rest as body ─────────────
@@ -248,9 +252,9 @@ Return ONLY this JSON (plain text, no HTML tags):
   const restaurantMeta: RestaurantMeta = {
     slug: slugify(restName),
     name: restName,
-    city: stripHtml(meta.city || restaurant.city),
+    city,
     country: stripHtml(meta.country || ''),
-    cuisine: stripHtml(meta.cuisine || ''),
+    cuisine,
     priceRange,
     priceContext,
     series: 'no-frills',
@@ -266,6 +270,8 @@ Return ONLY this JSON (plain text, no HTML tags):
     payment,
     proTips,
     bookingNote: stripHtml(meta.bookingNote || ''),
+    reservationUrl: reservationUrl || undefined,
+    youtubeUrl: youtubeUrl || undefined,
   }
 
   // No Serper auto-fetch — image tiles use manual upload
@@ -324,14 +330,25 @@ Return ONLY this JSON (plain text, no HTML):
   if (!jsonMatch) throw new Error('No JSON for restaurant ' + restaurant.name)
   const parsed = JSON.parse(jsonMatch)
 
-  const rawSlide: SlideResult = { ...parsed.slide, tileType: 'story' }
   const imageQuery = stripHtml(parsed.imageQuery || `${restaurant.name} ${restaurant.city} food`)
 
   const meta = parsed.restaurantMeta || {}
+  const top5Name = stripHtml(meta.name || restaurant.name)
+
+  const rawSlide: SlideResult = {
+    ...parsed.slide,
+    tag: top5Name,
+    headline: stripHtml(parsed.slide?.headline || ''),
+    body: stripHtml(parsed.slide?.body || ''),
+    badge: 'MUST ORDER:',
+    tileType: 'story',
+  }
+  const top5City = stripHtml(meta.city || restaurant.city)
+  const top5MapsUrl = stripHtml(meta.mapsUrl || '') || `https://maps.google.com/search?q=${encodeURIComponent(top5Name + ' ' + top5City)}`
   const restaurantMeta: RestaurantMeta = {
-    slug: slugify(meta.name || restaurant.name),
-    name: stripHtml(meta.name || restaurant.name),
-    city: stripHtml(meta.city || restaurant.city),
+    slug: slugify(top5Name),
+    name: top5Name,
+    city: top5City,
     country: stripHtml(meta.country || ''),
     cuisine: stripHtml(meta.cuisine || ''),
     priceRange: stripHtml(meta.priceRange || ''),
@@ -346,13 +363,15 @@ Return ONLY this JSON (plain text, no HTML):
     hoursNote: stripHtml(meta.hoursNote || ''),
     address: stripHtml(meta.address || ''),
     neighbourhood: stripHtml(meta.neighbourhood || ''),
-    mapsUrl: stripHtml(meta.mapsUrl || ''),
+    mapsUrl: top5MapsUrl,
     phone: stripHtml(meta.phone || ''),
     website: stripHtml(meta.website || ''),
     menuUrl: stripHtml(meta.menuUrl || ''),
     payment: stripHtml(meta.payment || ''),
     proTips: (meta.proTips || []).map((t: string) => stripHtml(t)),
     bookingNote: stripHtml(meta.bookingNote || ''),
+    reservationUrl: stripHtml(meta.reservationUrl || '') || undefined,
+    youtubeUrl: stripHtml(meta.youtubeUrl || '') || undefined,
   }
 
   return { slide: rawSlide, imageQuery, restaurantMeta }

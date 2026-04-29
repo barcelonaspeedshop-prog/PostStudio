@@ -9,6 +9,8 @@ import http from 'http'
 import { loadSettings } from '@/lib/settings'
 import { MUSIC_FILE_PATH, MUSIC_VOLUME_LINEAR } from '@/lib/music'
 
+const MUSIC_TOP5_FILE_PATH = '/data/music/music-top5.mp3'
+
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest) {
   const tmpDir = `/tmp/carousel_${Date.now()}`
   
   try {
-    const { slides, slideDuration: rawDuration = 5, reelMode = false } = await req.json()
+    const { slides, slideDuration: rawDuration = 5, reelMode = false, isTop5 = false } = await req.json()
     const videoW = 1080
     const videoH = reelMode ? 1920 : 1350
     const scaleFilter = `scale=${videoW}:${videoH}:force_original_aspect_ratio=decrease,pad=${videoW}:${videoH}:(ow-iw)/2:(oh-ih)/2,setsar=1`
@@ -96,9 +98,12 @@ export async function POST(req: NextRequest) {
     const settings = await loadSettings()
     let ffmpegCmd: string
 
-    if (settings.includeMusic && existsSync(MUSIC_FILE_PATH)) {
+    // Select music file: Top5 uses a dedicated track if present, else falls back to default
+    const top5MusicPath = isTop5 && existsSync(MUSIC_TOP5_FILE_PATH) ? MUSIC_TOP5_FILE_PATH : MUSIC_FILE_PATH
+
+    if (settings.includeMusic && existsSync(top5MusicPath)) {
       const totalDuration = slides.reduce((sum: number, s: { tileType?: string }) => sum + getTileDuration(s), 0)
-      ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -stream_loop -1 -i ${MUSIC_FILE_PATH} -vf "${scaleFilter}" -af "volume=${MUSIC_VOLUME_LINEAR}" -r 30 -vsync cfr -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -t ${totalDuration} -shortest -movflags +faststart -y ${outputPath}`
+      ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -stream_loop -1 -i ${top5MusicPath} -vf "${scaleFilter}" -af "volume=${MUSIC_VOLUME_LINEAR}" -r 30 -vsync cfr -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -preset fast -crf 23 -c:a aac -b:a 128k -t ${totalDuration} -shortest -movflags +faststart -y ${outputPath}`
     } else {
       ffmpegCmd = `ffmpeg -f concat -safe 0 -i ${listPath} -vf "${scaleFilter}" -r 30 -vsync cfr -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -preset fast -crf 23 -an -movflags +faststart -y ${outputPath}`
     }

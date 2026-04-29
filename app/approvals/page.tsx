@@ -51,6 +51,14 @@ type Slide = {
   tileType?: 'story' | 'story-text' | 'hook' | 'brand' | 'cta' | 'food-image' | 'food-must-order' | 'food-info' | 'food-pro-tips' | 'food-magazine' | 'thumbnail' | 'find-us-map' | 'fullbleed'
 }
 
+type RestaurantMetaItem = {
+  name: string; city: string; country?: string; cuisine?: string; priceRange?: string
+  story?: string; mustOrder?: Array<{ name: string; description: string; price?: string }>
+  hoursNote?: string; address?: string; neighbourhood?: string; mapsUrl?: string
+  website?: string; menuUrl?: string; reservationUrl?: string; youtubeUrl?: string
+  bookingNote?: string; proTips?: string[]
+}
+
 type ApprovalItem = {
   id: string
   channel: string
@@ -82,6 +90,9 @@ type ApprovalItem = {
   youtubeCredit?: string
   furtherReading?: Array<{ title: string; url: string; source?: string }>
   publishToWebsite?: boolean
+  restaurantMeta?: RestaurantMetaItem
+  restaurantMetas?: RestaurantMetaItem[]
+  socialDescription?: string
 }
 
 type PublishedArticleMeta = {
@@ -781,10 +792,17 @@ export default function ApprovalsPage() {
     setRegeneratingArticleId(item.id)
     try {
       const slidePayload = item.slides.map(s => ({ headline: s.headline, body: s.body }))
+      const restaurantMetas = item.restaurantMetas || (item.restaurantMeta ? [item.restaurantMeta] : undefined)
       const res = await fetch('/api/generate-article', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: item.id, channel: item.channel, ytTitle: item.ytTitle, slides: slidePayload }),
+        body: JSON.stringify({
+          id: item.id,
+          channel: item.channel,
+          ytTitle: item.ytTitle,
+          slides: slidePayload,
+          ...(restaurantMetas && restaurantMetas.length > 1 && { restaurantMetas }),
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -1185,6 +1203,84 @@ export default function ApprovalsPage() {
                           <p className="text-[12px] text-stone-400 italic">No article yet — click Generate article</p>
                         )}
                       </div>
+
+                      {/* Social description + restaurant links (Food Guide only) */}
+                      {item.channel === 'Omnira Food' && (item.socialDescription || item.restaurantMeta || item.restaurantMetas) && (
+                        <div className="px-4 py-3 border-t border-stone-50 bg-stone-50/20 flex flex-col gap-2">
+                          <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-widest">Food guide</p>
+                          {/* Social description */}
+                          {item.socialDescription && (
+                            <div className="flex items-start gap-2">
+                              <p className="flex-1 text-[12px] text-stone-600 leading-relaxed">{item.socialDescription}</p>
+                              <button
+                                onClick={() => navigator.clipboard.writeText(item.socialDescription || '').then(() => showToast('Description copied!'))}
+                                className="shrink-0 px-2 py-1 text-[10px] border border-stone-200 rounded-lg text-stone-500 hover:bg-stone-100 transition-colors"
+                                title="Copy social description"
+                              >
+                                Copy
+                              </button>
+                            </div>
+                          )}
+                          {/* Restaurant links — reservation and YouTube per restaurant */}
+                          {(() => {
+                            const metas = item.restaurantMetas || (item.restaurantMeta ? [item.restaurantMeta] : [])
+                            if (!metas.length) return null
+                            return (
+                              <div className="flex flex-col gap-2">
+                                {metas.map((m, idx) => (
+                                  <div key={idx} className="bg-white border border-stone-100 rounded-lg p-2.5 flex flex-col gap-1.5">
+                                    <p className="text-[11px] font-semibold text-stone-700">{m.name}</p>
+                                    {/* Reservation URL */}
+                                    <div>
+                                      <p className="text-[9px] text-stone-400 uppercase tracking-wider mb-0.5">Reservation URL</p>
+                                      <input
+                                        type="url"
+                                        defaultValue={m.reservationUrl || ''}
+                                        placeholder="https://resy.com/..."
+                                        onBlur={async e => {
+                                          const newVal = e.target.value.trim()
+                                          if (newVal === (m.reservationUrl || '')) return
+                                          const updatedMetas = metas.map((x, i) => i === idx ? { ...x, reservationUrl: newVal || undefined } : x)
+                                          const isSingle = !item.restaurantMetas && item.restaurantMeta
+                                          setItems(prev => prev.map(it => it.id === item.id ? { ...it, [isSingle ? 'restaurantMeta' : 'restaurantMetas']: isSingle ? updatedMetas[0] : updatedMetas } : it))
+                                          await fetch('/api/approvals', {
+                                            method: 'PUT',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ id: item.id, [isSingle ? 'restaurantMeta' : 'restaurantMetas']: isSingle ? updatedMetas[0] : updatedMetas }),
+                                          }).catch(() => {})
+                                        }}
+                                        className="w-full text-[11px] border border-stone-200 rounded px-2 py-1 focus:outline-none focus:border-stone-400"
+                                      />
+                                    </div>
+                                    {/* YouTube URL */}
+                                    <div>
+                                      <p className="text-[9px] text-stone-400 uppercase tracking-wider mb-0.5">YouTube URL</p>
+                                      <input
+                                        type="url"
+                                        defaultValue={m.youtubeUrl || ''}
+                                        placeholder="https://youtube.com/watch?v=..."
+                                        onBlur={async e => {
+                                          const newVal = e.target.value.trim()
+                                          if (newVal === (m.youtubeUrl || '')) return
+                                          const updatedMetas = metas.map((x, i) => i === idx ? { ...x, youtubeUrl: newVal || undefined } : x)
+                                          const isSingle = !item.restaurantMetas && item.restaurantMeta
+                                          setItems(prev => prev.map(it => it.id === item.id ? { ...it, [isSingle ? 'restaurantMeta' : 'restaurantMetas']: isSingle ? updatedMetas[0] : updatedMetas } : it))
+                                          await fetch('/api/approvals', {
+                                            method: 'PUT',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ id: item.id, [isSingle ? 'restaurantMeta' : 'restaurantMetas']: isSingle ? updatedMetas[0] : updatedMetas }),
+                                          }).catch(() => {})
+                                        }}
+                                        className="w-full text-[11px] border border-stone-200 rounded px-2 py-1 focus:outline-none focus:border-stone-400"
+                                      />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )
+                          })()}
+                        </div>
+                      )}
 
                       {/* Publish Panel */}
                       {publishPanelId === item.id && (

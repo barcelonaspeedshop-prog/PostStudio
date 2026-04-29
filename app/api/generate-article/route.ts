@@ -50,13 +50,34 @@ const CHANNEL_VOICE: Record<string, string> = {
   'Omnira Food': `You write for Omnira Food — a publication about the best places to eat and drink. The voice is warm, appetite-first, and specific about sensation: texture, flavour, smell, presentation. You write as someone who has actually eaten the food and wants the reader to feel the table. No clichés about "journeys" or "experiences". Write about food.`,
 }
 
+type RestaurantMetaInput = {
+  name: string
+  city: string
+  country?: string
+  cuisine?: string
+  priceRange?: string
+  story?: string
+  mustOrder?: Array<{ name: string; description: string; price?: string }>
+  hoursNote?: string
+  address?: string
+  neighbourhood?: string
+  mapsUrl?: string
+  website?: string
+  menuUrl?: string
+  reservationUrl?: string
+  youtubeUrl?: string
+  bookingNote?: string
+  proTips?: string[]
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { slides, channel, ytTitle, id } = await req.json() as {
+    const { slides, channel, ytTitle, id, restaurantMetas } = await req.json() as {
       slides: Array<{ headline: string; body: string }>
       channel: string
       ytTitle?: string
       id?: string
+      restaurantMetas?: RestaurantMetaInput[]
     }
 
     if (!slides || !Array.isArray(slides) || slides.length === 0) {
@@ -81,7 +102,58 @@ export async function POST(req: NextRequest) {
 
     const channelVoice = CHANNEL_VOICE[channel] || `You write for ${channel}.`
 
-    const systemPrompt = `${channelVoice}
+    // Top5 food guide: use a richer prompt that builds a proper guide article (600-1000 words)
+    const isTop5Guide = channel === 'Omnira Food' && restaurantMetas && restaurantMetas.length > 1
+
+    let systemPrompt: string
+    let userPrompt: string
+    let maxTokens: number
+
+    if (isTop5Guide) {
+      const location = restaurantMetas![0]?.city || ''
+      const restaurantList = restaurantMetas!.map((m, i) =>
+        `${i + 1}. ${m.name} (${m.city}${m.neighbourhood ? ', ' + m.neighbourhood : ''})
+   Cuisine: ${m.cuisine || 'N/A'} · Price: ${m.priceRange || 'N/A'}
+   Story: ${m.story || ''}
+   Must Order: ${(m.mustOrder || []).map(d => d.name).join(', ') || 'N/A'}
+   Address: ${m.address || m.city}
+   Hours: ${m.hoursNote || 'Check ahead'}
+   Booking: ${m.bookingNote || 'Walk-ins welcome'}
+   ${m.proTips && m.proTips.length ? 'Tips: ' + m.proTips.slice(0, 2).join('; ') : ''}`
+      ).join('\n\n')
+
+      systemPrompt = `${channelVoice}
+
+You are writing a "The Five" restaurant guide article for publication on the Omnira Food website. This is a curated best-of guide, not a listicle. Each entry should read like a recommendation from someone who has eaten there.
+
+Structure:
+- Opening paragraph (2-3 sentences): set the scene for the location or theme. What links these five places? Why this list, why now.
+- One section per restaurant — use ## Restaurant Name as the subheading. Each section: 3-5 sentences covering what makes it essential, the must-order dish, and one practical detail (price, booking, vibe).
+- Brief closing paragraph: a single sentence observation or invitation.
+
+Format rules:
+- Markdown with ## subheadings for each restaurant
+- NO H1 (title stored separately)
+- NO hashtags, NO emojis, NO star ratings
+- NO "journey", "experience", "culinary adventure", "hidden gem" clichés
+- NO "in conclusion", "furthermore", "it's worth noting"
+- Write about food specifically — name dishes, describe textures, flavours
+- 600–1000 words. Each restaurant entry: 80–150 words.
+
+After the article body, on a new line, write:
+EXCERPT: [1-2 sentence summary of the guide, max 200 characters]
+SLUG: [the-five-location-slug, lowercase, hyphens, max 80 chars]
+${recentSlugNote}`
+
+      userPrompt = `${titleHint ? titleHint + '\n\n' : ''}Restaurant data for this guide:
+
+${restaurantList}
+
+Write the guide. Use the restaurant data as your source — expand with flavour, atmosphere, and editorial judgement. Do not just restate the data fields. Make the reader want to book a table.`
+
+      maxTokens = 2400
+    } else {
+      systemPrompt = `${channelVoice}
 
 You are writing a standalone editorial article for publication on the website. This is NOT a social media caption, NOT a video script summary, NOT a listicle.
 
@@ -105,16 +177,19 @@ EXCERPT: [1-2 sentence summary, max 200 characters, suitable for article cards]
 SLUG: [URL-safe slug derived from the headline or main topic, lowercase, hyphens, max 80 chars]
 ${recentSlugNote}`
 
-    const userPrompt = `${titleHint}
+      userPrompt = `${titleHint}
 
 Source material (carousel slide content):
 ${sourceContent}
 
 Write the article. Use the source material as a starting point — restate, expand, and add editorial perspective. Do not just rephrase each slide in order.`
 
+      maxTokens = 1200
+    }
+
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1200,
+      max_tokens: maxTokens,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
     })
@@ -133,10 +208,12 @@ Write the article. Use the source material as a starting point — restate, expa
     if (slugIdx !== -1) articleBody = articleBody.slice(0, slugIdx)
     articleBody = articleBody.trim()
 
-    // Hard word count guard — truncate at ~500 words if Claude overshot
+    // Hard word count guard — Top5 guides allow up to 1100 words; standard articles cap at 500
     const words = articleBody.split(/\s+/)
-    if (words.length > 520) {
-      articleBody = words.slice(0, 500).join(' ') + '…'
+    const wordLimit = isTop5Guide ? 1100 : 520
+    const wordCap = isTop5Guide ? 1050 : 500
+    if (words.length > wordLimit) {
+      articleBody = words.slice(0, wordCap).join(' ') + '…'
     }
 
     let articleExcerpt = excerptMatch ? excerptMatch[1].trim().slice(0, 200) : ''

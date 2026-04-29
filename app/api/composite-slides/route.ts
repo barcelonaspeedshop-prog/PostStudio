@@ -328,11 +328,8 @@ function buildStorySvg(slide: SlideInput, primary: string, h: number = H): strin
   svg += `<rect width="${W}" height="200" fill="url(#topgrad)"/>`
   svg += `<rect width="${W}" height="${h}" fill="url(#grad)"/>`
 
-  // Tag top-left accent 26px
-  svg += `<text x="${pad}" y="92" font-family="${FONT_STACK}" font-size="26" font-weight="500" fill="rgb(${pr},${pg},${pb})" fill-opacity="1" letter-spacing="1">${escapeXml(slide.tag)}</text>`
-
-  // Slide number top-right white 25%
-  svg += `<text x="${W - pad}" y="92" font-family="${FONT_STACK}" font-size="30" fill="white" fill-opacity="0.25" text-anchor="end">${escapeXml(slide.num)}</text>`
+  // Tag top-left accent 31px
+  svg += `<text x="${pad}" y="92" font-family="${FONT_STACK}" font-size="31" font-weight="500" fill="rgb(${pr},${pg},${pb})" fill-opacity="1" letter-spacing="1">${escapeXml(slide.tag)}</text>`
 
   // Headline dynamic font size
   hedLines.forEach((line, i) => {
