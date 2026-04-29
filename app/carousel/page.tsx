@@ -383,6 +383,22 @@ export default function CarouselPage() {
 
     // Draw image if present
     if (slide.image && slide.image !== 'loading') {
+      // Proxy remote images through our server so the canvas stays untainted
+      // (direct cross-origin loads taint the canvas and block toDataURL)
+      let imageSrc = slide.image
+      if (/^https?:\/\//.test(slide.image)) {
+        try {
+          const proxyRes = await fetch('/api/fetch-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: slide.image }),
+          })
+          if (proxyRes.ok) {
+            const proxyData = await proxyRes.json()
+            if (proxyData.base64) imageSrc = proxyData.base64
+          }
+        } catch { /* use direct URL — crossOrigin fallback below */ }
+      }
       await new Promise<void>((resolve) => {
         const img = new Image()
         img.onload = () => {
@@ -395,8 +411,8 @@ export default function CarouselPage() {
           resolve()
         }
         img.onerror = () => resolve()
-        // Small delay to ensure base64 is ready
-        setTimeout(() => { img.src = slide.image! }, 10)
+        img.crossOrigin = 'anonymous'
+        setTimeout(() => { img.src = imageSrc }, 10)
       })
     }
 
