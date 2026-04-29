@@ -1704,6 +1704,23 @@ export default function ApprovalsPage() {
                           <p className="text-[10px] text-stone-400">{item.channel} · {formatDate(item.reviewedAt || item.createdAt)}</p>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
+                          {item.slides?.length > 0 && (
+                            <button
+                              onClick={() => downloadSlides(item)}
+                              disabled={downloadingSlides === item.id}
+                              className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-800 transition-colors disabled:opacity-50 flex items-center gap-1"
+                            >
+                              {downloadingSlides === item.id ? (
+                                <>
+                                  <svg className="w-2.5 h-2.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3"/>
+                                    <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                                  </svg>
+                                  Generating…
+                                </>
+                              ) : '↓ Slides'}
+                            </button>
+                          )}
                           {isWebsiteArticle && (
                             <button
                               onClick={() => isEditOpen ? setMediaEdit(null) : openEditMedia(item)}
