@@ -2,6 +2,7 @@
 
 // In-container path: /docker/poststudio/data/ on VPS → /data/ inside container
 export const MUSIC_FILE_PATH = '/data/music/music-default.mp3'
+export const MUSIC_TOP5_FILE_PATH = '/data/music/music-top5.mp3'
 
 export const MUSIC_VOLUME_DB = -22 // dB relative to voiceover. -22 is subtle background.
 

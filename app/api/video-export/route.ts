@@ -7,9 +7,7 @@ import path from 'path'
 import https from 'https'
 import http from 'http'
 import { loadSettings } from '@/lib/settings'
-import { MUSIC_FILE_PATH, MUSIC_VOLUME_LINEAR } from '@/lib/music'
-
-const MUSIC_TOP5_FILE_PATH = '/data/music/music-top5.mp3'
+import { MUSIC_FILE_PATH, MUSIC_TOP5_FILE_PATH, MUSIC_VOLUME_LINEAR } from '@/lib/music'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -98,8 +96,8 @@ export async function POST(req: NextRequest) {
     const settings = await loadSettings()
     let ffmpegCmd: string
 
-    // Select music file: Top5 uses a dedicated track if present, else falls back to default
-    const top5MusicPath = isTop5 && existsSync(MUSIC_TOP5_FILE_PATH) ? MUSIC_TOP5_FILE_PATH : MUSIC_FILE_PATH
+    // All carousels use music-top5.mp3; fall back to music-default.mp3 only if the top5 track is absent
+    const top5MusicPath = existsSync(MUSIC_TOP5_FILE_PATH) ? MUSIC_TOP5_FILE_PATH : MUSIC_FILE_PATH
 
     if (settings.includeMusic && existsSync(top5MusicPath)) {
       const totalDuration = slides.reduce((sum: number, s: { tileType?: string }) => sum + getTileDuration(s), 0)

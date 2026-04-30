@@ -8,7 +8,7 @@ import path from 'path'
 import { createJob, updateJob, cleanOldJobs, VIDEOS_DIR } from '../jobs'
 import { getChannel } from '@/lib/channels'
 import { loadSettings } from '@/lib/settings'
-import { MUSIC_FILE_PATH, MUSIC_VOLUME_LINEAR } from '@/lib/music'
+import { MUSIC_FILE_PATH, MUSIC_TOP5_FILE_PATH, MUSIC_VOLUME_LINEAR } from '@/lib/music'
 
 type ManifestEntry =
   | { type: 'media'; chapterId: number; filePath: string; isVideo: boolean }
@@ -523,10 +523,12 @@ export async function POST(req: NextRequest) {
 
       if (!musicEnabled) {
         console.log('[story-video] Music disabled')
+      } else if (existsSync(MUSIC_TOP5_FILE_PATH)) {
+        musicPath = MUSIC_TOP5_FILE_PATH
       } else if (existsSync(MUSIC_FILE_PATH)) {
         musicPath = MUSIC_FILE_PATH
       } else {
-        console.warn(`[story-video] Music file not found at ${MUSIC_FILE_PATH}`)
+        console.warn(`[story-video] Music file not found at ${MUSIC_TOP5_FILE_PATH} or ${MUSIC_FILE_PATH}`)
       }
 
       const job = createJob()
@@ -612,10 +614,12 @@ export async function POST(req: NextRequest) {
 
     if (!musicEnabled) {
       console.log('[story-video] Music disabled')
+    } else if (existsSync(MUSIC_TOP5_FILE_PATH)) {
+      musicPath = MUSIC_TOP5_FILE_PATH
     } else if (existsSync(MUSIC_FILE_PATH)) {
       musicPath = MUSIC_FILE_PATH
     } else {
-      console.warn(`[story-video] Music file not found at ${MUSIC_FILE_PATH}`)
+      console.warn(`[story-video] Music file not found at ${MUSIC_TOP5_FILE_PATH} or ${MUSIC_FILE_PATH}`)
     }
 
     const channelName = (formData.get('channel') as string | null) || undefined
