@@ -1051,31 +1051,31 @@ export default function LongFormPage() {
       setMetaConnected(metaMap)
     } catch { /* non-fatal */ }
 
-    // Default: current channel selected, ig/fb per connection status; website on by default for GoF
+    // Default: current channel selected, ig/fb per connection status; website on by default for all channels
     setChannelPlatforms(prev => {
       const platforms: Record<string, { ig: boolean; fb: boolean; website: boolean }> = {}
       for (const ch of CHANNELS) {
-        platforms[ch] = prev[ch] || { ig: false, fb: false, website: ch === 'Gentlemen of Fuel' }
+        platforms[ch] = prev[ch] || { ig: false, fb: false, website: true }
       }
-      if (!prev[channel] || (!prev[channel].ig && !prev[channel].fb && !prev[channel].website)) {
-        platforms[channel] = {
-          ig: !!metaMap[channel]?.instagram,
-          fb: !!metaMap[channel]?.facebook,
-          website: channel === 'Gentlemen of Fuel',
-        }
+      // Always reset the active channel to fresh defaults so a new post doesn't carry stale platform state
+      platforms[channel] = {
+        ig: !!metaMap[channel]?.instagram,
+        fb: !!metaMap[channel]?.facebook,
+        website: true,
       }
       return platforms
     })
 
     const { ytTags: fallbackYtTags, igTags: fallbackIgTags } = deriveTagsFromScript(script)
+    const freshDescription = script?.summary || script?.chapters?.map(c => c.narration).join(' ').slice(0, 400) || ''
     setPublishMeta(prev => {
       const meta: Record<string, { title: string; description: string; ytTags: string; igTags: string }> = {}
       for (const ch of CHANNELS) {
-        meta[ch] = prev[ch] || {
-          title: script?.title ?? '',
-          description: script?.summary || script?.chapters?.map(c => c.narration).join(' ').slice(0, 400) || '',
-          ytTags: fallbackYtTags,
-          igTags: fallbackIgTags,
+        if (ch === channel) {
+          // Always derive fresh from the current script for the active channel
+          meta[ch] = { title: script?.title ?? '', description: freshDescription, ytTags: fallbackYtTags, igTags: fallbackIgTags }
+        } else {
+          meta[ch] = prev[ch] || { title: script?.title ?? '', description: freshDescription, ytTags: fallbackYtTags, igTags: fallbackIgTags }
         }
       }
       return meta
@@ -1096,13 +1096,11 @@ export default function LongFormPage() {
         .then(r => r.ok ? r.json() : Promise.reject(new Error('yt-metadata failed')))
         .then((data: { ytTags?: string; igTags?: string; poll?: { question: string; options: string[] } }) => {
           if (data.ytTags) {
-            setPublishMeta(prev => {
-              const meta: Record<string, { title: string; description: string; ytTags: string; igTags: string }> = {}
-              for (const ch of CHANNELS) {
-                meta[ch] = { ...prev[ch], ytTags: data.ytTags!, igTags: data.igTags || prev[ch]?.igTags || '' }
-              }
-              return meta
-            })
+            // Only update the active channel — don't contaminate other channels with this script's tags
+            setPublishMeta(prev => ({
+              ...prev,
+              [channel]: { ...prev[channel], ytTags: data.ytTags!, igTags: data.igTags || prev[channel]?.igTags || '' },
+            }))
           }
           if (data.poll) setYtPoll(data.poll)
         })
