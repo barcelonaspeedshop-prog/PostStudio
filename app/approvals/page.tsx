@@ -90,6 +90,7 @@ type ApprovalItem = {
   youtubeCredit?: string
   furtherReading?: Array<{ title: string; url: string; source?: string }>
   publishToWebsite?: boolean
+  syncRoadAndTrax?: boolean
   restaurantMeta?: RestaurantMetaItem
   restaurantMetas?: RestaurantMetaItem[]
   socialDescription?: string
@@ -1466,6 +1467,36 @@ export default function ApprovalsPage() {
                                 </div>
                               </div>
                             )}
+                          </div>
+                        )}
+
+                        {/* Road & Trax sync toggle — GoF only */}
+                        {(item.channel === 'Gentlemen of Fuel' || item.channel === 'fuel') && item.publishToWebsite !== false && (
+                          <div className="flex items-center justify-between bg-stone-50 border border-stone-200 rounded-lg px-3 py-2">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px]">🏁</span>
+                              <span className="text-[10px] font-semibold text-stone-600">Sync to Road &amp; Trax</span>
+                              {item.syncRoadAndTrax === false
+                                ? <span className="text-[9px] text-stone-400 font-medium uppercase tracking-wide">off</span>
+                                : <span className="text-[9px] text-emerald-600 font-medium uppercase tracking-wide">on</span>
+                              }
+                            </div>
+                            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={item.syncRoadAndTrax !== false}
+                                onChange={e => {
+                                  const sync = e.target.checked
+                                  setItems(prev => prev.map(i => i.id === item.id ? { ...i, syncRoadAndTrax: sync } : i))
+                                  fetch('/api/approvals', {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ id: item.id, syncRoadAndTrax: sync }),
+                                  }).catch(() => {})
+                                }}
+                                className="w-3.5 h-3.5 rounded cursor-pointer accent-emerald-600"
+                              />
+                            </label>
                           </div>
                         )}
 

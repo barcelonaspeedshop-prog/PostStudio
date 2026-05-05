@@ -7,6 +7,7 @@ import { randomUUID } from 'crypto'
 import { trackHashtags } from '@/lib/hashtags'
 import { publishToWebsite } from '@/lib/website-publisher'
 import { syncGofPostToRoadAndTrax } from '@/lib/sync-roadandtrax'
+import { slugify } from '@/lib/article-expander'
 import type { RestaurantMeta } from '@/app/api/food-carousel-generate/route'
 import { restaurants as staticRestaurants } from '@/lib/restaurants'
 import type { Restaurant } from '@/lib/restaurants'
@@ -54,9 +55,17 @@ export type ApprovalItem = {
   youtubeCredit?: string
   furtherReading?: FurtherReadingItem[]
   publishToWebsite?: boolean
+  syncRoadAndTrax?: boolean
 }
 
 const AI_RESTAURANTS_FILE = path.join(DATA_DIR, 'restaurants-ai.json')
+
+function slidesToMarkdown(slides: ApprovalItem['slides']): string {
+  return slides
+    .filter(s => s.headline || s.body)
+    .map(s => `## ${s.headline}\n\n${s.body}`)
+    .join('\n\n')
+}
 
 async function loadAiRestaurants(): Promise<Restaurant[]> {
   try {
@@ -229,7 +238,7 @@ export async function POST(req: NextRequest) {
 // PUT — update an item (e.g. attach video after generation, or regenerate with fresh content)
 export async function PUT(req: NextRequest) {
   try {
-    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, articleBody, articleExcerpt, articleSlug, manualUploaded, cta, includeCta, hashtags, musicEnabled, series, coverImageDirect, youtubeId, youtubeCredit, furtherReading, publishToWebsite, restaurantMeta, restaurantMetas, socialDescription } = await req.json()
+    const { id, videoBase64, slides, headline, topic, ytTitle, ytDescription, ytTags, tiktokCaption, xCaption, articleBody, articleExcerpt, articleSlug, manualUploaded, cta, includeCta, hashtags, musicEnabled, series, coverImageDirect, youtubeId, youtubeCredit, furtherReading, publishToWebsite, syncRoadAndTrax, restaurantMeta, restaurantMetas, socialDescription } = await req.json()
     if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
     const items = await loadApprovals()
@@ -268,6 +277,7 @@ export async function PUT(req: NextRequest) {
     if (youtubeCredit !== undefined) item.youtubeCredit = youtubeCredit || undefined
     if (furtherReading !== undefined) item.furtherReading = Array.isArray(furtherReading) && furtherReading.length ? furtherReading : undefined
     if (publishToWebsite !== undefined) item.publishToWebsite = typeof publishToWebsite === 'boolean' ? publishToWebsite : undefined
+    if (syncRoadAndTrax !== undefined) item.syncRoadAndTrax = typeof syncRoadAndTrax === 'boolean' ? syncRoadAndTrax : undefined
     if (restaurantMeta !== undefined) item.restaurantMeta = restaurantMeta || undefined
     if (restaurantMetas !== undefined) item.restaurantMetas = Array.isArray(restaurantMetas) ? restaurantMetas : item.restaurantMetas
     if (socialDescription !== undefined) item.socialDescription = socialDescription || undefined
@@ -466,14 +476,28 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Publish article to website (skipped if publishToWebsite === false)
+    const isGof = item.channel === 'Gentlemen of Fuel' || item.channel === 'fuel'
     if (item.publishToWebsite !== false) {
+      // For GoF carousels: derive article fields from slides if not already set
+      if (isGof && !item.articleSlug) {
+        item.articleSlug = slugify(item.headline)
+      }
+      if (isGof && !item.articleBody && item.slides?.length) {
+        item.articleBody = slidesToMarkdown(item.slides)
+      }
+      if (isGof && !item.articleExcerpt) {
+        item.articleExcerpt = (item.slides?.[0]?.body || item.headline).slice(0, 250)
+      }
+
       const websiteResult = await publishToWebsite(item)
       if (websiteResult.success) {
         item.websitePublished = true
         console.log(`[approvals] Website published "${item.headline}" → ${websiteResult.path}`)
 
         // Sync GoF articles to Road & Trax repo (fire-and-forget, non-blocking)
-        if ((item.channel === 'Gentlemen of Fuel' || item.channel === 'fuel') && item.articleSlug) {
+        // Default on for GoF; opt-out with syncRoadAndTrax === false
+        const shouldSync = isGof && item.syncRoadAndTrax !== false && item.articleSlug
+        if (shouldSync) {
           const articleFilePath = path.join(DATA_DIR, 'published', 'fuel', `${item.articleSlug}.json`)
           readFile(articleFilePath, 'utf-8')
             .then(raw => JSON.parse(raw))
