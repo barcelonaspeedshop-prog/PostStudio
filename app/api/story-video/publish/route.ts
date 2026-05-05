@@ -14,6 +14,7 @@ import {
 import { getJob, updateJob } from '../jobs'
 import { expandScriptToArticle, slugify } from '@/lib/article-expander'
 import { publishToWebsite } from '@/lib/website-publisher'
+import { syncGofPostToRoadAndTrax } from '@/lib/sync-roadandtrax'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -102,14 +103,16 @@ export async function POST(req: NextRequest) {
       thumbnailBase64?: string
       publishInstagram?: boolean
       publishFacebook?: boolean
+      publishWebsite?: boolean
       storyTopic?: string
       youtubeUrl?: string
       coverImageDirect?: string
+      series?: string
     }
 
     const {
       jobId, channelName, title, description, tags,
-      publishInstagram, publishFacebook, storyTopic, youtubeUrl, coverImageDirect,
+      publishInstagram, publishFacebook, publishWebsite, storyTopic, youtubeUrl, coverImageDirect, series,
     } = body
     const format = body.format || 'youtube'
 
@@ -220,9 +223,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Auto-publish article to website with 15-min hold window
+    // Publish article to website when explicitly requested (or fallback: auto when social succeeded)
+    const shouldPublishWebsite = publishWebsite !== undefined ? publishWebsite : anySuccess
     let articleResult: { success: boolean; error?: string } | null = null
-    if (anySuccess) {
+    if (shouldPublishWebsite) {
       try {
         const articleBody = await expandScriptToArticle({ title, description, tags, channelName })
         const excerpt = articleBody.replace(/^#+[^\n]*\n?/gm, '').replace(/\n+/g, ' ').trim().slice(0, 250)
@@ -240,9 +244,32 @@ export async function POST(req: NextRequest) {
           goLiveAt,
           youtubeUrl,
           coverImageDirect,
+          series,
         })
         if (articleResult.success) {
           console.log(`[publish] Article queued: ${slug} (live at ${goLiveAt})`)
+
+          // Sync GoF articles to Road & Trax (fire-and-forget)
+          if (channelName === 'Gentlemen of Fuel' || channelName === 'fuel') {
+            const articleFilePath = path.join(DATA_DIR, 'published', 'fuel', `${slug}.json`)
+            readFile(articleFilePath, 'utf-8')
+              .then(raw => JSON.parse(raw))
+              .then(published => syncGofPostToRoadAndTrax({
+                id: published.id,
+                slug: published.slug,
+                title: published.title,
+                excerpt: published.excerpt,
+                publishedAt: published.publishedAt,
+                coverImage: published.coverImage,
+                body: published.body,
+                channel: 'fuel',
+              }))
+              .then(r => {
+                if (r.success) console.log(`[publish] Road & Trax sync succeeded for "${title}"`)
+                else console.warn(`[publish] Road & Trax sync failed for "${title}": ${r.error}`)
+              })
+              .catch(e => console.warn('[publish] Road & Trax sync error:', e instanceof Error ? e.message : e))
+          }
         } else {
           console.error(`[publish] Article write failed: ${articleResult.error}`)
         }

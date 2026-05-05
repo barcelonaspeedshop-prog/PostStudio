@@ -114,7 +114,7 @@ export default function LongFormPage() {
   const [publishPanelOpen, setPublishPanelOpen] = useState(false)
   const [metaConnected, setMetaConnected] = useState<Record<string, { instagram: boolean; facebook: boolean }>>({})
   // Per-channel platform selection: each platform is independently toggled
-  const [channelPlatforms, setChannelPlatforms] = useState<Record<string, { ig: boolean; fb: boolean }>>({})
+  const [channelPlatforms, setChannelPlatforms] = useState<Record<string, { ig: boolean; fb: boolean; website: boolean }>>({})
   // Per-channel metadata with separate tag fields per platform
   const [publishMeta, setPublishMeta] = useState<Record<string, { title: string; description: string; ytTags: string; igTags: string }>>({})
   // Separate status + error tracking per platform
@@ -1051,16 +1051,17 @@ export default function LongFormPage() {
       setMetaConnected(metaMap)
     } catch { /* non-fatal */ }
 
-    // Default: current channel selected, ig/fb per connection status
+    // Default: current channel selected, ig/fb per connection status; website on by default for GoF
     setChannelPlatforms(prev => {
-      const platforms: Record<string, { ig: boolean; fb: boolean }> = {}
+      const platforms: Record<string, { ig: boolean; fb: boolean; website: boolean }> = {}
       for (const ch of CHANNELS) {
-        platforms[ch] = prev[ch] || { ig: false, fb: false }
+        platforms[ch] = prev[ch] || { ig: false, fb: false, website: ch === 'Gentlemen of Fuel' }
       }
-      if (!prev[channel] || (!prev[channel].ig && !prev[channel].fb)) {
+      if (!prev[channel] || (!prev[channel].ig && !prev[channel].fb && !prev[channel].website)) {
         platforms[channel] = {
           ig: !!metaMap[channel]?.instagram,
           fb: !!metaMap[channel]?.facebook,
+          website: channel === 'Gentlemen of Fuel',
         }
       }
       return platforms
@@ -1115,7 +1116,7 @@ export default function LongFormPage() {
     const jobId = currentJobId || videoUrl?.match(/\/download\/([^/?]+)/)?.[1]
     if (!jobId) return
     const plat = channelPlatforms[ch]
-    if (!plat?.ig && !plat?.fb) return
+    if (!plat?.ig && !plat?.fb && !plat?.website) return
     setMetaStatus(prev => ({ ...prev, [ch]: 'uploading' }))
     setMetaError(prev => { const n = { ...prev }; delete n[ch]; return n })
     try {
@@ -1134,6 +1135,7 @@ export default function LongFormPage() {
           thumbnailBase64: thumbnailUrl || undefined,
           publishInstagram: !!plat?.ig,
           publishFacebook: !!plat?.fb,
+          publishWebsite: !!plat?.website,
           storyTopic: script?.title,
           youtubeUrl: ytUrl || undefined,
           coverImageDirect: longformCoverUrl || undefined,
@@ -1142,20 +1144,22 @@ export default function LongFormPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Publish failed')
-      // If neither Instagram nor Facebook succeeded, surface the error
       const igErr = data.errors?.instagram as string | undefined
       const fbErr = data.errors?.facebook as string | undefined
+      const anySocialSelected = plat?.ig || plat?.fb
       const anyMetaSuccess = !!(data.instagram || data.facebook)
-      if (!anyMetaSuccess) {
+      const websiteOk = (data.article as { success: boolean } | null)?.success
+      // Fail only if social was selected but nothing succeeded (website-only is fine)
+      if (anySocialSelected && !anyMetaSuccess) {
         throw new Error(igErr || fbErr || 'Publish failed — no platforms succeeded')
       }
       setMetaStatus(prev => ({ ...prev, [ch]: 'done' }))
-      // Warn about partial failures (e.g. IG ok but FB failed)
       const partialErr = (plat?.ig && igErr) ? igErr : (plat?.fb && fbErr) ? fbErr : null
       if (partialErr) showToast(`${ch}: ${partialErr}`, 'error')
-      // Warn if article failed to queue
-      const articleErr = (data.article as { success: boolean; error?: string } | null)?.error
-      if (articleErr) showToast(`Article not queued for ${ch}: ${articleErr}`, 'error')
+      if (plat?.website && !websiteOk) {
+        const articleErr = (data.article as { success: boolean; error?: string } | null)?.error
+        showToast(`Website publish failed for ${ch}: ${articleErr || 'unknown error'}`, 'error')
+      }
     } catch (e: unknown) {
       setMetaStatus(prev => ({ ...prev, [ch]: 'error' }))
       setMetaError(prev => ({ ...prev, [ch]: e instanceof Error ? e.message : 'Publish failed' }))
@@ -1188,19 +1192,19 @@ export default function LongFormPage() {
 
   // Show confirmation dialog before publishing anything
   const handlePublishButton = () => {
-    const hasAny = CHANNELS.some(ch => channelPlatforms[ch]?.ig || channelPlatforms[ch]?.fb)
+    const hasAny = CHANNELS.some(ch => channelPlatforms[ch]?.ig || channelPlatforms[ch]?.fb || channelPlatforms[ch]?.website)
     if (!hasAny) { showToast('Select at least one platform to publish', 'error'); return }
     if (!longformCoverUrl) { showToast('Add a cover image before publishing', 'error'); return }
     setConfirmPublishOpen(true)
   }
 
-  // Execute after user confirms: publish to Meta platforms
+  // Execute after user confirms
   const executePublish = async () => {
     setConfirmPublishOpen(false)
     for (const ch of CHANNELS) {
       const plat = channelPlatforms[ch]
       if (!plat) continue
-      if ((plat.ig || plat.fb) && metaStatus[ch] !== 'done' && metaStatus[ch] !== 'uploading') {
+      if ((plat.ig || plat.fb || plat.website) && metaStatus[ch] !== 'done' && metaStatus[ch] !== 'uploading') {
         publishMetaForChannel(ch)
       }
     }
@@ -1596,8 +1600,8 @@ export default function LongFormPage() {
                   <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
                     <div className="p-4 space-y-3">
                       {CHANNELS.map(ch => {
-                        const plat = channelPlatforms[ch] || { ig: false, fb: false }
-                        const anySelected = plat.ig || plat.fb
+                        const plat = channelPlatforms[ch] || { ig: false, fb: false, website: false }
+                        const anySelected = plat.ig || plat.fb || plat.website
                         const igOk = !!metaConnected[ch]?.instagram
                         const fbOk = !!metaConnected[ch]?.facebook
                         const meta = metaStatus[ch] || 'idle'
@@ -1617,6 +1621,11 @@ export default function LongFormPage() {
                                   title={fbOk ? 'Facebook' : 'Facebook — connect via Accounts page first'}
                                   className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.fb ? 'bg-blue-50 text-blue-600 border-blue-300' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300'}`}
                                 >FB</button>
+                                <button
+                                  onClick={() => setChannelPlatforms(p => ({ ...p, [ch]: { ...p[ch], website: !plat.website } }))}
+                                  title="Publish to website (Premira First / Road & Trax)"
+                                  className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold transition-colors ${plat.website ? 'bg-emerald-50 text-emerald-600 border-emerald-300' : 'bg-stone-50 text-stone-400 border-stone-200 hover:border-stone-300'}`}
+                                >WEB</button>
                               </div>
                             </div>
 
@@ -1687,10 +1696,10 @@ export default function LongFormPage() {
                                 )}
 
                                 {/* Meta publish status */}
-                                {(plat.ig || plat.fb) && (
+                                {anySelected && (
                                   <div className="text-[11px]">
-                                    {meta === 'done' && <p className="text-emerald-600 font-medium">✓ Published to {[plat.ig && 'Instagram', plat.fb && 'Facebook'].filter(Boolean).join(' & ')}</p>}
-                                    {meta === 'uploading' && <span className="flex items-center gap-1.5 text-stone-500"><Spinner className="w-3 h-3" /> Publishing to {[plat.ig && 'Instagram', plat.fb && 'Facebook'].filter(Boolean).join(' & ')}...</span>}
+                                    {meta === 'done' && <p className="text-emerald-600 font-medium">✓ Published to {[plat.ig && 'Instagram', plat.fb && 'Facebook', plat.website && 'Website'].filter(Boolean).join(' & ')}</p>}
+                                    {meta === 'uploading' && <span className="flex items-center gap-1.5 text-stone-500"><Spinner className="w-3 h-3" /> Publishing to {[plat.ig && 'Instagram', plat.fb && 'Facebook', plat.website && 'Website'].filter(Boolean).join(' & ')}...</span>}
                                     {meta === 'error' && <p className="text-red-500">{metaError[ch]}</p>}
                                     {meta === 'idle' && <p className="text-stone-400">Will publish when you click Publish below</p>}
                                   </div>
@@ -1761,7 +1770,7 @@ export default function LongFormPage() {
                       {/* Publish button */}
                       <button
                         onClick={handlePublishButton}
-                        disabled={!CHANNELS.some(ch => channelPlatforms[ch]?.ig || channelPlatforms[ch]?.fb)}
+                        disabled={!CHANNELS.some(ch => channelPlatforms[ch]?.ig || channelPlatforms[ch]?.fb || channelPlatforms[ch]?.website)}
                         className="w-full flex items-center justify-center gap-2 px-4 py-3 text-[13px] font-semibold bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors disabled:opacity-40"
                       >
                         {CHANNELS.some(ch => metaStatus[ch] === 'uploading')
@@ -2099,8 +2108,8 @@ export default function LongFormPage() {
                     <div className="rounded-lg border border-stone-200 bg-white overflow-hidden">
                       <div className="p-2 space-y-2">
                       {CHANNELS.map(ch => {
-                        const plat = channelPlatforms[ch] || { ig: false, fb: false }
-                        const anySelected = plat.ig || plat.fb
+                        const plat = channelPlatforms[ch] || { ig: false, fb: false, website: false }
+                        const anySelected = plat.ig || plat.fb || plat.website
                         const igOk = !!metaConnected[ch]?.instagram
                         const fbOk = !!metaConnected[ch]?.facebook
                         const meta = metaStatus[ch] || 'idle'
@@ -2184,10 +2193,10 @@ export default function LongFormPage() {
                                     )}
                                   </div>
                                 )}
-                                {(plat.ig || plat.fb) && (
+                                {anySelected && (
                                   <div className="text-[11px]">
-                                    {meta === 'done' && <p className="text-emerald-600 font-medium">✓ Published to {[plat.ig && 'Instagram', plat.fb && 'Facebook'].filter(Boolean).join(' & ')}</p>}
-                                    {meta === 'uploading' && <span className="flex items-center gap-1.5 text-stone-500"><Spinner className="w-3 h-3" /> Publishing to {[plat.ig && 'Instagram', plat.fb && 'Facebook'].filter(Boolean).join(' & ')}...</span>}
+                                    {meta === 'done' && <p className="text-emerald-600 font-medium">✓ Published to {[plat.ig && 'Instagram', plat.fb && 'Facebook', plat.website && 'Website'].filter(Boolean).join(' & ')}</p>}
+                                    {meta === 'uploading' && <span className="flex items-center gap-1.5 text-stone-500"><Spinner className="w-3 h-3" /> Publishing to {[plat.ig && 'Instagram', plat.fb && 'Facebook', plat.website && 'Website'].filter(Boolean).join(' & ')}...</span>}
                                     {meta === 'error' && <p className="text-red-500">{metaError[ch]}</p>}
                                     {meta === 'idle' && <p className="text-stone-400">Will publish when you click Publish below</p>}
                                   </div>
@@ -2255,7 +2264,7 @@ export default function LongFormPage() {
                       </div>
                       <button
                         onClick={handlePublishButton}
-                        disabled={!CHANNELS.some(ch => channelPlatforms[ch]?.ig || channelPlatforms[ch]?.fb)}
+                        disabled={!CHANNELS.some(ch => channelPlatforms[ch]?.ig || channelPlatforms[ch]?.fb || channelPlatforms[ch]?.website)}
                         className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-40">
                         {CHANNELS.some(ch => metaStatus[ch] === 'uploading')
                           ? <><Spinner className="w-3 h-3" /> Publishing...</>
