@@ -477,15 +477,17 @@ export async function PATCH(req: NextRequest) {
 
     // Publish article to website (skipped if publishToWebsite === false)
     const isGof = item.channel === 'Gentlemen of Fuel' || item.channel === 'fuel'
+    const SUPPORTED_WEBSITE_CHANNELS = new Set(['Gentlemen of Fuel', 'fuel', 'Omnira F1', 'Omnira Football', 'Omnira Food'])
+    const isWebsiteChannel = SUPPORTED_WEBSITE_CHANNELS.has(item.channel)
     if (item.publishToWebsite !== false) {
-      // For GoF carousels: derive article fields from slides if not already set
-      if (isGof && !item.articleSlug) {
+      // For all supported channels: derive article fields from slides if not already set
+      if (isWebsiteChannel && !item.articleSlug) {
         item.articleSlug = slugify(item.headline)
       }
-      if (isGof && !item.articleBody && item.slides?.length) {
+      if (isWebsiteChannel && !item.articleBody && item.slides?.length) {
         item.articleBody = slidesToMarkdown(item.slides)
       }
-      if (isGof && !item.articleExcerpt) {
+      if (isWebsiteChannel && !item.articleExcerpt) {
         item.articleExcerpt = (item.slides?.[0]?.body || item.headline).slice(0, 250)
       }
 
