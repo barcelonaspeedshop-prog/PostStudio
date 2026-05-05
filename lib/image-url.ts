@@ -15,6 +15,8 @@ const BLOCKED_DOMAINS = [
   'instagram.com', 'lookaside.fbsbx.com', 'lookaside.facebook.com', 'fbcdn.net', 'facebook.com',
   'twitter.com', 'twimg.com', 'pbs.twimg.com', 'tiktok.com', 'tiktokcdn.com',
   'pinterest.com', 'pinimg.com', 'reddit.com', 'redd.it', 'whatsapp.com',
+  // YouTube thumbnail CDN — ytimg URLs are scraped thumbnails we don't have rights to republish
+  'ytimg.com', 'i.ytimg.com', 'img.youtube.com',
 ]
 
 // Reliable signals that a path points to an image asset, not an article page
