@@ -6,6 +6,7 @@ import crypto from 'crypto'
 import { randomUUID } from 'crypto'
 import { trackHashtags } from '@/lib/hashtags'
 import { publishToWebsite } from '@/lib/website-publisher'
+import { syncGofPostToRoadAndTrax } from '@/lib/sync-roadandtrax'
 import type { RestaurantMeta } from '@/app/api/food-carousel-generate/route'
 import { restaurants as staticRestaurants } from '@/lib/restaurants'
 import type { Restaurant } from '@/lib/restaurants'
@@ -470,6 +471,33 @@ export async function PATCH(req: NextRequest) {
       if (websiteResult.success) {
         item.websitePublished = true
         console.log(`[approvals] Website published "${item.headline}" → ${websiteResult.path}`)
+
+        // Sync GoF articles to Road & Trax repo (fire-and-forget, non-blocking)
+        if ((item.channel === 'Gentlemen of Fuel' || item.channel === 'fuel') && item.articleSlug) {
+          const articleFilePath = path.join(DATA_DIR, 'published', 'fuel', `${item.articleSlug}.json`)
+          readFile(articleFilePath, 'utf-8')
+            .then(raw => JSON.parse(raw))
+            .then(published => syncGofPostToRoadAndTrax({
+              id: published.id,
+              slug: published.slug,
+              title: published.title,
+              excerpt: published.excerpt,
+              publishedAt: published.publishedAt,
+              coverImage: published.coverImage,
+              body: published.body,
+              channel: 'fuel',
+            }))
+            .then(r => {
+              if (r.success) {
+                console.log(`[approvals] Road & Trax sync succeeded for "${item.headline}"`)
+              } else {
+                console.warn(`[approvals] Road & Trax sync skipped/failed for "${item.headline}": ${r.error}`)
+              }
+            })
+            .catch(e => {
+              console.warn(`[approvals] Road & Trax sync error for "${item.headline}":`, e instanceof Error ? e.message : e)
+            })
+        }
       } else {
         item.websitePublished = false
         console.warn(`[approvals] Website publish failed for "${item.headline}": ${websiteResult.error}`)
