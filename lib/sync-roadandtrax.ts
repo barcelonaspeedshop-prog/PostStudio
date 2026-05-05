@@ -118,9 +118,18 @@ function markdownToHtml(md: string): string {
  * Fetch the current posts.json from GitHub, add/update the GoF entry, and push back.
  * Returns { success, error? }.
  */
+// Sync is currently disabled pending content/imagery policy review.
+// To re-enable: remove the early-return block below and deploy.
+const ROADANDTRAX_SYNC_DISABLED = true
+
 export async function syncGofPostToRoadAndTrax(
   article: Article
 ): Promise<{ success: boolean; error?: string }> {
+  if (ROADANDTRAX_SYNC_DISABLED) {
+    console.log('[sync-roadandtrax] Sync is disabled — skipping Road & Trax sync for:', article.slug)
+    return { success: false, error: 'Road & Trax sync is currently disabled' }
+  }
+
   const token = process.env.ROADANDTRAX_GITHUB_TOKEN
   if (!token) {
     return { success: false, error: 'ROADANDTRAX_GITHUB_TOKEN not set — skipping Road & Trax sync' }
