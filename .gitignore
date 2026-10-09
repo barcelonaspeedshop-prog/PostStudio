@@ -8,3 +8,12 @@ data/credentials.json
 app/api/composite-slides/route.ts.bak
 app/api/video-export/route.ts.bak
 next.config.js.bak
+tsconfig.tsbuildinfo
+
+# PostStudio v2 story videos: renders, raw audio and third-party media stay local
+docs/videos/*/video/
+docs/videos/*/media/mike/
+docs/videos/*/audio/*.wav
+docs/videos/*/audio/*.m4a
+docs/videos/*/audio/*.mp3
+.DS_Store
