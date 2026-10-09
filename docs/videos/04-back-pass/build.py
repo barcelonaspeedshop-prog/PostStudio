@@ -69,6 +69,8 @@ def legal_boring(d, L, t, sc):
         text_top(d, (W / 2 + (i * 2 - 1) * 330, 330), txt, pf(150, 900), rgba(CREAM, a), "center")
     b = ramp(t, at("And in 1992", sc), at("And in 1992", sc) + 0.4)
     text_top(d, (W / 2, 560), "1992.", pf(180, 900), rgba(GOLD, b), "center")
+    k = atf("And in 1992", 0.9, sc)                                   # stamp lands on "banned"
+    place_stamp(L, W / 2, 860, ramp(t, k - 0.05, k + 0.2), size=120, rot=-7)
 
 def law12(d, L, t, sc):
     tracked(d, (W / 2, 250), "THE LAWS OF THE GAME  ·  BEFORE 1992", cond(34, 2), rgba(GOLD, ramp(t, 0, 0.5)), 8, "center")
@@ -171,6 +173,28 @@ def striker(d, L, t, sc):
     dot(d, *DF, TEAM, a); ball(d, bx, by, a, 0 if f < 1.6 else 30 * math.sin(min(1, (f - 1.6) / 0.9) * math.pi))
     tracked(d, (960, 965), "FEET ONLY", cond(46, 8), rgba(CREAM, ramp(t, 0.8, 1.2)), 8, "center")
 
+def risky_backpass(d, L, t, sc):
+    """A soft back-pass, an attacker reading it, the keeper can't pick it up: goal."""
+    a = ramp(t, 0, 0.5); pitch_base(d, a); P = 4.2; f = t % P
+    for p in OUR: dot(d, *p, TEAM, a)
+    for p in THEM[1:]: dot(d, *p, OPP, a)
+    goal = (262, 550); meet = (430, 515)
+    if f < 1.9: bx, by = lerp(DF, meet, f / 1.9 * 0.97)                     # slow pass back
+    elif f < 2.6: bx, by = lerp(meet, goal, (f - 1.9) / 0.7)                # attacker gets there first
+    else: bx, by = goal
+    sx, sy = lerp(THEM[0], (meet[0] + 18, meet[1] - 10), min(1, f / 1.9))
+    if f >= 1.9: sx, sy = lerp((meet[0] + 18, meet[1] - 10), (330, 530), min(1, (f - 1.9) / 0.8))
+    kx, ky = lerp(K, (360, 600), min(1, f / 2.2))
+    dot(d, *DF, TEAM, a); dot(d, kx, ky, (240, 200, 60), a); dot(d, sx, sy, OPP, a, ring=RED if f > 1.2 else None)
+    ball(d, bx, by, a)
+    if f < 1.9: d.line((DF[0], DF[1], bx, by), fill=rgba(GOLD, 0.35 * a), width=3)
+    if f >= 2.6: tracked(d, (420, 440), "GOAL", cond(54, 8), rgba(RED, a * ramp(f, 2.6, 2.8) * (1 - ramp(f, 3.9, 4.2))), 8, "center")
+    caps = [("Defenders weren't safe either", "DEFENDERS WEREN'T SAFE EITHER", CREAM), ("For years, a pass back", "THE SAFE OPTION?", CREAM), ("Now it was a risk", "NOW IT WAS A RISK", RED)]
+    cur = [c for c in caps if t >= at(c[0], sc) - 0.15]
+    if cur:
+        sn, txt, col = cur[-1]; b = ramp(t, at(sn, sc) - 0.15, at(sn, sc) + 0.2)
+        tracked(d, (960, 965), txt, cond(46, 8), rgba(col, b), 8, "center")
+
 def rule_timeline(d, L, t, sc):
     tracked(d, (W / 2, 200), "THE KEEPER'S RULEBOOK", cond(34, 2), rgba(GOLD, ramp(t, 0, 0.5)), 8, "center")
     x0, x1, y = 300, 1620, 560
@@ -247,8 +271,7 @@ scenes = [
     AS("Some of them panicked", "ai_keeper_miskick.png", zoom=(1.15, 1.3), focus=((0.6, 0.5), (0.7, 0.55)),
        texts=[(0.3, "Into the stands.", "mid"), (S("Some of them miskicked") - S("Some of them panicked", -0.15), "Miskicked.", "mid"),
               (S("Some of them got caught") - S("Some of them panicked", -0.15), "Caught on the ball.", "mid")]),
-    CaS("Defenders weren't safe either", [{"k": "title", "text": "Defenders weren't safe either.", "y": 360, "size": 100, "at": 0.2},
-                                          {"k": "line", "text": "The safe pass was now a risk.", "y": 560, "size": 70, "at": "Now it was a risk", "color": GOLD}], align="center"),
+    CuS("Defenders weren't safe either", risky_backpass),
     # VI. what happened next
     CuS("But the game got faster", rule_timeline, chapter=CH("VI", "WHAT HAPPENED NEXT")),
     CaS("And something nobody expected", [{"k": "title", "text": "A new kind of goalkeeper.", "y": 450, "size": 120, "at": "A whole new kind"}], align="center"),

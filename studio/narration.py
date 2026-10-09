@@ -291,6 +291,13 @@ def build(script_md, raw, outdir):
     # manual cuts (stutters Mike points out): audio/manual_cuts.json = [[raw_start, raw_end, "note"], ...]
     mc_path = os.path.join(outdir, "manual_cuts.json")
     cuts = json.load(open(mc_path)) if os.path.exists(mc_path) else []
+    # an entry {"line": "words from the sentence", "end": raw_time} moves where that line stops (a clipped last word)
+    for c in [c for c in cuts if isinstance(c, dict)]:
+        e = next(e for e in edl if c["line"].lower() in e["text"].lower())
+        if "end" in c: e["segs"][-1][1] = c["end"]; e["b"] = c["end"]
+        if "start" in c: e["segs"][0][0] = c["start"]; e["a"] = c["start"]
+        report.append(f"  manual edge: {c}")
+    cuts = [c for c in cuts if not isinstance(c, dict)]
     for e in edl:
         for c0, c1, *note in cuts:
             new = []
