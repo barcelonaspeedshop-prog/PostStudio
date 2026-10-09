@@ -313,14 +313,21 @@ def build(script_md, raw, outdir):
             labels.append(f"[s{k}_{q}]")
         e["out_end"] = round(t, 3); prev = e
     fc.append("".join(labels) + f"concat=n={len(labels)}:v=0:a=1[c]")
-    # Light touch, no denoise (heavy denoise/de-ess sounded distant). Tuned 2026-10-09 against a pro
-    # documentary narrator: body below 120 Hz, cut the 550 Hz honk, presence at 1.5/2.6 kHz, and a mild
-    # exciter to rebuild the top end the phone/Hollyland recording loses above ~8 kHz ("tinny").
-    fc.append("[c]highpass=f=50,lowshelf=f=120:g=4,equalizer=f=550:t=q:w=0.9:g=-3.5,equalizer=f=1500:t=q:w=0.9:g=3,"
-              "equalizer=f=2600:t=q:w=0.9:g=3.5,aexciter=amount=1:drive=4:blend=0:freq=7000:ceil=16000,"
-              "acompressor=threshold=-24dB:ratio=2:attack=10:release=150,loudnorm=I=-16:TP=-1.5:LRA=9[o]")
-    out = os.path.join(outdir, "narration.wav")
-    run("ffmpeg", "-v", "error", "-y", "-i", raw, "-filter_complex", ";".join(fc), "-map", "[o]", "-ar", "48000", "-ac", "1", out)
+    # Voice B (Mike, 2026-10-09): DeepFilterNet voice repair strips the room echo ("sounds like a different
+    # room"), then a light EQ tuned against a pro documentary narrator: body below 120 Hz, cut the 550 Hz
+    # honk, presence at 1.5/2.6 kHz, gentle compression. No exciter (it read as tinny once the echo was gone).
+    fc.append("[c]anull[o]")
+    out = os.path.join(outdir, "narration.wav"); cut, rep = out + ".cut.wav", out + ".dfn.wav"
+    run("ffmpeg", "-v", "error", "-y", "-i", raw, "-filter_complex", ";".join(fc), "-map", "[o]", "-ar", "48000", "-ac", "1", cut)
+    dfn = os.path.expanduser("~/.venvs/enhance/bin/python")
+    if os.path.exists(dfn): run(dfn, os.path.join(os.path.dirname(os.path.abspath(__file__)), "denoise.py"), cut, rep)
+    else: print("WARNING: ~/.venvs/enhance missing, voice repair skipped"); os.replace(cut, rep)
+    run("ffmpeg", "-v", "error", "-y", "-i", rep, "-af",
+        "highpass=f=50,lowshelf=f=120:g=4,equalizer=f=550:t=q:w=0.9:g=-3.5,equalizer=f=1500:t=q:w=0.9:g=3,"
+        "equalizer=f=2600:t=q:w=0.9:g=3.5,acompressor=threshold=-24dB:ratio=2:attack=10:release=150,loudnorm=I=-16:TP=-1.5:LRA=9",
+        "-ar", "48000", "-ac", "1", out)
+    for f in (cut, rep):
+        if os.path.exists(f): os.remove(f)
     run("ffmpeg", "-v", "error", "-y", "-i", out, "-b:a", "160k", os.path.join(outdir, "narration_preview.mp3"))
     json.dump(edl, open(os.path.join(outdir, "sentences.json"), "w"), indent=1)
     open(os.path.join(outdir, "edit_report.txt"), "w").write(f"{len(edl)}/{len(sents)} sentences, {t:.1f}s\n" + "\n".join(report) + "\n")
