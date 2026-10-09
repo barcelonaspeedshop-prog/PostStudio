@@ -86,6 +86,8 @@ Within days, it announced that Group B was finished. No new cars. And from the e
 
 Even the next set of rules, already being planned, was cancelled.
 
+Five-hundred-horsepower rally cars, on roads lined with people. Banned.
+
 ## 8. What happened next
 
 The 1986 season finished with the Group B cars it already had.
