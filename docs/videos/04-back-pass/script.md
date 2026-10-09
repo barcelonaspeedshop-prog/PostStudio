@@ -14,7 +14,7 @@ Get one goal ahead, and pass it back to your goalkeeper. He picks it up. Bounces
 
 Again. And again. Until the referee blows the final whistle.
 
-It was legal. It was boring. And in 1992, football banned it.
+It was legal. It was boring. And in 1992, the most boring tactic in football was finally banned.
 
 ---
 
@@ -24,7 +24,7 @@ For more than a hundred years, a goalkeeper could pick up the ball whenever a te
 
 Most of the time, nobody minded.
 
-But the better teams got at defending, the more they used it. One goal up? Kill the game. Pass it back.
+But as teams perfected the art of defending, the pass back became all too common. One goal up? Kill the game. Pass it back.
 
 ---
 
@@ -34,7 +34,7 @@ The 1990 World Cup in Italy should have been a celebration.
 
 Instead, it's remembered as one of the dullest tournaments ever played.
 
-Fewer goals per game than any World Cup before or since. Two point two one. Teams sat back, defended, and passed it back to the keeper.
+Fewer goals per game than any World Cup before or since. Teams sat back, defended, and passed it back to the keeper.
 
 In one game, between the Republic of Ireland and Egypt, the Irish goalkeeper Packie Bonner reportedly had the ball in his hands for almost six minutes.
 
@@ -54,9 +54,7 @@ Denmark had failed to qualify. Then, with barely ten days to go, Yugoslavia were
 
 They beat France. They beat the Netherlands on penalties. And in the final, they beat Germany two–nil.
 
-How did they hold on? Partly with the keeper.
-
-Peter Schmeichel, picking up back-pass after back-pass, as the clock ran down.
+How did they pull off the football shock of the century? Well, a big part of it was their keeper, Peter Schmeichel, picking up back-pass after back-pass, as the clock ran down.
 
 It was the last major tournament before the rule changed.
 
@@ -122,8 +120,8 @@ Tell me what you think in the comments.
 
 ## 10. Outro  [5:45]
 
-This was Banned. Every episode, the cars, the players and the tricks that were too fast, too clever, or too shameful to be allowed.
+This was Banned. The ideas that went too far, and the rules written to stop them.
 
-Subscribe so you don't miss the next one.
+Next week, something else gets banned. Make sure you're here when it does.
 
 **[End card.]**
