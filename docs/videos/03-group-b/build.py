@@ -1,4 +1,4 @@
-"""BANNED 03: Group B -> PostDrive/Stories/03 Group B/video/BANNED 03 - Group B.mp4
+"""BANNED 03: Group B -> PostDrive/Stories/BANNED series/03 Group B/video/BANNED 03 - Group B.mp4
 
     ~/.venvs/poststudio/bin/python build.py            # full render (+ review 720p)
     ~/.venvs/poststudio/bin/python build.py 95 125     # preview slice (video seconds)
@@ -7,7 +7,7 @@ import math, os, sys
 VDIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(VDIR, "..", "..", "..", "studio"))
 import episode as E
-E.init("/Volumes/PostDrive/Stories/03 Group B/")
+E.init("/Volumes/PostDrive/Stories/BANNED series/03 Group B/")
 from episode import *
 
 FINAL = "BANNED 03 - Group B.mp4"

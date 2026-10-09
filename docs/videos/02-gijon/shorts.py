@@ -1,4 +1,4 @@
-"""Vertical Shorts cut from the finished episode -> PostDrive/Stories/02 Gijon/shorts/
+"""Vertical Shorts cut from the finished episode -> PostDrive/Stories/BANNED series/02 Gijon/shorts/
 
     ~/.venvs/poststudio/bin/python shorts.py            # all
     ~/.venvs/poststudio/bin/python shorts.py 2          # just short 2

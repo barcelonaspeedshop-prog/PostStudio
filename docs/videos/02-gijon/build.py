@@ -1,4 +1,4 @@
-"""BANNED 02: The Disgrace of Gijón -> PostDrive/Stories/02 Gijon/video/BANNED 02 - The Disgrace of Gijon.mp4
+"""BANNED 02: The Disgrace of Gijón -> PostDrive/Stories/BANNED series/02 Gijon/video/BANNED 02 - The Disgrace of Gijon.mp4
 
     ~/.venvs/poststudio/bin/python build.py            # full render
     ~/.venvs/poststudio/bin/python build.py 95 125     # preview slice (video seconds)
@@ -9,7 +9,7 @@ VDIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(VDIR, "..", "..", "..", "studio"))
 from storykit import *
 
-STORY = "/Volumes/PostDrive/Stories/02 Gijon/"
+STORY = "/Volumes/PostDrive/Stories/BANNED series/02 Gijon/"
 C, M, G, A, AI = (STORY + p for p in ("media/commons/", "media/mike/", "graphics/", "audio/", "media/ai/"))
 OUT = STORY + "video/"; FINAL = "BANNED 02 - The Disgrace of Gijon.mp4"
 TRACKS = [A + "Mi Dispiace - Mini Vandals.mp3", A + "To Loom Is to Love - Mini Vandals.mp3"]   # YouTube Audio Library

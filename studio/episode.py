@@ -1,6 +1,6 @@
 """episode: the shared parts of a BANNED episode build (ep 3 onwards; ep 1-2 keep their own copies).
 
-    import episode as E; E.init("/Volumes/PostDrive/Stories/03 Group B/")
+    import episode as E; E.init("/Volumes/PostDrive/Stories/BANNED series/03 Group B/")
     from episode import *          # after init: S, at, PS, AS, OPT, CaS, CuS, CH, ...
     scenes = [opening(...), ..., CuS("So here's the question", what_if(...)), CuS("This was Banned", banned_end)]
     if __name__ == "__main__": main(scenes, FINAL)

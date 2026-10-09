@@ -1,6 +1,6 @@
 """Video 01: The Fan Car. Builds video/fan_car.mp4 from the narration + media.
 
-    ~/.venvs/poststudio/bin/python build.py            # full render -> PostDrive/Stories/01 Fan Car/video/BANNED 01 - The Fan Car.mp4
+    ~/.venvs/poststudio/bin/python build.py            # full render -> PostDrive/Stories/BANNED series/01 Fan Car/video/BANNED 01 - The Fan Car.mp4
     ~/.venvs/poststudio/bin/python build.py test.mp4   # full render under another name
     ~/.venvs/poststudio/bin/python build.py 95 125     # preview slice (video seconds)
 Scene times below are NARRATION seconds (audio/narration_words.json); V() shifts them
@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.join(VDIR, "..", "..", "..", "studio"))
 from storykit import *
 
 # all media, audio and renders live on the PostDrive; this folder holds only the code and the script
-STORY = "/Volumes/PostDrive/Stories/01 Fan Car/"
+STORY = "/Volumes/PostDrive/Stories/BANNED series/01 Fan Car/"
 C, M, G, A, AI = (STORY + p for p in ("media/commons/", "media/mike/", "graphics/", "audio/", "media/ai/"))
 OUT = STORY + "video/"
 FINAL = "BANNED 01 - The Fan Car.mp4"                      # the one published file; intermediates are deleted after a render

@@ -1,6 +1,6 @@
 """narration: turn a raw one-file narration (with stops and retakes) into a clean voice track.
 
-    ~/.venvs/poststudio/bin/python studio/narration.py docs/videos/01-fan-car/script.md raw.m4a "/Volumes/PostDrive/Stories/01 Fan Car/audio"
+    ~/.venvs/poststudio/bin/python studio/narration.py docs/videos/01-fan-car/script.md raw.m4a "/Volumes/PostDrive/Stories/BANNED series/01 Fan Car/audio"
 
 1. Split the script into sentences (headings, [edit notes] and the intro lines are skipped).
 2. Transcribe the raw file with word timings (local Whisper, in overlapping windows, because
