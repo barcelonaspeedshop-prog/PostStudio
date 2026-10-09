@@ -177,7 +177,10 @@ def extend_tail(sent, pick, W, gap=0.7):
         if i1 + k >= len(W) or W[i1 + k][0] - W[i1 + k - 1][1] > gap: break
         heard = " ".join(t for w in W[i1 + 1:i1 + k + 1] for t in norm(w[2]))
         r = SequenceMatcher(None, missing, heard).ratio()
-        if r >= 0.6 and (best is None or r > best): best, j = r, i1 + k
+        # a badly misheard name ("Juha Kankkunen" -> "-York Ankening.") still belongs here when the run
+        # ends the spoken sentence: it closes with a full stop right before a pause
+        ends = W[i1 + k][2].rstrip().endswith((".", "?", "!")) and (i1 + k + 1 >= len(W) or W[i1 + k + 1][0] - W[i1 + k][1] > 0.3)
+        if (r >= 0.6 or (r >= 0.25 and ends)) and (best is None or r > best): best, j = r, i1 + k
     return (i0, j, sc) if best else pick
 
 # ---------------------------------------------------------------- restarts inside a take
