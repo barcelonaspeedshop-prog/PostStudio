@@ -189,7 +189,10 @@ def cue_cut(W, a, b, sil, report, text):
     restart point and everything from the restart on, e.g. "this summer at the two | stop | at the 2026" ->
     "this summer" + "at the 2026"."""
     span = [w for w in W if a - 0.05 <= w[0] <= b]
-    idx = [i for i, w in enumerate(span) if w[2].strip(".,!?").lower() == CUE]
+    tw = norm(text)                                        # "stop" that belongs to the script ("stop them",
+    legit = {tw[k + 1] for k in range(len(tw) - 1) if tw[k] == CUE}   # "stop time-wasting") is not a cue
+    nxt = lambda i: (norm(span[i + 1][2])[:1] or [""])[0] if i + 1 < len(span) else ""
+    idx = [i for i, w in enumerate(span) if w[2].strip(".,!?").lower() == CUE and not (nxt(i) and nxt(i) in legit)]
     if not idx: return [(a, b)]
     c = idx[-1]; pre, post = span[:c], span[c + 1:]
     if not post: return [(a, b)]
