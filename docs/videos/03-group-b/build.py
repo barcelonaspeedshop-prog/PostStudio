@@ -14,19 +14,52 @@ FINAL = "BANNED 03 - Group B.mp4"
 BLUE = (90, 150, 230)
 
 # ---------------------------------------------------------------- the rules
+def car_icon(d, x, y, a, col):
+    """A tiny side-on hatchback, 34 x 18."""
+    d.polygon([(x, y + 12), (x + 4, y + 6), (x + 11, y + 5), (x + 16, y), (x + 26, y), (x + 31, y + 6), (x + 34, y + 8), (x + 34, y + 13), (x, y + 13)], fill=rgba(col, a))
+    for wx in (x + 8, x + 27): d.ellipse((wx - 4, y + 10, wx + 4, y + 18), fill=rgba(NAVY_D, a), outline=rgba(col, a), width=2)
+
 def rules(d, L, t, sc):
-    tracked(d, (W / 2, 170), "FIA  ·  GROUP B  ·  1982", cond(34, 2), rgba(GOLD, ramp(t, 0, 0.5)), 8, "center")
-    a = ramp(t, at("Build two hundred road cars", sc), at("Build two hundred road cars", sc) + 0.5)
-    text_top(d, (W / 2, 260 + 20 * (1 - a)), "Build 200 road cars.", pf(110, 900), rgba(CREAM, a), "center")
-    text_top(d, (W / 2, 400), "New rules.", pf(140, 900), rgba(CREAM, ramp(t, 0.3, 0.8) * (1 - ramp(t, at("The regulations were", sc) + 0.5, at("Build two hundred", sc)))), "center")
-    rows = [("POWER", "NO LIMIT", "No limits on power"), ("WEIGHT", "HARDLY ANY LIMIT", "Hardly any limits on weight"),
-            ("TECHNOLOGY", "HARDLY ANY LIMIT", "Hardly any limits on technology")]
+    tracked(d, (W / 2, 120), "WORLD RALLY  ·  1982", cond(34, 2), rgba(GOLD, ramp(t, 0, 0.5)), 8, "center")
+    t_simple, t_build = at("The regulations were", sc), at("Build two hundred road cars", sc)
+    # 1. the rulebook: a cover, then a page that is almost empty ("almost too simple")
+    book = ramp(t, 0.2, 0.7) * (1 - ramp(t, t_build - 0.2, t_build + 0.3))
+    if book > 0:
+        x0, y0, x1, y1 = 700, 200, 1220, 900
+        d.rounded_rectangle((x0, y0, x1, y1), 16, fill=rgba(CREAM, book), outline=rgba(GOLD, book), width=4)
+        opened = ramp(t, t_simple, t_simple + 0.4)
+        ink = (40, 34, 30)
+        if opened < 1:
+            c = book * (1 - opened)
+            tracked(d, (960, 330), "FIA", cond(40, 8), rgba(ink, c), 10, "center")
+            text_top(d, (960, 420), "Group B", pf(96, 900), rgba(RED, c), "center")
+            tracked(d, (960, 580), "REGULATIONS  ·  1982", cond(30, 2), rgba(ink, c), 6, "center")
+        if opened > 0:
+            c = book * opened
+            tracked(d, (760, 250), "GROUP B  ·  THE RULES", cond(26, 2), rgba(ink, 0.7 * c), 4)
+            for k, w in enumerate((380, 300, 340)):                          # three lines. that's it.
+                d.rectangle((760, 330 + k * 46, 760 + w * ramp(t, t_simple + 0.4 + k * 0.3, t_simple + 0.8 + k * 0.3), 344 + k * 46), fill=rgba(ink, 0.55 * c))
+            tracked(d, (960, 820), "ALMOST TOO SIMPLE", cond(30, 8), rgba(RED, c * ramp(t, t_simple + 1.6, t_simple + 2.0)), 6, "center")
+    # 2. build 200 road cars: they fill the left half while the counter runs
+    a = ramp(t, t_build, t_build + 0.4)
+    if a > 0:
+        n = int(200 * min(1, max(0, (t - t_build - 0.3) / 2.6)))
+        text_top(d, (520, 190), str(n), pf(150, 900), rgba(CREAM, a), "center")
+        tracked(d, (520, 380), "ROAD CARS TO BUILD", cond(32, 8), rgba(GOLD, a), 6, "center")
+        for k in range(200):
+            cx, cy = 190 + (k % 16) * 42, 450 + (k // 16) * 34
+            car_icon(d, cx, cy, a if k < n else 0.12 * a, CREAM if k < n else GOLD)
+    # 3. ... and in return, almost no limits
+    rows = [("POWER", "NO LIMIT", "No limits on power"), ("WEIGHT", "HARDLY ANY", "Hardly any limits on weight"),
+            ("TECHNOLOGY", "HARDLY ANY", "Hardly any limits on technology")]
     for i, (k, v, snip) in enumerate(rows):
-        b = ramp(t, at(snip, sc), at(snip, sc) + 0.35); y = 470 + i * 120
+        b = ramp(t, at(snip, sc), at(snip, sc) + 0.35); y = 440 + i * 130
         if b <= 0: continue
-        d.rectangle((460, y, 1460, y + 96), fill=rgba(NAVY_D, 0.85 * b), outline=rgba(GOLD, 0.6 * b), width=2)
-        tracked(d, (510, y + 32), k, cond(38, 8), rgba(CREAM, b), 6)
-        tracked(d, (1410, y + 32), v, cond(38, 8), rgba(GOLD if i else RED, b), 6, "right")
+        d.rectangle((1020, y, 1760, y + 100), fill=rgba(NAVY_D, 0.85 * b), outline=rgba(GOLD, 0.6 * b), width=2)
+        tracked(d, (1060, y + 34), k, cond(38, 8), rgba(CREAM, b), 6)
+        tracked(d, (1720, y + 34), v, cond(38, 8), rgba(RED if i == 0 else GOLD, b), 6, "right")
+    if t > at("No limits on power", sc) - 0.2:
+        tracked(d, (1390, 360), "IN RETURN", cond(30, 2), rgba(CREAM, 0.7 * ramp(t, at("No limits on power", sc) - 0.2, at("No limits on power", sc) + 0.2)), 8, "center")
 
 # ---------------------------------------------------------------- twincharging: turbo + supercharger
 def twincharge(d, L, t, sc):
