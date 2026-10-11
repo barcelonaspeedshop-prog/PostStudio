@@ -534,6 +534,87 @@ def stamp_sfx(path, length=STING_LEN, hit=STING_HIT, sr=48000):
     return path
 
 
+# ---------------------------------------------------------------- IMPOSSIBLE: the second series' mark
+# The word IMPOSSIBLE with a red marker stroke through "IM", leaving POSSIBLE.
+def _marker_stroke(w, h, seed=3):
+    """A rough red marker stroke, w x h, drawn left to right (RGBA, cached)."""
+    key = ("stroke", w, h, seed)
+    if key in _stamps: return _stamps[key]
+    rng = np.random.default_rng(seed); k = 2; W2, H2 = w * k, h * k
+    m = Image.new("L", (W2, H2), 0); d = ImageDraw.Draw(m)
+    top = [(x, H2 * (0.18 + 0.05 * math.sin(x / W2 * 3.1)) + rng.uniform(-1, 1) * H2 * 0.03) for x in np.linspace(0, W2, 24)]
+    bot = [(x, H2 * (0.84 - 0.05 * math.sin(x / W2 * 2.3 + 1)) + rng.uniform(-1, 1) * H2 * 0.03) for x in np.linspace(W2, 0, 24)]
+    d.polygon(top + bot, fill=255)
+    d.ellipse((-H2 * 0.25, H2 * 0.12, H2 * 0.4, H2 * 0.88), fill=255)            # rounded nib ends
+    d.ellipse((W2 - H2 * 0.4, H2 * 0.16, W2 + H2 * 0.2, H2 * 0.86), fill=255)
+    a = np.asarray(m.filter(ImageFilter.GaussianBlur(1.2 * k))).astype(np.float32) / 255
+    streak = Image.fromarray((rng.random((max(2, H2 // 6), 8)) * 255).astype(np.uint8)).resize((W2, H2), Image.BICUBIC)
+    ink = 0.8 + 0.2 * np.asarray(streak.filter(ImageFilter.GaussianBlur(2)), np.float32) / 255   # dry streaks along the stroke
+    out = np.zeros((H2, W2, 4), np.uint8); out[..., :3] = STAMP_RED; out[..., 3] = (np.clip((a - 0.35) * 3, 0, 1) * ink * 255).astype(np.uint8)
+    im = Image.fromarray(out).resize((w, h), Image.LANCZOS); _stamps[key] = im; return im
+
+def impossible_mark(size=200, strike=1.0, dim=1.0, color=CREAM, rot=-7):
+    """IMPOSSIBLE with "IM" struck out. strike 0..1 = how far the stroke has been drawn;
+    dim 0..1 = how far "IM" has faded back. Returns RGBA sized to the word."""
+    f = cond(size, 8); track = int(size * 0.06)
+    wid = lambda s_: sum(f.getlength(c) for c in s_) + track * (len(s_) - 1)
+    pad = int(size * 0.35); w, h = int(wid("IMPOSSIBLE") + 2 * pad), int(size * 1.7)
+    im = Image.new("RGBA", (w, h), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
+    cap = f.getbbox("H"); y = h / 2 - (cap[3] - cap[1]) / 2
+    x_im = wid("IM") + track
+    tracked(d, (pad, y), "IM", f, rgba(color, 1 - 0.55 * dim), track)
+    tracked(d, (pad + x_im, y), "POSSIBLE", f, rgba(color, 1), track)
+    if strike > 0:
+        sw, sh = int(x_im + size * 0.3), int(size * 0.27)
+        st = _marker_stroke(sw, sh).rotate(rot, expand=True, resample=Image.BICUBIC)
+        cut = int(st.width * min(1, strike))
+        if cut > 0: im.alpha_composite(st.crop((0, 0, cut, st.height)), (int(pad - size * 0.15), int(h / 2 - st.height / 2)))
+    return im
+
+IMP_LEN, IMP_STRIKE = 5.0, (1.0, 1.35)        # opening length; when the stroke is drawn
+
+class ImpossibleSting(Scene):
+    """The IMPOSSIBLE open: over moving footage the word lands, a red marker strikes out "IM",
+    POSSIBLE is left standing, then the episode title fades in underneath."""
+    def __init__(self, start=0.0, size=230, bg=None, cy=380, items=None, length=IMP_LEN, **kw):
+        super().__init__(start, **kw); self.size, self.bgsc, self.cy, self.length = size, bg, cy, length
+        self.card = Card(0, items, align="center") if items else None
+        if bg: bg.dur = length + XFADE
+        if self.card: self.card.dur = length
+    def base(self, t):
+        a, b = IMP_STRIKE
+        im = self.bgsc.frame(t) if self.bgsc else navy_bg()
+        im = Image.blend(im, Image.new("RGB", (W, H), (8, 10, 16)), 0.4 + 0.2 * ramp(t, 0.8, 1.6)).convert("RGBA")
+        land = ramp(t, 0.15, 0.55)                       # the word settles in from slightly larger
+        if land > 0:
+            mk = impossible_mark(self.size, strike=(t - a) / (b - a) if t > a else 0, dim=ramp(t, b, b + 0.4))
+            sc = 1.12 - 0.12 * land
+            if sc != 1: mk = mk.resize((int(mk.width * sc), int(mk.height * sc)), Image.BICUBIC)
+            if land < 1: mk = Image.fromarray((np.asarray(mk) * np.array([1, 1, 1, land])).astype(np.uint8))
+            jolt = 6 * math.exp(-max(0, t - b) / 0.08) * (t >= b)          # tiny kick as the stroke finishes
+            im.alpha_composite(mk, (int(W / 2 - mk.width / 2 + jolt), int(self.cy - mk.height / 2)))
+        if self.card: im = self.card.draw_items(im, t)
+        return im
+
+def impossible_sfx(path, length=IMP_LEN, sr=48000):
+    """A low swell as the word lands, a fast marker squeak-swipe for the strike, a deep hit after it. Mono WAV."""
+    import wave
+    n = int(length * sr); t = np.arange(n) / sr; out = np.zeros(n); rng = np.random.default_rng(4)
+    noise = rng.standard_normal(n)
+    def env(t0, decay): x = t - t0; return np.where(x >= 0, np.exp(-np.maximum(x, 0) / decay), 0)
+    def lp(x, k): return np.convolve(x, np.ones(k) / k, mode="same")
+    a, b = IMP_STRIKE
+    out += 0.25 * np.sin(2 * np.pi * 55 * t) * np.clip((t - 0.1) / 0.5, 0, 1) * env(0.6, 0.5) * (t > 0.1)      # swell
+    sw = ((t >= a) & (t < b)).astype(float) * np.sin(np.pi * np.clip((t - a) / (b - a), 0, 1))            # the swipe
+    out += 0.5 * sw * (noise - lp(noise, 3)) + 0.15 * sw * np.sin(2 * np.pi * (900 + 600 * (t - a)) * t)
+    f = 62 - 20 * np.clip((t - b) / 0.25, 0, 1); ph = 2 * np.pi * np.cumsum(f) / sr                       # hit
+    out += 0.9 * np.sin(ph) * env(b, 0.35) * (t >= b) + 0.3 * lp(noise, 50) * env(b, 0.08)
+    out = out / np.max(np.abs(out)) * 0.89
+    with wave.open(path, "w") as w:
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr); w.writeframes((out * 32767).astype(np.int16).tobytes())
+    return path
+
+
 # ---------------------------------------------------------------- music bed: any number of tracks, cycled to length
 def music_bed(tracks, length, out, xfade=6.0, level=-20.0):
     """Level-match the tracks, play them in order (cycling if the video is longer than all of them),

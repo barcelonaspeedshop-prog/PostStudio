@@ -1,4 +1,7 @@
-"""episode: the shared parts of a BANNED episode build (ep 3 onwards; ep 1-2 keep their own copies).
+"""episode: the shared parts of a BANNED or IMPOSSIBLE episode build (BANNED ep 3 onwards; ep 1-2 keep their own copies).
+
+    IMPOSSIBLE: E.init(".../IMPOSSIBLE series/01 Brawn GP/", series="impossible") — opening() then strikes out "IM"
+    instead of stamping, main() mixes the marker sound, and the end card is impossible_end(this).
 
     import episode as E; E.init("/Volumes/PostDrive/Stories/BANNED series/03 Group B/")
     from episode import *          # after init: S, at, PS, AS, OPT, CaS, CuS, CH, ...
@@ -12,11 +15,11 @@ import glob, json, math, os, subprocess, sys
 from storykit import *
 
 INTRO = 5.0                                   # wordless open: stamp + title over footage, music from frame 0
-STORY = C = M = A = AI = OUT = None; SENTS = []; _cr = {}
+STORY = C = M = A = AI = OUT = None; SENTS = []; _cr = {}; SERIES = "banned"
 
-def init(story):
-    global STORY, C, M, A, AI, OUT, SENTS, _cr
-    STORY = story; C, M, A, AI = (story + p for p in ("media/commons/", "media/mike/", "audio/", "media/ai/")); OUT = story + "video/"
+def init(story, series="banned"):
+    global STORY, C, M, A, AI, OUT, SENTS, _cr, SERIES
+    STORY = story; SERIES = series; C, M, A, AI = (story + p for p in ("media/commons/", "media/mike/", "audio/", "media/ai/")); OUT = story + "video/"
     SENTS = json.load(open(A + "sentences.json"))
     _cr = {c["file"]: c for c in json.load(open(C + "credits.json"))} if os.path.exists(C + "credits.json") else {}
 
@@ -66,7 +69,13 @@ def bg_of(path, amount=0.8): return lambda t: dim_bg(path, amount)
 
 # ---------------------------------------------------------------- shared graphics
 def opening(bg_path, title, kicker, credit=None, **photo):
-    """The series open: the stamp slams down over moving footage, the episode title fades in under it."""
+    """The series open: the stamp slams down (BANNED) or "IM" is struck out (IMPOSSIBLE) over moving footage,
+    then the episode title fades in under it."""
+    if SERIES == "impossible":
+        return ImpossibleSting(0.0, bg=Photo(0, bg_path, credit=credit, **({"zoom": (1.0, 1.18)} | photo)), cy=380, length=INTRO,
+                               items=[{"k": "title", "text": title, "y": 655, "size": 130, "at": 2.0},
+                                      {"k": "rule", "y": 830, "w": 560, "at": 2.4},
+                                      {"k": "kicker", "text": kicker, "y": 868, "at": 2.6}])
     return Sting(0.0, bg=Photo(0, bg_path, credit=credit, **({"zoom": (1.0, 1.18)} | photo)), cy=395, size=290, length=INTRO,
                  items=[{"k": "title", "text": title, "y": 655, "size": 130, "at": 1.0},
                         {"k": "rule", "y": 830, "w": 560, "at": 1.4},
@@ -123,6 +132,33 @@ def banned_end(this):
             tracked(d, (W / 2, 858), "SUBSCRIBE", cond(44, 3), rgba(CREAM, s_), 8, "center")
     return draw
 
+IMP_EPISODES = [("Brawn GP.", "THE TEAM BOUGHT FOR £1"), ("Istanbul.", "3–0 DOWN AT HALF-TIME")]
+def impossible_end(this):
+    """IMPOSSIBLE end card: the mark, the tagline, the other episodes, then the subscribe button."""
+    others = [e for e in IMP_EPISODES if e[0] != this][:3]
+    def draw(d, L, t, sc):
+        a, b = ramp(t, 0.1, 0.5), ramp(t, 0.6, 1.0)
+        if a > 0:
+            mk = impossible_mark(130, strike=b, dim=ramp(t, 1.0, 1.4))
+            mk = Image.fromarray((np.asarray(mk) * np.array([1, 1, 1, a])).astype(np.uint8))
+            L.alpha_composite(mk, (int(W / 2 - mk.width / 2), int(200 - mk.height / 2)))
+        tracked(d, (W / 2, 350), "THE DAYS THE ODDS GOT IT WRONG", cond(30), rgba(GOLD, ramp(t, 1.2, 1.7)), 6, "center")
+        if others:
+            tracked(d, (W / 2, 470), "MORE ON IMPOSSIBLE", cond(30), rgba(CREAM, ramp(t, 2.0, 2.5)), 8, "center")
+            x0 = W / 2 - (len(others) - 1) * 300
+            for i, (a_, b_) in enumerate(others):
+                al = ramp(t, 2.4 + 0.4 * i, 2.9 + 0.4 * i); x = x0 + i * 600; y = 540
+                if al <= 0: continue
+                d.rectangle((x - 270, y, x + 270, y + 190), fill=rgba(NAVY_D, 0.9 * al), outline=rgba(GOLD, al), width=3)
+                d.rectangle((x - 270, y, x + 270, y + 8), fill=rgba(RED, al))
+                text_top(d, (x, y + 52), a_, pf(54 if len(a_) < 16 else 42, 700), rgba(CREAM, al), "center")
+                tracked(d, (x, y + 132), b_, cond(24), rgba(GOLD, al), 4, "center")
+        s_ = ramp(t, at("Make sure you're here", sc), at("Make sure you're here", sc) + 0.4)
+        if s_ > 0:
+            d.rounded_rectangle((W / 2 - 220, 830, W / 2 + 220, 920), 14, fill=rgba(RED, s_))
+            tracked(d, (W / 2, 858), "SUBSCRIBE", cond(44, 3), rgba(CREAM, s_), 8, "center")
+    return draw
+
 # ---------------------------------------------------------------- render + mix
 def main(scenes, final, music_gain=0.35):
     scenes = [x for x in scenes if x is not None]
@@ -135,7 +171,7 @@ def main(scenes, final, music_gain=0.35):
                     "-map", "[o]", voice], check=True)
     tracks = sorted(glob.glob(A + "*.mp3"))
     bed, order = music_bed(tracks, total, OUT + "music_bed.wav"); print("music:", " -> ".join(order))
-    sfx = stamp_sfx(OUT + "sting_sfx.wav")
+    sfx = impossible_sfx(OUT + "sting_sfx.wav", INTRO) if SERIES == "impossible" else stamp_sfx(OUT + "sting_sfx.wav")
     fc = (f"[1:a]volume={music_gain * 1.6}[mus];"
           f"[0:a]aresample=48000,pan=stereo|c0=c0|c1=c0,asplit=2[v1][key];[mus][key]sidechaincompress=threshold=0.02:ratio=8:attack=40:release=600[duck];"
           f"[2:a]aresample=48000,pan=stereo|c0=c0|c1=c0,volume=0.8[fx];[v1][duck][fx]amix=inputs=3:normalize=0:duration=first,loudnorm=I=-14:TP=-1.5:LRA=11[o]")
