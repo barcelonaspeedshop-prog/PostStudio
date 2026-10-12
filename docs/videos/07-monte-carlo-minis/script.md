@@ -132,7 +132,7 @@ Pauli Toivonen became European Rally Champion in 1968, in a Porsche.
 
 Twenty years after his awkward win, his son Henri won the Monte Carlo Rally too. Pauli reportedly said the family name had finally been cleared.
 
-That May, Henri and his co-driver, Sergio Cresto, were killed on the Tour de Corse, in the final season of Group B. We told that story in our Group B episode. [Card: link to BANNED: Group B]
+That May, Henri and his co-driver, Sergio Cresto, were killed on the Tour de Corse, in the final season of Group B. That's a story we told in our Group B episode. [Card: link to BANNED: Group B]
 
 And the Mini? More than five million of the originals were built, until the year 2000.
 
