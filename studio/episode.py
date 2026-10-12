@@ -73,9 +73,9 @@ def opening(bg_path, title, kicker, credit=None, **photo):
     then the episode title fades in under it."""
     if SERIES == "impossible":
         return ImpossibleSting(0.0, bg=Photo(0, bg_path, credit=credit, **({"zoom": (1.0, 1.18)} | photo)), cy=380, length=INTRO,
-                               items=[{"k": "title", "text": title, "y": 655, "size": 130, "at": 2.0},
-                                      {"k": "rule", "y": 830, "w": 560, "at": 2.4},
-                                      {"k": "kicker", "text": kicker, "y": 868, "at": 2.6}])
+                               items=[{"k": "title", "text": title, "y": 655, "size": 130, "at": 2.5},
+                                      {"k": "rule", "y": 830, "w": 560, "at": 2.9},
+                                      {"k": "kicker", "text": kicker, "y": 868, "at": 3.1}])
     return Sting(0.0, bg=Photo(0, bg_path, credit=credit, **({"zoom": (1.0, 1.18)} | photo)), cy=395, size=290, length=INTRO,
                  items=[{"k": "title", "text": title, "y": 655, "size": 130, "at": 1.0},
                         {"k": "rule", "y": 830, "w": 560, "at": 1.4},
@@ -132,7 +132,7 @@ def banned_end(this):
             tracked(d, (W / 2, 858), "SUBSCRIBE", cond(44, 3), rgba(CREAM, s_), 8, "center")
     return draw
 
-IMP_EPISODES = [("Brawn GP.", "THE TEAM BOUGHT FOR £1"), ("Istanbul.", "3–0 DOWN AT HALF-TIME")]
+IMP_EPISODES = [("Brawn GP.", "THE TEAM BOUGHT FOR £1"), ("Istanbul.", "3–0 DOWN AT HALF-TIME"), ("McLaren F1.", "THE ROAD CAR THAT WON LE MANS")]
 def impossible_end(this):
     """IMPOSSIBLE end card: the mark, the tagline, the other episodes, then the subscribe button."""
     others = [e for e in IMP_EPISODES if e[0] != this][:3]

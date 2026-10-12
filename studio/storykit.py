@@ -571,44 +571,139 @@ def impossible_mark(size=200, strike=1.0, dim=1.0, color=CREAM, rot=-7):
         if cut > 0: im.alpha_composite(st.crop((0, 0, cut, st.height)), (int(pad - size * 0.15), int(h / 2 - st.height / 2)))
     return im
 
-IMP_LEN, IMP_STRIKE = 5.0, (1.0, 1.35)        # opening length; when the stroke is drawn
+IMP_LEN = 5.0
+IMP_HIT, IMP_CRACK, IMP_SHATTER, IMP_GLIDE, IMP_SHINE = 0.35, (0.75, 1.3), 1.4, (1.55, 2.35), (2.15, 2.95)
+IMP_STRIKE = (IMP_SHATTER, IMP_SHATTER + 0.01)          # kept for older callers
+
+_imp = {}
+def _imp_parts(size):
+    """The word as two RGBA pieces ("IM" and "POSSIBLE"), the shards "IM" breaks into, and its crack lines."""
+    if size in _imp: return _imp[size]
+    f = cond(size, 8); track = int(size * 0.06)
+    wid = lambda s_: sum(f.getlength(c) for c in s_) + track * (len(s_) - 1)
+    pad = int(size * 0.2); h = int(size * 1.5); cap = f.getbbox("H"); y = h / 2 - (cap[3] - cap[1]) / 2
+    def word(txt, col):
+        im = Image.new("RGBA", (int(wid(txt) + 2 * pad), h), (0, 0, 0, 0)); tracked(ImageDraw.Draw(im), (pad, y), txt, f, col + (255,), track); return im
+    im_w, pos_w = word("IM", CREAM), word("POSSIBLE", CREAM)
+    gap = track - 2 * pad                                  # where POSSIBLE sits relative to IM so the word reads as one
+    # shards: jittered grid triangles over "IM"
+    rng = np.random.default_rng(11); cols, rows = 7, 5; W_, H_ = im_w.size
+    pts = [[(x * W_ / (cols - 1) + (rng.uniform(-0.3, 0.3) * W_ / cols if 0 < x < cols - 1 else 0),
+             yy * H_ / (rows - 1) + (rng.uniform(-0.3, 0.3) * H_ / rows if 0 < yy < rows - 1 else 0)) for x in range(cols)] for yy in range(rows)]
+    shards = []
+    for yy in range(rows - 1):
+        for x in range(cols - 1):
+            a, b, c, d_ = pts[yy][x], pts[yy][x + 1], pts[yy + 1][x], pts[yy + 1][x + 1]
+            for tri in ((a, b, c), (b, d_, c)):
+                m = Image.new("L", im_w.size, 0); ImageDraw.Draw(m).polygon(tri, fill=255)
+                piece = Image.new("RGBA", im_w.size, (0, 0, 0, 0)); piece.paste(im_w, (0, 0), m)
+                bb = piece.getbbox()
+                if not bb: continue
+                cx, cy = (bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2
+                shards.append((piece.crop(bb), bb[0], bb[1], (cx - W_ / 2) / W_, (cy - H_ / 2) / H_, rng.uniform(-1, 1), rng.uniform(0.6, 1.4)))
+    cracks = []
+    for k in range(6):                                     # jagged lines out from a point inside the M
+        x, y_ = W_ * 0.62, H_ * 0.5; an = rng.uniform(0, 2 * math.pi); line = [(x, y_)]
+        for _ in range(6): an += rng.uniform(-0.6, 0.6); x += math.cos(an) * W_ * 0.09; y_ += math.sin(an) * H_ * 0.09; line.append((x, y_))
+        cracks.append(line)
+    _imp[size] = (im_w, pos_w, gap, shards, cracks); return _imp[size]
 
 class ImpossibleSting(Scene):
-    """The IMPOSSIBLE open: over moving footage the word lands, a red marker strikes out "IM",
-    POSSIBLE is left standing, then the episode title fades in underneath."""
+    """The IMPOSSIBLE open: over moving footage the word slams down, cracks run through "IM", "IM" shatters into
+    shards and gold sparks, POSSIBLE glides to the centre and a gold light sweeps across it; title fades in below."""
     def __init__(self, start=0.0, size=230, bg=None, cy=380, items=None, length=IMP_LEN, **kw):
         super().__init__(start, **kw); self.size, self.bgsc, self.cy, self.length = size, bg, cy, length
         self.card = Card(0, items, align="center") if items else None
         if bg: bg.dur = length + XFADE
         if self.card: self.card.dur = length
     def base(self, t):
-        a, b = IMP_STRIKE
-        im = self.bgsc.frame(t) if self.bgsc else navy_bg()
-        im = Image.blend(im, Image.new("RGB", (W, H), (8, 10, 16)), 0.4 + 0.2 * ramp(t, 0.8, 1.6)).convert("RGBA")
-        land = ramp(t, 0.15, 0.55)                       # the word settles in from slightly larger
-        if land > 0:
-            mk = impossible_mark(self.size, strike=(t - a) / (b - a) if t > a else 0, dim=ramp(t, b, b + 0.4))
-            sc = 1.12 - 0.12 * land
-            if sc != 1: mk = mk.resize((int(mk.width * sc), int(mk.height * sc)), Image.BICUBIC)
-            if land < 1: mk = Image.fromarray((np.asarray(mk) * np.array([1, 1, 1, land])).astype(np.uint8))
-            jolt = 6 * math.exp(-max(0, t - b) / 0.08) * (t >= b)          # tiny kick as the stroke finishes
-            im.alpha_composite(mk, (int(W / 2 - mk.width / 2 + jolt), int(self.cy - mk.height / 2)))
+        im_w, pos_w, gap, shards, cracks = _imp_parts(self.size)
+        bg = self.bgsc.frame(t) if self.bgsc else navy_bg()
+        im = Image.blend(bg, Image.new("RGB", (W, H), (6, 8, 12)), 0.55 + 0.15 * ramp(t, 1.4, 2.4)).convert("RGBA")
+        L = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        total = im_w.width + gap + pos_w.width
+        x_im0 = W / 2 - total / 2; x_pos0 = x_im0 + im_w.width + gap
+        g = ease((t - IMP_GLIDE[0]) / (IMP_GLIDE[1] - IMP_GLIDE[0])) if t > IMP_GLIDE[0] else 0
+        x_pos = x_pos0 + (W / 2 - pos_w.width / 2 - x_pos0) * g; y0 = self.cy - im_w.height / 2
+        # 1. the slam: the whole word drops from big and blurred to its place
+        if t < IMP_HIT:
+            f = ease(t / IMP_HIT) ** 2; sc = 2.4 - 1.4 * f; a = min(1, 0.3 + t / IMP_HIT)
+            word = Image.new("RGBA", (int(total), im_w.height), (0, 0, 0, 0)); word.alpha_composite(im_w, (0, 0)); word.alpha_composite(pos_w, (int(im_w.width + gap), 0))
+            word = word.resize((int(word.width * sc), int(word.height * sc)), Image.BICUBIC).filter(ImageFilter.GaussianBlur(5 * (sc - 1)))
+            word = Image.fromarray((np.asarray(word) * np.array([1, 1, 1, a])).astype(np.uint8))
+            L.alpha_composite(word, (int(W / 2 - word.width / 2), int(self.cy - word.height / 2)))
+        else:
+            # 2. "IM": cracks, then shards flying out with spin and gravity
+            if t < IMP_SHATTER:
+                piece = im_w.copy(); c = ramp(t, *IMP_CRACK)
+                if c > 0:
+                    d = ImageDraw.Draw(piece)
+                    for line in cracks:
+                        n = max(2, int(len(line) * c)); d.line(line[:n], fill=(10, 10, 14, 255), width=max(3, self.size // 45))
+                L.alpha_composite(piece, (int(x_im0), int(y0)))
+            else:
+                u = t - IMP_SHATTER
+                for (sh, sx, sy, dx, dy, spin, sp) in shards:
+                    fade = 1 - ramp(u, 0.35, 0.95)
+                    if fade <= 0: continue
+                    vx, vy = dx * 1900 * sp - 260, dy * 1500 * sp - 300           # burst out and back, a little up
+                    px = x_im0 + sx + vx * u; py = y0 + sy + vy * u + 1400 * u * u
+                    r = sh.rotate(spin * 540 * u, expand=True, resample=Image.BICUBIC)
+                    if fade < 1: r = Image.fromarray((np.asarray(r) * np.array([1, 1, 1, fade])).astype(np.uint8))
+                    L.alpha_composite(r, (int(px), int(py)))
+                rng = np.random.default_rng(3); d = ImageDraw.Draw(L)                 # gold sparks
+                for k in range(70):
+                    an = rng.uniform(0, 2 * math.pi); v = rng.uniform(300, 1400); life = rng.uniform(0.3, 0.8)
+                    if u > life: continue
+                    cx, cy_ = x_im0 + im_w.width / 2, self.cy
+                    px, py = cx + math.cos(an) * v * u, cy_ + math.sin(an) * v * u + 600 * u * u
+                    a2 = 1 - u / life; r_ = 2 + 3 * a2
+                    d.line((px, py, px - math.cos(an) * 26 * a2, py - math.sin(an) * 26 * a2), fill=rgba(GOLD, a2), width=int(r_))
+                ring = ramp(u, 0, 0.5)                                                  # shockwave
+                if ring < 1:
+                    R = 60 + 900 * ring; cx, cy_ = x_im0 + im_w.width / 2, self.cy
+                    d.ellipse((cx - R, cy_ - R * 0.6, cx + R, cy_ + R * 0.6), outline=rgba(CREAM, 0.5 * (1 - ring)), width=6)
+            # 3. POSSIBLE: glides to the centre, turns gold, a light sweeps across
+            gold = ramp(t, IMP_SHINE[0], IMP_SHINE[0] + 0.5)
+            pw = pos_w if gold <= 0 else Image.fromarray(np.dstack([
+                (np.asarray(pos_w)[..., :3] * (1 - gold) + np.array(GOLD) * gold).astype(np.uint8), np.asarray(pos_w)[..., 3]]))
+            s = ramp(t, *IMP_SHINE)
+            if 0 < s < 1:                                                              # specular band
+                band = Image.new("L", pw.size, 0); bx = -200 + (pw.width + 400) * s
+                ImageDraw.Draw(band).polygon([(bx, 0), (bx + 90, 0), (bx + 30, pw.height), (bx - 60, pw.height)], fill=210)
+                band = Image.fromarray((np.asarray(band.filter(ImageFilter.GaussianBlur(14)), np.float32) * np.asarray(pw)[..., 3] / 255).astype(np.uint8))
+                lit = Image.new("RGBA", pw.size, (255, 248, 225, 0)); lit.putalpha(band); pw = pw.copy(); pw.alpha_composite(lit)
+            L.alpha_composite(pw, (int(x_pos), int(y0)))
+        # camera: impact shake + flash
+        sh_ = 22 * math.exp(-max(0, t - IMP_HIT) / 0.1) * (t >= IMP_HIT) + 12 * math.exp(-max(0, t - IMP_SHATTER) / 0.08) * (t >= IMP_SHATTER)
+        im.alpha_composite(L, (int(sh_ * math.sin(t * 93)), int(sh_ * math.cos(t * 71))))
+        if IMP_HIT <= t < IMP_HIT + 0.05 or IMP_SHATTER <= t < IMP_SHATTER + 0.04:
+            im = Image.blend(im.convert("RGB"), Image.new("RGB", (W, H), (255, 246, 225)), 0.3).convert("RGBA")
         if self.card: im = self.card.draw_items(im, t)
         return im
 
 def impossible_sfx(path, length=IMP_LEN, sr=48000):
-    """A low swell as the word lands, a fast marker squeak-swipe for the strike, a deep hit after it. Mono WAV."""
+    """Whoosh down, a deep boom as the word lands, creaks as it cracks, a glassy shatter with debris,
+    then a rising shimmer as POSSIBLE turns gold. Mono WAV."""
     import wave
     n = int(length * sr); t = np.arange(n) / sr; out = np.zeros(n); rng = np.random.default_rng(4)
     noise = rng.standard_normal(n)
     def env(t0, decay): x = t - t0; return np.where(x >= 0, np.exp(-np.maximum(x, 0) / decay), 0)
     def lp(x, k): return np.convolve(x, np.ones(k) / k, mode="same")
-    a, b = IMP_STRIKE
-    out += 0.25 * np.sin(2 * np.pi * 55 * t) * np.clip((t - 0.1) / 0.5, 0, 1) * env(0.6, 0.5) * (t > 0.1)      # swell
-    sw = ((t >= a) & (t < b)).astype(float) * np.sin(np.pi * np.clip((t - a) / (b - a), 0, 1))            # the swipe
-    out += 0.5 * sw * (noise - lp(noise, 3)) + 0.15 * sw * np.sin(2 * np.pi * (900 + 600 * (t - a)) * t)
-    f = 62 - 20 * np.clip((t - b) / 0.25, 0, 1); ph = 2 * np.pi * np.cumsum(f) / sr                       # hit
-    out += 0.9 * np.sin(ph) * env(b, 0.35) * (t >= b) + 0.3 * lp(noise, 50) * env(b, 0.08)
+    hp = noise - lp(noise, 4)
+    out += 0.25 * np.clip((t - 0.02) / (IMP_HIT - 0.02), 0, 1) ** 2 * (t < IMP_HIT) * lp(noise, 6)                    # whoosh
+    f = 48 - 16 * np.clip((t - IMP_HIT) / 0.4, 0, 1); ph = 2 * np.pi * np.cumsum(f) / sr                            # boom
+    out += 1.0 * np.sin(ph) * env(IMP_HIT, 0.5) * (t >= IMP_HIT) + 0.5 * lp(noise, 60) * env(IMP_HIT, 0.12)
+    for k in range(7):                                                                                             # cracks
+        c0 = IMP_CRACK[0] + (IMP_CRACK[1] - IMP_CRACK[0]) * k / 6 + rng.uniform(0, 0.03)
+        out += 0.35 * hp * env(c0, 0.012) + 0.12 * np.sin(2 * np.pi * rng.uniform(1800, 3200) * t) * env(c0, 0.01)
+    out += 0.7 * hp * env(IMP_SHATTER, 0.25) + 0.6 * lp(noise, 30) * env(IMP_SHATTER, 0.1)                         # shatter
+    out += 0.7 * np.sin(2 * np.pi * 40 * t) * env(IMP_SHATTER, 0.3) * (t >= IMP_SHATTER)
+    for k in range(18):                                                                                            # debris tinkles
+        c0 = IMP_SHATTER + rng.uniform(0.05, 0.9)
+        out += 0.08 * np.sin(2 * np.pi * rng.uniform(2500, 6000) * t) * env(c0, 0.03)
+    sh = np.clip((t - IMP_SHINE[0]) / 0.6, 0, 1) * env(IMP_SHINE[0] + 0.6, 0.9) * (t >= IMP_SHINE[0])              # shimmer
+    out += 0.12 * sh * sum(np.sin(2 * np.pi * fq * t) for fq in (880, 1320, 1760))
     out = out / np.max(np.abs(out)) * 0.89
     with wave.open(path, "w") as w:
         w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr); w.writeframes((out * 32767).astype(np.int16).tobytes())
