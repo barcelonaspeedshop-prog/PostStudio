@@ -10,21 +10,19 @@ After a mistake, say "stop", pause, and restart the whole sentence.
 
 ## 1. Cold open
 
-At half-time in the 2005 Champions League final, Liverpool were losing three–nil.
+At half-time in the 2005 Champions League final, Liverpool were losing three–nil against AC Milan, one of the best teams in the world.
 
-Against AC Milan. One of the best teams in the world.
-
-Nobody comes back from that. Not in a final. Not against Milan.
+Nobody comes back from that. Not in a final, and definitely not against Milan.
 
 Fifteen minutes into the second half, the score was three–three.
 
-This is the story of Istanbul.
+This is the story of Liverpool's Champions League miracle in Istanbul.
 
 **[Title card: IMPOSSIBLE. — "Istanbul 2005."]**
 
 ## 2. The outsiders
 
-Liverpool shouldn't really have been there.
+Liverpool shouldn't really have been there in the first place.
 
 They had a new manager, a Spaniard called Rafael Benítez, in his first season at the club.
 
@@ -32,9 +30,17 @@ In the Premier League, they finished fifth. Not even good enough to qualify for 
 
 And in Europe, they nearly went out before Christmas.
 
-In their last group game, against Olympiacos, they had to win by two goals. At half-time, they were losing.
+In their last group game, at Anfield against Olympiacos, they had to win. And because they'd lost one–nil in Greece, if Olympiacos scored, Liverpool would have to win by two clear goals.
 
-With four minutes left, Steven Gerrard hit a shot from twenty-five yards into the corner. Liverpool won three–one, and they were through.
+Then the great Rivaldo curled in a free kick. At half-time, Liverpool were losing one–nil. Now they needed three goals in forty-five minutes.
+
+Benítez sent on a young striker, Florent Sinama-Pongolle. Two minutes after the restart, he equalised. One–one.
+
+With nine minutes left, another substitute, Neil Mellor, made it two–one. But that still wasn't enough.
+
+Then, with four minutes to go, Mellor headed the ball down, and Steven Gerrard hit it first time from twenty-five yards, into the corner.
+
+Three–one. Liverpool were through. Looking back, it was a sign of things to come.
 
 After that, they knocked out Bayer Leverkusen, then Juventus, then Chelsea.
 
@@ -42,7 +48,7 @@ And somehow, they were in the final.
 
 ## 3. The giants
 
-Waiting for them were AC Milan.
+So to the final. Waiting for Liverpool in Istanbul was a team that can only be described as a European football Goliath. AC Milan.
 
 Champions of Europe two years earlier, and packed with world-class players.
 
@@ -122,6 +128,8 @@ Dudek later called it the save of his career.
 
 ## 8. Penalties
 
+And so the game was going to penalties.
+
 Before the shoot-out, Jamie Carragher reportedly jumped on Dudek's back with some advice.
 
 Put them off, he said. Do what Bruce Grobbelaar did, when Liverpool won the European Cup on penalties in 1984.
@@ -132,7 +140,7 @@ Serginho went first for Milan. Over the bar.
 
 Hamann scored. Then Dudek saved from Andrea Pirlo.
 
-Djibril Cissé scored for Liverpool. Jon Dahl Tomasson scored for Milan.
+Cissé scored for Liverpool. Jon Dahl Tomasson scored for Milan.
 
 Dida saved from Riise. Kaká scored. Šmicer scored.
 
@@ -179,3 +187,4 @@ This was Impossible. The days the odds got it wrong.
 In the next video, someone else does the impossible. Make sure you're here when it happens.
 
 **[End card.]**
+

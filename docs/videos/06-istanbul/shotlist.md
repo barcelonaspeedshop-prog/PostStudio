@@ -12,7 +12,7 @@ Rules: no match or broadcast footage and no agency photos (UEFA/Getty enforce th
 ## 2. The outsiders
 - ✅ `Rafael Benitez 2009 Asia Tour.jpg` (Benítez portrait)
 - 🎨 Premier League 2004–05 table, top five, Liverpool 5th highlighted, line under 4th: "CHAMPIONS LEAGUE PLACES"
-- 🎨 Olympiacos card: 8 DEC 2004 · NEED TO WIN BY 2 · HT 0–1 → FT 3–1 · GERRARD 86'
+- 🎨 Olympiacos comeback, built line by line: 8 DEC 2004 · ANFIELD · "LOST 1–0 IN GREECE: IF THEY SCORE, WIN BY 2" → RIVALDO 27' (0–1, "NEED 3 GOALS") → SINAMA-PONGOLLE 47' (1–1) → MELLOR 81' (2–1, "STILL NOT ENOUGH") → GERRARD 86' (3–1, THROUGH ✓); a 'needed' counter ticking 3 → 2 → 1 → 0
 - ✅ `Steven Gerrard celebrating.jpg` (2012, used only as a Gerrard image, not as this goal)
 - 🎨 Route bracket: LEVERKUSEN → JUVENTUS → CHELSEA → FINAL
 
