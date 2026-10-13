@@ -335,7 +335,7 @@ scenes = [
     CP("It all came down to Brazil", "Interlagos", zoom=(1.0, 1.1), strap=("Interlagos", "SÃO PAULO  ·  18 OCTOBER 2009", 0.6),
        texts=[(S("A podium would guarantee") - S("It all came down to Brazil", -0.15) + 0.4, "A podium = the title.", "mid")]),
     CuS("But starting fourteenth", p14_to_p5),
-    VS("As though fate had decided", "ai_interlagos_clip.mp4", fallback=AS("As though fate had decided", "ai_interlagos_b.png", zoom=(1.0, 1.15))),
+    VS("As though fate had decided", "ai_interlagos_clip.mp4", skip=1.7, fallback=AS("As though fate had decided", "ai_interlagos_b.png", zoom=(1.0, 1.15))),
     AS("He fought his way up", "ai_interlagos_a.png", zoom=(1.0, 1.15), focus=((0.55, 0.6), (0.6, 0.62)),
        texts=[(0.3, "P14  →  P5", "big"), (SF("He fought his way up", 0.55) - S("He fought his way up", -0.15), "Barrichello: 8th. Enough.", "mid+")]),
     PS("Jenson Button was world champion", "button_brazil_celebrates.jpg", zoom=(1.0, 1.1), strap=("Jenson Button", "2009 WORLD CHAMPION", 0.3)),
