@@ -49,6 +49,9 @@ def AS(snip, ai, fallback=None, off=-0.15, **kw):
     if has(ai): return Photo(S(snip, off), AI + ai, credit="AI illustration", **kw)
     return fallback
 OPT = AS
+def VS(snip, clip, fallback=None, off=-0.15, **kw):                          # an AI video clip (media/ai/*.mp4)
+    if has(clip): return Clip(S(snip, off), AI + clip, credit="AI illustration", **kw)
+    return fallback
 def CaS(snip, items, off=-0.15, **kw):
     t0 = S(snip, off)
     for it in items:
@@ -169,7 +172,7 @@ def main(scenes, final, music_gain=0.35):
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", A + "narration.wav", "-filter_complex",
                     f"anullsrc=r=48000:cl=mono,atrim=0:{INTRO}[i];anullsrc=r=48000:cl=mono,atrim=0:3[e];[i][0:a][e]concat=n=3:v=0:a=1[o]",
                     "-map", "[o]", voice], check=True)
-    tracks = sorted(glob.glob(A + "*.mp3"))
+    tracks = sorted(t for t in glob.glob(A + "*.mp3") if not os.path.basename(t).startswith(("narration", "voice_test")))
     bed, order = music_bed(tracks, total, OUT + "music_bed.wav"); print("music:", " -> ".join(order))
     sfx = impossible_sfx(OUT + "sting_sfx.wav", INTRO) if SERIES == "impossible" else stamp_sfx(OUT + "sting_sfx.wav")
     fc = (f"[1:a]volume={music_gain * 1.6}[mus];"

@@ -200,6 +200,30 @@ class Photo(Scene):
         fg = src.resize((tw, th), Image.BICUBIC)
         im = self._bg.copy(); im.paste(fg, ((W - tw) // 2, (H - th) // 2)); return im
 
+# ---------------------------------------------------------------- video clip (AI footage)
+class Clip(Scene):
+    """A short video clip (e.g. a 5 s Runway shot). Frames are extracted once, at full frame size, into
+    <clip>_frames/ beside it, so render workers just load JPEGs. If the scene is longer than the clip it
+    plays slower (down to min_rate), then holds the last frame with a slow push-in."""
+    def __init__(self, start, path, min_rate=0.6, **kw):
+        super().__init__(start, **kw)
+        self.path, self.min_rate = path, min_rate
+        self.fdir = os.path.splitext(path)[0] + "_frames"
+        if not (os.path.isdir(self.fdir) and os.listdir(self.fdir)):
+            os.makedirs(self.fdir, exist_ok=True)
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", path, "-vf",
+                            f"fps={FPS},scale={W}:{H}:force_original_aspect_ratio=increase:flags=lanczos,crop={W}:{H}",
+                            "-q:v", "2", os.path.join(self.fdir, "%04d.jpg")], check=True)
+        self.n = len([f for f in os.listdir(self.fdir) if f.endswith(".jpg") and not f.startswith(".")])
+    def base(self, t):
+        clip = self.n / FPS; rate = max(self.min_rate, min(1.0, clip / max(self.dur or clip, 0.01)))
+        ct = max(0.0, t) * rate; over = max(0.0, ct - clip) / rate
+        im = Image.open(os.path.join(self.fdir, f"{min(self.n, int(ct * FPS) + 1):04d}.jpg")).convert("RGB")
+        if over > 0:                                    # past the end: hold, creeping in
+            z = 1 + 0.012 * over; vw, vh = W / z, H / z
+            im = im.transform((W, H), Image.EXTENT, ((W - vw) / 2, (H - vh) / 2, (W + vw) / 2, (H + vh) / 2), Image.BICUBIC)
+        return im
+
 # ---------------------------------------------------------------- navy cards
 class Card(Scene):
     """Navy card. items: list of dicts drawn in order, each with 'at' (local seconds):
