@@ -73,21 +73,57 @@ def price_tag(d, L, t, sc):
     text_top(d, (cx + 20, cy - 70), "£1", pf(220, 900), rgba(RED, k), "center")
     tracked(d, (cx + 20, cy + 190), "REPORTEDLY", cond(34, 8), rgba(GOLD, k), 10, "center")
 
+_masks = {}
+def paste_fit(L, path, cx, cy, w, a=1.0):
+    """An AI studio shot, edges feathered into the navy so it doesn't sit in a box."""
+    im = load(path).convert("RGBA"); s_ = w / im.width; im = im.resize((int(im.width * s_), int(im.height * s_)), Image.BICUBIC)
+    if im.size not in _masks:
+        yy, xx = np.mgrid[0:im.height, 0:im.width]; r = np.hypot((xx / im.width - 0.5) / 0.5, (yy / im.height - 0.5) / 0.5)
+        _masks[im.size] = np.clip((1.0 - r) / 0.35, 0, 1)
+    im.putalpha(Image.fromarray((255 * _masks[im.size] * a).astype(np.uint8)))
+    L.alpha_composite(im, (int(cx - im.width / 2), int(cy - im.height / 2)))
+
 def engine_swap(d, L, t, sc):
-    tracked(d, (W / 2, 180), "THE ENGINE", cond(36, 2), rgba(GOLD, ramp(t, 0, 0.5)), 8, "center")
-    a = ramp(t, at("The car had been designed", sc), at("The car had been designed", sc) + 0.4)
-    m = ramp(t, at("Now it needed a Mercedes", sc), atf("Now it needed a Mercedes", 0.35, sc))
-    def block(x, label, col, al):
-        d.rounded_rectangle((x - 230, 360, x + 230, 640), 20, outline=rgba(col, al), width=6, fill=rgba(NAVY_D, 0.8 * al))
-        for k in range(4): d.rectangle((x - 170 + k * 95, 400, x - 120 + k * 95, 470), fill=rgba(col, 0.5 * al))   # cylinders
-        tracked(d, (x, 540), label, cond(56, 8), rgba(col, al), 8, "center")
-    block(560, "HONDA", CREAM, a * (1 - 0.6 * m))
+    tracked(d, (W / 2, 140), "THE ENGINE", cond(36, 2), rgba(GOLD, ramp(t, 0, 0.5)), 8, "center")
+    a = ramp(t, 0.1, 0.5); m = ramp(t, at("Now it needed a Mercedes", sc), atf("Now it needed a Mercedes", 0.25, sc))
+    paste_fit(L, AI + "ai_engine_honda.png", 500, 520, 700, a * (1 - 0.55 * m))
+    tracked(d, (500, 830), "HONDA", cond(52, 8), rgba(CREAM, a * (1 - 0.55 * m)), 10, "center")
     if m > 0:
-        d.line((360, 680, 760, 320), fill=rgba(RED, m), width=12)
-        arrow(d, (840, 500), (1060, 500), m, GOLD, 8, 26)
-        block(1360, "MERCEDES", SILVER, m)
-    w = ramp(t, atf("Now it needed a Mercedes", 0.7, sc), atf("Now it needed a Mercedes", 0.7, sc) + 0.4)
-    tracked(d, (W / 2, 790), "A FEW WEEKS TO MAKE IT FIT", cond(44, 8), rgba(CREAM, w), 8, "center")
+        d.line((230, 800, 770, 260), fill=rgba(RED, m), width=14)
+        arrow(d, (880, 520), (1040, 520), m, GOLD, 8, 26)
+        paste_fit(L, AI + "ai_engine_mercedes.png", 1420, 520, 700, m)
+        tracked(d, (1420, 830), "MERCEDES", cond(52, 8), rgba(SILVER, m), 10, "center")
+
+def stopwatch(d, cx, cy, r, secs, a, col=GOLD):
+    d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=rgba(NAVY_D, a), outline=rgba(CREAM, a), width=8)
+    d.rectangle((cx - 22, cy - r - 46, cx + 22, cy - r - 8), fill=rgba(CREAM, a))
+    for k in range(60):
+        an = k * math.pi / 30; r0 = 0.86 if k % 5 else 0.78
+        d.line((cx + r0 * r * math.sin(an), cy - r0 * r * math.cos(an), cx + 0.94 * r * math.sin(an), cy - 0.94 * r * math.cos(an)), fill=rgba(CREAM, 0.7 * a), width=3 if k % 5 else 5)
+    an = (secs % 60) / 60 * 2 * math.pi
+    d.line((cx, cy, cx + 0.8 * r * math.sin(an), cy - 0.8 * r * math.cos(an)), fill=rgba(col, a), width=8)
+    d.ellipse((cx - 12, cy - 12, cx + 12, cy + 12), fill=rgba(col, a))
+
+def clock_bomb(d, L, t, sc):
+    """A stopwatch ticking ever faster and shaking, then it blows apart."""
+    boom = sc.dur - 0.9; cx, cy, r = W / 2, 540, 300
+    if t < boom:
+        a = ramp(t, 0, 0.3); speed = 1 + 8 * (t / boom) ** 2; secs = 60 * (t * speed) / 4
+        sh = 14 * (t / boom) ** 3; jx, jy = sh * math.sin(t * 61), sh * math.cos(t * 47)
+        stopwatch(d, cx + jx, cy + jy, r, secs, a, RED if t > boom - 1.2 else GOLD)
+        return
+    f = min(1.0, (t - boom) / 0.9)
+    d.ellipse((cx - r * 1.6 * f, cy - r * 1.6 * f, cx + r * 1.6 * f, cy + r * 1.6 * f), fill=rgba(CREAM, 0.85 * (1 - f) ** 2))   # flash
+    for k in range(28):                                                      # shards
+        an = k * 2 * math.pi / 28 + 0.3 * math.sin(k * 7.1); v = 500 + 380 * ((k * 37) % 11) / 11
+        x = cx + math.cos(an) * v * f; y = cy + math.sin(an) * v * f + 700 * f * f
+        s_ = 26 + (k % 5) * 9; rot = an + f * (6 + k % 4)
+        pts = [(x + s_ * math.cos(rot + q), y + s_ * math.sin(rot + q)) for q in (0, 2.3, 4.1)]
+        d.polygon(pts, fill=rgba(CREAM if k % 3 else RED, 1 - f))
+    for k in range(40):                                                      # sparks
+        an = k * 2.399; v = 300 + 700 * ((k * 13) % 17) / 17
+        x = cx + math.cos(an) * v * f; y = cy + math.sin(an) * v * f
+        d.ellipse((x - 5, y - 5, x + 5, y + 5), fill=rgba(GOLD, 1 - f))
 
 def countdown(d, L, t, sc):
     born = at("On the sixth of March", sc); first = at("The first race was", sc)
@@ -261,28 +297,32 @@ scenes = [
     CuS("The price?", price_tag),
     AS("Honda helped with the bills", "ai_for_sale_b.png", zoom=(1.0, 1.1), texts=[(2.6, "Hundreds of jobs cut.", "mid")]),
     CuS("There was another problem", engine_swap),
+    Custom(SF("Now it needed a Mercedes", 0.45), clock_bomb),
     CuS("On the sixth of March", countdown),
     # III. the secret
-    CP("The car was almost completely white", "Brawn BGP 001", 1, zoom=(1.0, 1.12), chapter=CH("III", "THE SECRET"),
-       fallback=AS("The car was almost completely white", "ai_empty_factory.png", zoom=(1.2, 1.35), focus=((0.4, 0.62), (0.42, 0.62)), chapter=CH("III", "THE SECRET"))),
+    PS("The car was almost completely white", "Button_Spain_2009.jpg", zoom=(1.0, 1.12), chapter=CH("III", "THE SECRET"), strap=("Brawn BGP 001", "SPAIN  ·  2009", 0.8)),
     CuS("But at the back, under the rear wing", diffuser),
-    CaS("Brawn weren't the only team", [{"k": "kicker", "text": "WILLIAMS AND TOYOTA HAD ONE TOO", "y": 380, "at": 0.3},
-                                        {"k": "title", "text": "Brawn did it best.", "y": 450, "size": 130, "at": "But they'd done it best"}], align="center"),
-    CuS("The rival teams were furious", protest),
+    PS("Brawn weren't the only team", "brawn_chassis_topdown.jpg", zoom=(1.0, 1.12), texts=[(0.9, "Williams and Toyota had one too.", "mid"),
+                                                                                         (S("But they'd done it best") - S("Brawn weren't the only team", -0.15), "Brawn did it best.", "big")]),
+    CuS("The rival teams were furious", protest, bg=bg_of(M + "Button_Spain_2009.jpg", 0.78)),
     # IV. the impossible
     CP("Melbourne.", "Albert Park circuit", zoom=(1.0, 1.1), chapter=CH("IV", "THE IMPOSSIBLE"), strap=("Albert Park", "MELBOURNE  ·  29 MARCH 2009", 1.2)),
     VS("The team's first ever race", "ai_pit_garage_clip.mp4"),
-    CP("Jenson Button put the car on pole", "Jenson Button 2009", zoom=(1.0, 1.08), strap=("Jenson Button", "POLE POSITION", 0.5)),
+    PS("Jenson Button put the car on pole", "brawn_melbourne_2009.jpg", zoom=(1.0, 1.1), strap=("Jenson Button", "POLE POSITION  ·  MELBOURNE", 0.5)),
     CP("Rubens Barrichello qualified second", "Rubens Barrichello 2009", zoom=(1.0, 1.08), strap=("Rubens Barrichello", "SECOND", 0.4)),
     CuS("On Sunday, they finished", grid),
-    AS("A team that hadn't existed", "ai_champagne.png", zoom=(1.0, 1.1), texts=[(0.6, "A month old.", "mid"), (2.4, "A race winner.", "big")]),
+    PS("A team that hadn't existed", "Rubens-Barrichello-Ross-Brawn-Jenson-Button-A_2079770.jpg", zoom=(1.0, 1.08), strap=("Barrichello  ·  Brawn  ·  Button", "MELBOURNE  ·  29 MARCH 2009", 0.6)),
     CuS("And Button kept winning", win_tally),
     # V. the fight
     CuS("But the money was running out", lead_shrinks, chapter=CH("V", "THE FIGHT")),
     CP("It all came down to Brazil", "Interlagos", zoom=(1.0, 1.1), strap=("Interlagos", "SÃO PAULO  ·  18 OCTOBER 2009", 0.6),
        texts=[(S("A podium would guarantee") - S("It all came down to Brazil", -0.15) + 0.4, "A podium = the title.", "mid")]),
     CuS("But starting fourteenth", p14_to_p5),
-    CuS("Jenson Button was world champion", champions, bg=bg_of(AI + "ai_champagne.png", 0.78)),
+    VS("As though fate had decided", "ai_interlagos_clip.mp4", end=3.6, fallback=AS("As though fate had decided", "ai_interlagos_b.png", zoom=(1.0, 1.15))),
+    AS("He fought his way up", "ai_interlagos_a.png", zoom=(1.0, 1.15), focus=((0.55, 0.6), (0.6, 0.62)),
+       texts=[(0.3, "P14  →  P5", "big"), (SF("He fought his way up", 0.55) - S("He fought his way up", -0.15), "Barrichello: 8th. Enough.", "mid+")]),
+    PS("Jenson Button was world champion", "button_brazil_celebrates.jpg", zoom=(1.0, 1.1), strap=("Jenson Button", "2009 WORLD CHAMPION", 0.3)),
+    PS("And on the same day", "brawn-gp_63z6lxym2iob1ts8v86khmdyh.jpeg", zoom=(1.0, 1.08), texts=[(1.6, "Constructors' champions too.", "mid")]),
     # VI. what happened next
     CaS("And then, Brawn GP was gone", [{"k": "title", "text": "And then, it was gone.", "y": 450, "size": 120, "at": 0.3}], align="center",
         bg=FACTORY, chapter=CH("VI", "WHAT HAPPENED NEXT")),

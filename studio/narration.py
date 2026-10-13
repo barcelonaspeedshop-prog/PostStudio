@@ -320,18 +320,20 @@ def build(script_md, raw, outdir):
             labels.append(f"[s{k}_{q}]")
         e["out_end"] = round(t, 3); prev = e
     fc.append("".join(labels) + f"concat=n={len(labels)}:v=0:a=1[c]")
-    # Voice C (Mike, 2026-10-13, Rode NT-USB+): the Rode is full range and the room is quiet, so no
-    # DeepFilterNet repair and no presence boost (the 1.5/2.6 kHz lift built for the band-limited Hollyland
-    # made it tinny). Light EQ only: a little warmth at 150 Hz, cut the 550 Hz honk, soften 3 kHz.
-    # For a Hollyland/phone take, studio/denoise.py + the old Voice B chain are in git history (2026-10-09).
+    # Voice D (Mike, 2026-10-13, Rode NT-USB+): with no echo removal (Voice C) the full video sounded roomy
+    # with no bass. DeepFilterNet capped at 12 dB of reduction takes the room out without the processed edge,
+    # then warmth: shelf +7 below 140 Hz, +2 at 250, cut the 550 Hz honk. No presence boost (that was tinny).
     fc.append("[c]anull[o]")
-    out = os.path.join(outdir, "narration.wav"); cut = out + ".cut.wav"
+    out = os.path.join(outdir, "narration.wav"); cut, rep = out + ".cut.wav", out + ".dfn.wav"
     run("ffmpeg", "-v", "error", "-y", "-i", raw, "-filter_complex", ";".join(fc), "-map", "[o]", "-ar", "48000", "-ac", "1", cut)
-    run("ffmpeg", "-v", "error", "-y", "-i", cut, "-af",
-        "highpass=f=60,lowshelf=f=150:g=3,equalizer=f=550:t=q:w=0.9:g=-2.5,equalizer=f=3000:t=q:w=1:g=-1.5,"
+    dfn = os.path.expanduser("~/.venvs/enhance/bin/python")
+    if os.path.exists(dfn): run(dfn, os.path.join(os.path.dirname(os.path.abspath(__file__)), "denoise.py"), cut, rep, "12")
+    else: print("WARNING: ~/.venvs/enhance missing, voice repair skipped"); os.replace(cut, rep)
+    run("ffmpeg", "-v", "error", "-y", "-i", rep, "-af",
+        "highpass=f=55,lowshelf=f=140:g=7,equalizer=f=250:t=q:w=1:g=2,equalizer=f=550:t=q:w=0.9:g=-3,"
         "acompressor=threshold=-24dB:ratio=2:attack=10:release=150,loudnorm=I=-16:TP=-1.5:LRA=9",
         "-ar", "48000", "-ac", "1", out)
-    for f in (cut,):
+    for f in (cut, rep):
         if os.path.exists(f): os.remove(f)
     run("ffmpeg", "-v", "error", "-y", "-i", out, "-b:a", "160k", os.path.join(outdir, "narration_preview.mp3"))
     json.dump(edl, open(os.path.join(outdir, "sentences.json"), "w"), indent=1)

@@ -205,9 +205,9 @@ class Clip(Scene):
     """A short video clip (e.g. a 5 s Runway shot). Frames are extracted once, at full frame size, into
     <clip>_frames/ beside it, so render workers just load JPEGs. If the scene is longer than the clip it
     plays slower (down to min_rate), then holds the last frame with a slow push-in."""
-    def __init__(self, start, path, min_rate=0.6, **kw):
+    def __init__(self, start, path, min_rate=0.6, end=None, **kw):
         super().__init__(start, **kw)
-        self.path, self.min_rate = path, min_rate
+        self.path, self.min_rate, self.end = path, min_rate, end         # end: use only the first `end` seconds
         self.fdir = os.path.splitext(path)[0] + "_frames"
         if not (os.path.isdir(self.fdir) and os.listdir(self.fdir)):
             os.makedirs(self.fdir, exist_ok=True)
@@ -215,6 +215,7 @@ class Clip(Scene):
                             f"fps={FPS},scale={W}:{H}:force_original_aspect_ratio=increase:flags=lanczos,crop={W}:{H}",
                             "-q:v", "2", os.path.join(self.fdir, "%04d.jpg")], check=True)
         self.n = len([f for f in os.listdir(self.fdir) if f.endswith(".jpg") and not f.startswith(".")])
+        if end: self.n = min(self.n, int(end * FPS))
     def base(self, t):
         clip = self.n / FPS; rate = max(self.min_rate, min(1.0, clip / max(self.dur or clip, 0.01)))
         ct = max(0.0, t) * rate; over = max(0.0, ct - clip) / rate
