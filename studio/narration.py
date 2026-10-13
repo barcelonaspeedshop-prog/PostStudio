@@ -315,11 +315,13 @@ def build(script_md, raw, outdir):
     # manual cuts (stutters Mike points out): audio/manual_cuts.json = [[raw_start, raw_end, "note"], ...]
     mc_path = os.path.join(outdir, "manual_cuts.json")
     cuts = json.load(open(mc_path)) if os.path.exists(mc_path) else []
-    # an entry {"line": "words from the sentence", "end": raw_time} moves where that line stops (a clipped last word)
+    # an entry {"line": "words from the sentence", "end": raw_time} moves where that line stops (a clipped last word);
+    # {"line": ..., "segs": [[a, b], [c, d]]} replaces its pieces outright, e.g. to borrow a word Mike said cleanly elsewhere
     for c in [c for c in cuts if isinstance(c, dict)]:
         e = next(e for e in edl if c["line"].lower() in e["text"].lower())
         if "end" in c: e["segs"][-1][1] = c["end"]; e["b"] = c["end"]
         if "start" in c: e["segs"][0][0] = c["start"]; e["a"] = c["start"]
+        if "segs" in c: e["segs"] = [list(x) for x in c["segs"]]; e["a"], e["b"] = c["segs"][0][0], c["segs"][-1][1]   # splice (a word from another take)
         report.append(f"  manual edge: {c}")
     cuts = [c for c in cuts if not isinstance(c, dict)]
     for e in edl:
@@ -344,17 +346,18 @@ def build(script_md, raw, outdir):
             labels.append(f"[s{k}_{q}]")
         e["out_end"] = round(t, 3); prev = e
     fc.append("".join(labels) + f"concat=n={len(labels)}:v=0:a=1[c]")
-    # Voice D (Mike, 2026-10-13, Rode NT-USB+): with no echo removal (Voice C) the full video sounded roomy
-    # with no bass. DeepFilterNet capped at 12 dB of reduction takes the room out without the processed edge,
-    # then warmth: shelf +7 below 140 Hz, +2 at 250, cut the 550 Hz honk. No presence boost (that was tinny).
+    # Voice E (Mike, 2026-10-13, Rode NT-USB+ in the office): the room echo made the voice sound "separate from
+    # the video". Full DeepFilterNet repair (no reduction cap), warm EQ, then a gentle expander that closes the
+    # room ring between words (tails ~54 dB under the voice instead of ~33). Voice D (12 dB cap) was too roomy.
     fc.append("[c]anull[o]")
     out = os.path.join(outdir, "narration.wav"); cut, rep = out + ".cut.wav", out + ".dfn.wav"
     run("ffmpeg", "-v", "error", "-y", "-i", raw, "-filter_complex", ";".join(fc), "-map", "[o]", "-ar", "48000", "-ac", "1", cut)
     dfn = os.path.expanduser("~/.venvs/enhance/bin/python")
-    if os.path.exists(dfn): run(dfn, os.path.join(os.path.dirname(os.path.abspath(__file__)), "denoise.py"), cut, rep, "12")
+    if os.path.exists(dfn): run(dfn, os.path.join(os.path.dirname(os.path.abspath(__file__)), "denoise.py"), cut, rep)
     else: print("WARNING: ~/.venvs/enhance missing, voice repair skipped"); os.replace(cut, rep)
     run("ffmpeg", "-v", "error", "-y", "-i", rep, "-af",
         "highpass=f=55,lowshelf=f=140:g=7,equalizer=f=250:t=q:w=1:g=2,equalizer=f=550:t=q:w=0.9:g=-3,"
+        "agate=threshold=0.02:ratio=3:attack=5:release=120:range=0.12,"
         "acompressor=threshold=-24dB:ratio=2:attack=10:release=150,loudnorm=I=-16:TP=-1.5:LRA=9",
         "-ar", "48000", "-ac", "1", out)
     for f in (cut, rep):

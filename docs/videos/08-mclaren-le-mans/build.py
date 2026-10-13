@@ -16,7 +16,7 @@ E.init(STORY, series="impossible")
 # narration.wav still holds two fluffs the editor kept: the tail of a "stop" before "Its designer..." and a
 # failed take + a full repeat of "A road car, built for the road..." after "...fourth and fifth."
 # Both are cut here (narration seconds, at silences) and every later sentence is shifted to match.
-CUTS = [(6.62, 7.42), (227.95, 238.50)]
+CUTS = []                                     # 10-13: both fluffs now cut in audio/manual_cuts.json
 def _shift(t):
     s = 0.0
     for a, b in CUTS:
