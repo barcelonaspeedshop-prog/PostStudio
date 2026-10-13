@@ -348,11 +348,11 @@ def milan(d, L, t, sc):
     s = ramp(t, atf("Champions of Europe two years", 0.6, sc), atf("Champions of Europe two years", 0.6, sc) + 0.4)
     if s > 0: tracked(d, (W / 2, 950), "WORLD-CLASS IN EVERY POSITION", cond(44, 8), rgba(CREAM, s), 8, "center")
 
-PAIRS = [("Two of the best defenders", "DEFENCE", [(MALDINI, "Paolo Maldini", "CAPTAIN", 0.32), (NESTA, "Alessandro Nesta", "CENTRE-BACK", 0.3)]),
-         ("Two of the finest midfielders", "MIDFIELD", [(PIRLO, "Andrea Pirlo", "PLAYMAKER", 0.32), (KAKA, "Kaká", "ATTACKING MIDFIELD", 0.25)]),
-         ("And up front, the European", "ATTACK", [(SHEVA, "Andriy Shevchenko", "EUROPEAN FOOTBALLER OF THE YEAR", 0.2), (CRESPO, "Hernán Crespo", "STRIKER", 0.3)])]
+PAIRS = [("Two of the best defenders", "DEFENCE", [("3", "Paolo Maldini", "CAPTAIN"), ("13", "Alessandro Nesta", "CENTRE-BACK")]),
+         ("Two of the finest midfielders", "MIDFIELD", [("21", "Andrea Pirlo", "PLAYMAKER"), ("22", "Kaká", "ATTACKING MIDFIELD")]),
+         ("And up front, the European", "ATTACK", [("7", "Andriy Shevchenko", "EUROPEAN FOOTBALLER OF THE YEAR"), ("11", "Hernán Crespo", "STRIKER")])]
 def portraits(d, L, t, sc):
-    """Milan's stars, two at a time, sliding in."""
+    """Milan's stars as their white 2005 shirts with name and number, two at a time, sliding in."""
     ks = [at(p[0], sc) for p in PAIRS]; ks[0] = min(ks[0], 0.0)
     cur = max(i for i, k in enumerate(ks) if t >= k - 0.35 or i == 0)
     for i in (cur - 1, cur):
@@ -362,15 +362,32 @@ def portraits(d, L, t, sc):
         off = 1920 * (1 - enter) - 1920 * leave
         if abs(off) >= 1920: continue
         _, line, people = PAIRS[i]
-        for j, (path, name, role, fy) in enumerate(people):
-            x0 = 150 + j * 830 + off; y0 = 175
-            if x0 > W or x0 + 790 < 0: continue
-            paste_box(L, C + path, x0, y0, 790, 790, 1.0, fy)
-            d.rectangle((x0, y0 + 790 - 150, x0 + 790, y0 + 790), fill=rgba(NAVY_D, 0.9))
-            d.rectangle((x0, y0 + 790 - 150, x0 + 12, y0 + 790), fill=rgba(WHITE, 1))
-            text_top(d, (x0 + 40, y0 + 790 - 125), name, pf(60, 800), rgba(CREAM, 1))
-            tracked(d, (x0 + 42, y0 + 790 - 45), role, cond(28, 8), rgba(GOLD, 1), 5)
+        for j, (num, name, role) in enumerate(people):
+            cx = 560 + j * 800 + off; bob = 8 * math.sin(t * 2.2 + j)
+            shirt(d, cx, 470 + bob, 330, WHITE, (20, 20, 20), 1.0, stripes=[(200, 16, 46), (20, 20, 20)])
+            text_top(d, (cx, 330 + bob), num, pf(170, 900), rgba((200, 16, 46), 1), "center")
+            text_top(d, (cx, 760), name, pf(66, 800), rgba(CREAM, 1), "center")
+            tracked(d, (cx, 860), role, cond(30, 8), rgba(GOLD, 1), 5, "center")
         tracked(d, (W / 2 + off, 105), f"AC MILAN  ·  {line}", cond(40, 8), rgba(GOLD, 1), 10, "center")
+
+def player_card(path, name, sub):
+    """A small original photo shown at (near) its own size in a frame, never blown up, with the name beside it."""
+    def draw(d, L, t, sc):
+        im = load(C + path); h = min(760, int(im.height * 1.15)); w_ = int(im.width * h / im.height)
+        if w_ > 900: w_ = 900; h = int(im.height * w_ / im.width)
+        a = ramp(t, 0, 0.4); x0 = 640 - w_ // 2 - int(60 * (1 - ease(min(1, t / 0.6)))); y0 = 540 - h // 2
+        d.rectangle((x0 - 14, y0 - 14, x0 + w_ + 14, y0 + h + 14), fill=rgba(CREAM, a))
+        key = ("card", path, w_, h)
+        if key not in E.__dict__.setdefault("_cards", {}): E._cards[key] = im.resize((w_, h), Image.LANCZOS).convert("RGBA")
+        ph = E._cards[key]
+        if a < 1: ph = ph.copy(); ph.putalpha(int(255 * a))
+        L.alpha_composite(ph, (x0, y0))
+        b = ramp(t, 0.3, 0.8); x = max(1120, x0 + w_ + 90)
+        text_top(d, (x, 430), name, pf(84, 900), rgba(CREAM, b), "left")
+        tracked(d, (x + 4, 560), sub, cond(34, 8), rgba(GOLD, b), 6)
+    return draw
+def PC(snip, path, name, sub, bg=None, off=-0.15, **kw):
+    return Custom(S(snip, off), player_card(path, name, sub), bg=bg_of(bg or (C + STADIUM_IN), 0.78), **kw)
 
 def shirt(d, cx, cy, s, body, trim, a, stripes=None):
     pts = [(-0.5, -0.62), (-0.18, -0.72), (0.18, -0.72), (0.5, -0.62), (0.95, -0.25), (0.72, 0.02), (0.5, -0.15), (0.5, 0.72), (-0.5, 0.72), (-0.5, -0.15), (-0.72, 0.02), (-0.95, -0.25)]
@@ -621,14 +638,14 @@ scenes = [
     CuS("And in Europe, they nearly", calendar, bg=bg_of(C + KOP_IN, 0.84)),
     PS("In their last group game", KOP_IN, zoom=(1.0, 1.12), strap=("Liverpool v Olympiacos", "ANFIELD  ·  8 DECEMBER 2004", 0.5)),
     Custom(SF("And because they'd lost", 0.15), win_by_two, bg=bg_of(C + KOP_IN, 0.84)),
-    PS("Then a Brazilian World Cup winner", RIVALDO, zoom=(1.0, 1.08), strap=("Rivaldo", "OLYMPIACOS  ·  WORLD CUP WINNER", 0.4),
+    PC("Then a Brazilian World Cup winner", RIVALDO, "Rivaldo", "OLYMPIACOS  ·  WORLD CUP WINNER",
        texts=[(S("At half-time, Liverpool were losing") - S("Then a Brazilian World Cup winner", -0.15) - 0.2, "Half-time: 0–1.", "big")]),
     Custom(SF("At half-time, Liverpool were losing", 0.55), tracker("HALF-TIME  ·  " + "ANFIELD", [(0, 0, 1)], 0, needed_at=("Now they needed three", 0.2),
            note=("THREE GOALS  ·  45 MINUTES", ("Now they needed three", 1.4), CREAM)), bg=bg_of(C + KOP_IN, 0.84)),
     PS("The manager sent on a young French", PONGOLLE, zoom=(1.0, 1.1), strap=("Florent Sinama-Pongolle", "SUBSTITUTE", 0.4)),
     CuS("Two minutes after the restart", tracker("47'  ·  SINAMA-PONGOLLE", [(0, 0, 1), (("One–one.", -0.1), 1, 1)], 1),
         bg=bg_of(C + KOP_IN, 0.84)),
-    PS("With nine minutes left", MELLOR, zoom=(1.0, 1.1), focus=((0.5, 0.35), (0.5, 0.3)), strap=("Neil Mellor", "81'  ·  2–1", 0.6)),
+    PC("With nine minutes left", MELLOR, "Neil Mellor", "81'  ·  2–1"),
     CuS("But that still wasn't enough", tracker("81'  ·  NEIL MELLOR", [(0, 2, 1)], 2, clock=(81, 86), note=("STILL ONE SHORT", 0.4, LFC)),
         bg=bg_of(C + KOP_IN, 0.84)),
     PS("Then, with four minutes to go", GERRARD12, zoom=(1.0, 1.1), focus=((0.55, 0.45), (0.55, 0.4)), strap=("Steven Gerrard", "CAPTAIN", 0.5)),
@@ -647,7 +664,7 @@ scenes = [
     # III. the first half
     CuS("It took Milan less than a minute", scoreboard("KICK-OFF", [(0, 0, 0), (1.4, 1, 0)],
         sub=("LESS THAN A MINUTE", 2.2)), bg=bg_of(C + STADIUM_IN, 0.82), chapter=CH("III", "THE FIRST HALF")),
-    PS("A free kick came in, and the Milan captain", MALDINI, zoom=(1.0, 1.08), focus=((0.5, 0.4), (0.5, 0.35)), strap=("Paolo Maldini", "MILAN CAPTAIN  ·  0:50", 0.4)),
+    PC("A free kick came in, and the Milan captain", MALDINI, "Paolo Maldini", "MILAN CAPTAIN  ·  0:50"),
     CuS("About fifty seconds on the clock", fifty_seconds),
     CuS("Then Liverpool lost Harry Kewell", sub_board("23'  ·  INJURY", "KEWELL", "ŠMICER")),
     PS("A Czech midfielder came on", SMICER, zoom=(1.0, 1.1), focus=((0.5, 0.35), (0.5, 0.3)), strap=("Vladimír Šmicer", "ON FOR KEWELL", 0.4),
@@ -658,8 +675,8 @@ scenes = [
         [(0.2, 1100, 300), (1.4, 1530, 245), (2.2, 1585, 575, 0, 40), (2.6, PX1 + 22, PYM + 30)],
         events=[(2.6, "GOAL", GOLD, 1420, 820)], score=("MILAN", "LIVERPOOL", [(0, 1, 0), (2.7, 2, 0)]),
         others=[(LFC, 1450, 420), (LFC, 1480, 640), (LFC, 1380, 520), (LFC, 1200, 740)])),
-    PF("Six minutes before the break", 0.74, CRESPO, zoom=(1.0, 1.08), focus=((0.5, 0.35), (0.5, 0.3)), strap=("Hernán Crespo", "39'  ·  2–0", 0.3)),
-    PS("Right on half-time, Milan's young Brazilian", KAKA, zoom=(1.0, 1.1), focus=((0.5, 0.3), (0.5, 0.3)), strap=("Kaká", "MILAN'S PLAYMAKER", 0.4)),
+    Custom(SF("Six minutes before the break", 0.74), player_card(CRESPO, "Hernán Crespo", "39'  ·  2–0"), bg=bg_of(C + STADIUM_IN, 0.78)),
+    PC("Right on half-time, Milan's young Brazilian", KAKA, "Kaká", "MILAN'S PLAYMAKER"),
     Custom(SF("Right on half-time, Milan's young Brazilian", 0.6), play("44'  ·  KAKÁ'S PASS  ·  CRESPO'S CHIP",
         [("KAKÁ", WHITE, [(0, 760, 600)]), ("CRESPO", WHITE, [(0.3, 1050, 360), (1.9, 1450, 440), (2.6, 1560, 470)]),
          ("", KEEPER, [(0, PX1 - 25, PYM), (2.0, 1560, 520), (3.0, 1570, 520)])],
@@ -704,7 +721,8 @@ scenes = [
     # VI. the save
     AS("After that, Milan took control", "ai_extra_time.png", zoom=(1.0, 1.12), chapter=CH("VI", "THE SAVE"),
        texts=[(S("Liverpool clung on into extra time") - S("After that, Milan took control", -0.15), "Extra time.", "big")]),
-    PS("With three minutes left", SHEVA, zoom=(1.0, 1.08), focus=((0.5, 0.25), (0.5, 0.2)), strap=("Andriy Shevchenko", "117'  ·  IN FRONT OF GOAL", 0.5)),
+    AS("With three minutes left", "ai_sheva_close.png", zoom=(1.0, 1.12), strap=("Andriy Shevchenko", "117'  ·  IN FRONT OF GOAL", 0.5),
+       fallback=AS("With three minutes left", "ai_shootout_behind_goal.png", zoom=(1.05, 1.18), strap=("Andriy Shevchenko", "117'  ·  IN FRONT OF GOAL", 0.5))),
     Custom(SF("With three minutes left", 0.75), play("117'  ·  SHEVCHENKO  v  DUDEK",
         [("SHEVCHENKO", WHITE, [(0, 1540, 520), (("Liverpool's Polish goalkeeper", 0.6), 1560, 540), (("Liverpool's Polish goalkeeper", 2.4), 1610, 520)]),
          ("_DUDEK", KEEPER, [(0, PX1 - 25, PYM), (("Liverpool's Polish goalkeeper", 0.8), PX1 - 60, 545), (("Liverpool's Polish goalkeeper", 2.6), PX1 - 50, 520)])],
@@ -713,7 +731,7 @@ scenes = [
         events=[(("Liverpool's Polish goalkeeper", 0.8), "BLOCKED", CREAM, 1420, 300), (("Liverpool's Polish goalkeeper", 2.2), "IT COMES BACK…", GOLD, 1420, 820)],
         score=("MILAN", "LIVERPOOL", [(0, 3, 3)]),
         others=[(LFC, 1450, 640), (LFC, 1420, 420), (WHITE, 1350, 520)])),
-    PS("The ball came straight back to the striker", DUDEK, zoom=(1.0, 1.1), focus=((0.5, 0.4), (0.5, 0.35)), strap=("Jerzy Dudek", "v ANDRIY SHEVCHENKO", 0.4),
+    PC("The ball came straight back to the striker", DUDEK, "Jerzy Dudek", "v ANDRIY SHEVCHENKO",
        texts=[(S("Somehow, the keeper threw up") - S("The ball came straight back to the striker", -0.15) + 0.6, "Over the bar.", "big")]),
     CuS("He later called it the save", save_quote, bg=bg_of(C + DUDEK, 0.8)),
     # VII. penalties
@@ -725,9 +743,10 @@ scenes = [
        texts=[(S("Wobbly legs.") - S("So the keeper danced on his line", -0.15), "Wobbly legs.", "mid"),
               (S("Arms everywhere.") - S("So the keeper danced on his line", -0.15), "Arms everywhere.", "mid+")]),
     CuS("Milan's first taker blazed", shootout, bg=bg_of(SHOOTOUT, 0.84)),
-    PS("Then Milan missed again", PIRLO, zoom=(1.0, 1.08), focus=((0.5, 0.35), (0.5, 0.3)), strap=("Andrea Pirlo", "SAVED BY DUDEK", 0.6)),
+    PC("Then Milan missed again", PIRLO, "Andrea Pirlo", "SAVED BY DUDEK"),
     CuS("Both teams scored.", shootout, bg=bg_of(SHOOTOUT, 0.84)),
-    PS("Which left Milan's star striker", SHEVA, zoom=(1.12, 1.24), focus=((0.5, 0.2), (0.5, 0.18)), strap=("Andriy Shevchenko", "EUROPEAN FOOTBALLER OF THE YEAR", 0.4)),
+    AS("Which left Milan's star striker", "ai_sheva_walk.png", zoom=(1.0, 1.1), strap=("Andriy Shevchenko", "EUROPEAN FOOTBALLER OF THE YEAR", 0.4),
+       fallback=PC("Which left Milan's star striker", SHEVA, "Andriy Shevchenko", "EUROPEAN FOOTBALLER OF THE YEAR")),
     CuS("The keeper dived, and stopped it", shootout, bg=bg_of(SHOOTOUT, 0.84)),
     VS("Liverpool were champions of Europe", "ai_trophy_fireworks_clip.mp4", texts=[(0.4, "Champions of Europe.", "big")]),
     # VIII. what happened next
@@ -746,7 +765,7 @@ scenes = [
     PS("But in Liverpool, one word", PARADE, zoom=(1.0, 1.1), strap=("Liverpool", "THE PARADE  ·  26 MAY 2005", 0.5)),
     PF("But in Liverpool, one word", 0.8, M_KISS, zoom=(1.0, 1.1), focus=((0.6, 0.45), (0.62, 0.4)), texts=[(0.5, "Istanbul.", "big")]),
     # IX. what if
-    PS("So here's the question", DUDEK, zoom=(1.1, 1.2), focus=((0.5, 0.35), (0.5, 0.3)), chapter=CH("IX", "WHAT IF"),
+    PC("So here's the question", DUDEK, "Jerzy Dudek", "THE SAVE", bg=NIGHT, chapter=CH("IX", "WHAT IF"),
        texts=[(S("What if that save in extra time") - S("So here's the question", -0.15), "What if that save doesn't happen?", "mid")]),
     CuS("Was it the manager's changes?", what_next, bg=bg_of(RED_END, 0.84)),
     CuS("This was Impossible", impossible_end("Istanbul.")),

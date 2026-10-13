@@ -299,6 +299,19 @@ def build(script_md, raw, outdir):
         edl.append({**s, "i": k, "a": round(segs[0][0], 3), "b": round(b, 3), "score": round(p[2], 2),
                     "segs": [[round(x, 3), round(y, 3)] for x, y in segs]})
         if 0 < p[2] < 0.9: report.append(f"  check (match {p[2]:.2f}) @raw {a:.1f}s: {s['text'][:60]}")
+    # lines read straight on with no pause share one boundary, picked by word timing: move it to the quietest
+    # 25 ms within 0.35 s so it never falls inside a word (Mike heard that as a jitter / a clipped word)
+    import numpy as np
+    x = np.frombuffer(subprocess.run(["ffmpeg", "-v", "error", "-i", raw16, "-f", "s16le", "-"], capture_output=True).stdout,
+                      np.int16).astype(np.float32) / 32768
+    env = np.sqrt(np.convolve(x * x, np.ones(400) / 400, "same"))[::400]                     # 25 ms steps
+    for p, n in zip(edl, edl[1:]):
+        t = p["segs"][-1][1]
+        if abs(n["segs"][0][0] - t) < 0.02:
+            i0, i1 = max(0, int((t - 0.35) * 40)), min(len(env) - 1, int((t + 0.35) * 40))
+            q = round((i0 + int(np.argmin(env[i0:i1 + 1]))) / 40, 3)
+            if abs(q - t) > 0.02: report.append(f"  boundary {t:.2f} -> {q:.2f} (quietest point) before: {n['text'][:40]}")
+            p["segs"][-1][1] = p["b"] = n["segs"][0][0] = n["a"] = q
     # manual cuts (stutters Mike points out): audio/manual_cuts.json = [[raw_start, raw_end, "note"], ...]
     mc_path = os.path.join(outdir, "manual_cuts.json")
     cuts = json.load(open(mc_path)) if os.path.exists(mc_path) else []
