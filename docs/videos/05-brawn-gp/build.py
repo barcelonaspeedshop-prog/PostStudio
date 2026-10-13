@@ -184,8 +184,8 @@ def grid(d, L, t, sc):
     tracked(d, (W / 2, 160), "AUSTRALIAN GRAND PRIX  ·  2009", cond(36, 2), rgba(GOLD, ramp(t, 0, 0.5)), 8, "center")
     fin = ramp(t, at("First and second", sc), at("First and second", sc) + 0.4)
     for i, (who, snip) in enumerate((("BUTTON", None), ("BARRICHELLO", None))):
-        a = ramp(t, 0.2 + i * 0.4, 0.6 + i * 0.4); y = 330 + i * 200; x = 700 + i * 140
-        d.rounded_rectangle((x - 40, y, x + 520, y + 140), 12, fill=rgba(NAVY_D, 0.9 * a), outline=rgba(YEL, a), width=4)
+        a = ramp(t, 0.2 + i * 0.4, 0.6 + i * 0.4); y = 330 + i * 200; x = 600 + i * 140
+        d.rounded_rectangle((x - 40, y, x + 640, y + 140), 12, fill=rgba(NAVY_D, 0.9 * a), outline=rgba(YEL, a), width=4)
         text_top(d, (x + 20, y + 22), f"P{i + 1}", pf(84, 900), rgba(YEL, a), "left")
         tracked(d, (x + 170, y + 52), who, cond(52, 8), rgba(CREAM, a), 6)
     tracked(d, (W / 2, 330 + 2 * 200 + 40), "QUALIFYING", cond(34, 8), rgba(CREAM, 0.7 * ramp(t, 0.8, 1.2) * (1 - fin)), 8, "center")
@@ -243,17 +243,34 @@ def champions(d, L, t, sc):
     tracked(d, (W / 2, 810), "CONSTRUCTORS", cond(36, 8), rgba(YEL, ramp(t, k + 0.4, k + 0.8)), 10, "center")
 
 # ---------------------------------------------------------------- VI. what happened next
+def trophy(d, cx, base, h, a, col=SILVER, shine=-1.0):
+    """A championship cup, `h` tall, standing on `base`. shine: 0..1 position of a gold glint sweeping up it."""
+    w = h * 0.62; top = base - h
+    d.rounded_rectangle((cx - w * 0.42, base - h * 0.12, cx + w * 0.42, base), 6, fill=rgba(NAVY_D, a), outline=rgba(col, a), width=4)   # plinth
+    d.rectangle((cx - w * 0.30, base - h * 0.20, cx + w * 0.30, base - h * 0.12), fill=rgba(col, a))                                     # foot
+    d.rectangle((cx - w * 0.07, base - h * 0.42, cx + w * 0.07, base - h * 0.20), fill=rgba(col, a))                                     # stem
+    d.pieslice((cx - w * 0.5, top - h * 0.18, cx + w * 0.5, base - h * 0.30), 0, 180, fill=rgba(col, a))                               # bowl
+    d.rectangle((cx - w * 0.5, top, cx + w * 0.5, top + h * 0.26), fill=rgba(col, a))
+    for sgn in (-1, 1):                                                                                                                   # handles
+        hx = cx + sgn * w * 0.5
+        d.arc((hx - w * 0.22, top + h * 0.04, hx + w * 0.22, top + h * 0.40), 270 if sgn > 0 else 90, 90 if sgn > 0 else 270, fill=rgba(col, a), width=7)
+    if 0 <= shine <= 1:
+        y = base - h * shine
+        d.line((cx - w * 0.36, y + 12, cx + w * 0.36, y - 12), fill=rgba(GOLD, 0.9 * a), width=7)
+
 def eight_titles(d, L, t, sc):
-    tracked(d, (W / 2, 220), "MERCEDES  ·  CONSTRUCTORS' CHAMPIONS", cond(36, 2), rgba(GOLD, ramp(t, 0, 0.5)), 8, "center")
-    x0 = W / 2 - 3.5 * 190
+    tracked(d, (W / 2, 160), "MERCEDES  ·  CONSTRUCTORS' CHAMPIONS", cond(36, 2), rgba(GOLD, ramp(t, 0, 0.5)), 8, "center")
+    x0 = W / 2 - 3.5 * 200; base = 700; landed = 0
     for i, yr in enumerate(range(2014, 2022)):
-        a = ramp(t, 0.4 + i * 0.25, 0.7 + i * 0.25)
+        k = 0.4 + i * 0.32; a = ramp(t, k, k + 0.12)
         if a <= 0: continue
-        x = x0 + i * 190
-        d.rounded_rectangle((x - 70, 400, x + 70, 600), 10, fill=rgba(SILVER, a))
-        text_top(d, (x, 450), "1", pf(90, 900), rgba(NAVY_D, a), "center")
-        tracked(d, (x, 640), str(yr), cond(34, 8), rgba(CREAM, a), 4, "center")
-    tracked(d, (W / 2, 780), "EIGHT IN A ROW", cond(52, 8), rgba(GOLD, ramp(t, 2.6, 3.0)), 12, "center")
+        f = min(1.0, (t - k) / 0.35); drop = -260 * (1 - f) ** 2 + (14 * math.sin(f * math.pi) if f < 1 else 0)   # falls in, small bounce
+        x = x0 + i * 200; landed += f >= 1
+        trophy(d, x, base + drop, 200, a, SILVER, ((t - k - 0.35) / 0.5) if t > k + 0.35 else -1)
+        tracked(d, (x, base + 30), str(yr), cond(34, 8), rgba(CREAM, a), 4, "center")
+    if landed:
+        text_top(d, (W / 2, 800), f"{landed}", pf(150, 900), rgba(GOLD if landed == 8 else CREAM, 1), "center")
+    tracked(d, (W / 2, 970), "IN A ROW", cond(40, 8), rgba(GOLD, ramp(t, 3.2, 3.6)), 12, "center")
 
 def one_pound(d, L, t, sc):
     a = ramp(t, 0.1, 0.5)
@@ -318,7 +335,7 @@ scenes = [
     CP("It all came down to Brazil", "Interlagos", zoom=(1.0, 1.1), strap=("Interlagos", "SÃO PAULO  ·  18 OCTOBER 2009", 0.6),
        texts=[(S("A podium would guarantee") - S("It all came down to Brazil", -0.15) + 0.4, "A podium = the title.", "mid")]),
     CuS("But starting fourteenth", p14_to_p5),
-    VS("As though fate had decided", "ai_interlagos_clip.mp4", end=3.6, fallback=AS("As though fate had decided", "ai_interlagos_b.png", zoom=(1.0, 1.15))),
+    VS("As though fate had decided", "ai_interlagos_clip.mp4", fallback=AS("As though fate had decided", "ai_interlagos_b.png", zoom=(1.0, 1.15))),
     AS("He fought his way up", "ai_interlagos_a.png", zoom=(1.0, 1.15), focus=((0.55, 0.6), (0.6, 0.62)),
        texts=[(0.3, "P14  →  P5", "big"), (SF("He fought his way up", 0.55) - S("He fought his way up", -0.15), "Barrichello: 8th. Enough.", "mid+")]),
     PS("Jenson Button was world champion", "button_brazil_celebrates.jpg", zoom=(1.0, 1.1), strap=("Jenson Button", "2009 WORLD CHAMPION", 0.3)),

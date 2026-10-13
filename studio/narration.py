@@ -42,10 +42,20 @@ def say(n):
     if n < 100: return _TENS[n // 10] + ("" if n % 10 == 0 else " " + _ONES[n % 10])
     return _ONES[n // 100] + " hundred" + ("" if n % 100 == 0 else " " + say(n % 100))
 
+def say_year(y):
+    """1966 -> nineteen sixty six, 2009 -> two thousand nine, 2014 -> twenty fourteen (how years are read)."""
+    y = int(y)
+    if 2000 <= y <= 2009: return "two thousand" + ("" if y == 2000 else " " + _ONES[y - 2000])
+    hi, lo = divmod(y, 100)
+    return say(hi) + " " + ("hundred" if lo == 0 else ("oh " + _ONES[lo] if lo < 10 else say(lo)))
+
 def norm(s):
-    """Lower-case word tokens; small numbers spelled out (years stay digits) so script and speech compare."""
+    """Lower-case word tokens; numbers and years spelled out so the script ("2009") and the speech
+    (Whisper writes "2009" or "two thousand nine") compare the same. "two thousand and nine" -> drop the "and"."""
     s = s.lower().replace("—", " ").replace("-", " ").replace("%", " per cent").replace("formula 1", "formula one")
     s = re.sub(r"\bf1\b", "formula one", s)
+    s = re.sub(r"\b(1[89]\d\d|20\d\d)\b", lambda m: say_year(m.group()), s)
+    s = re.sub(r"\bthousand and\b", "thousand", s)
     s = re.sub(r"\b\d{1,3}\b", lambda m: say(m.group()), s)
     return re.sub(r"[^a-z0-9 ]", " ", s).split()
 
