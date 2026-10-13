@@ -245,13 +245,11 @@ def letter(d, L, t, sc):
     pts = [(-560, -360), (560, -360), (560, 360), (-560, 360)]
     c, s_ = math.cos(math.radians(rot)), math.sin(math.radians(rot))
     d.polygon([(cx + x * c - y * s_, cy + x * s_ + y * c) for x, y in pts], fill=rgba((242, 236, 220), a))
-    lines = [("To McLaren,", 0.3), ("We want to race our cars.", 0.9), ("With your help –", 1.9), ("or without it.", 2.6)]
+    lines = [("THE OWNERS, IN SHORT:", 0.3), ("We'll race them.", 0.9), ("With your help –", 1.9), ("or without it.", 2.6)]
     for i, (txt, k) in enumerate(lines):
         n = int(max(0, t - k) * 28)
         if n <= 0: continue
         text_top(d, (cx - 470, cy - 270 + i * 130 + i * 2), txt[:n], pf(76 if i else 60, 600), rgba(INK, a), "left")
-    k = at("And they told McLaren", sc) + 3.2
-    tracked(d, (cx + 470, cy + 270), "—  THE OWNERS", cond(40, 8), rgba(NAVY, ramp(t, k - 0.4, k)), 8, "right")
 
 def lemans_map(d, L, t, sc):
     a = ramp(t, 0, 0.3); pts = track_pts((330, 90, 1590, 1010))
@@ -524,7 +522,7 @@ scenes = [
        texts=[(1.4, "Le Mans: harder than an F1 title.", "mid")]),
     CuS("He should know", both_done, bg=bgp("no59_podium.jpg", 0.85)),
     CuS("Only one hundred and six", hundred_six, bg=bgp("f1_road_silver.jpg", 0.86)),
-    CP("Today, they're some", "f1_road_silver_doors.jpg", zoom=(1.0, 1.12), texts=[(0.5, "Now worth tens of millions.", "mid")]),
+    CP("Today, they're some", "f1_road_silver_doors.jpg", zoom=(1.0, 1.12), texts=[(0.5, "One sold for over $20 million in 2021.", "mid")]),
     CP("And number fifty-nine, the grey", "no59_goodwood_display.jpg", zoom=(1.0, 1.15), focus=((0.5, 0.5), (0.47, 0.5)), strap=("No. 59", "THE GREY TEST CAR THAT WON LE MANS", 0.6)),
     # VII. what if
     AS("So here's the question", "ai_finish.png", zoom=(1.0, 1.12), chapter=CH("VII", "WHAT IF"),
