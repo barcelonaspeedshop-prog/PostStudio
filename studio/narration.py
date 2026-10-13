@@ -204,6 +204,7 @@ def cue_cut(W, a, b, sil, report, text):
     nxt = lambda i: (norm(span[i + 1][2])[:1] or [""])[0] if i + 1 < len(span) else ""
     idx = [i for i, w in enumerate(span) if w[2].strip(".,!?").lower() == CUE and not (nxt(i) and nxt(i) in legit)]
     if not idx: return [(a, b)]
+    if tw[-1:] == [CUE] and len(idx) <= tw.count(CUE): return [(a, b)]   # the line itself ends "...didn't stop."
     c = idx[-1]; pre, post = span[:c], span[c + 1:]
     if not post: return [(a, b)]
     pt = [norm(w[2])[:1] or [""] for w in post[:2]]
