@@ -4,8 +4,20 @@
     {
       "name": "poststudio-dev",
       "runtimeExecutable": "/usr/local/bin/node",
-      "runtimeArgs": ["node_modules/.bin/next", "dev"],
+      "runtimeArgs": [
+        "node_modules/.bin/next",
+        "dev"
+      ],
       "port": 3000
+    },
+    {
+      "name": "household-budget",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd '/Users/michaelloughrie/Desktop/Household Budget' && exec node node_modules/.bin/concurrently \"node api.cjs\" \"node node_modules/.bin/vite\""
+      ],
+      "port": 5173
     }
   ]
 }

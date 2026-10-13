@@ -739,9 +739,9 @@ scenes = [
     PS("Before the shoot-out, Jamie Carragher", CARRA, zoom=(1.0, 1.08), focus=((0.5, 0.3), (0.5, 0.25)), strap=("Jamie Carragher", "LIVERPOOL DEFENDER", 0.6),
        texts=[(S("Put them off, he said.") - S("Before the shoot-out, Jamie Carragher", -0.15), "“Put them off.”", "big")]),
     PS("Do what Liverpool's keeper did", GROBBELAAR, zoom=(1.0, 1.1), focus=((0.35, 0.45), (0.32, 0.4)), strap=("Bruce Grobbelaar", "LIVERPOOL KEEPER  ·  ROME 1984", 0.5)),
-    VS("So the keeper danced on his line", "ai_shootout_clip.mp4", end=2.9,
-       texts=[(S("Wobbly legs.") - S("So the keeper danced on his line", -0.15), "Wobbly legs.", "mid"),
-              (S("Arms everywhere.") - S("So the keeper danced on his line", -0.15), "Arms everywhere.", "mid+")]),
+    VS("So the keeper danced on his line", "ai_shootout_clip.mp4", end=1.6),   # after 1.6 s the striker just taps the ball (Mike)
+    AS("Wobbly legs.", "ai_shootout_behind_goal.png", zoom=(1.05, 1.2), focus=((0.5, 0.6), (0.5, 0.62)),
+       texts=[(0.15, "Wobbly legs.", "mid"), (S("Arms everywhere.") - S("Wobbly legs.", -0.15), "Arms everywhere.", "mid+")]),
     CuS("Milan's first taker blazed", shootout, bg=bg_of(SHOOTOUT, 0.84)),
     PC("Then Milan missed again", PIRLO, "Andrea Pirlo", "SAVED BY DUDEK"),
     CuS("Both teams scored.", shootout, bg=bg_of(SHOOTOUT, 0.84)),

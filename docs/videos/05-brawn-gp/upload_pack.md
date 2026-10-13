@@ -44,7 +44,7 @@ Vista aérea del Autódromo José Carlos Pace: ProtoplasmaKid, CC BY-SA 4.0
 Licences: CC BY 2.0 creativecommons.org/licenses/by/2.0 · CC BY-SA 2.0 creativecommons.org/licenses/by-sa/2.0 · CC BY-SA 4.0 creativecommons.org/licenses/by-sa/4.0
 Photos from period sources belong to their owners. If one is yours and you'd like a credit or its removal, comment or get in touch.
 Some scenes are AI illustrations and AI video, not footage of real events.
-Music: "Seasons" by ANBR, "Hidden" by LaFaye.
+Music: "Seasons" by ANBR and "Hidden" by LaFaye (YouTube Audio Library).
 
 #F1 #Formula1 #BrawnGP #JensonButton #RossBrawn #F1History #Motorsport #Impossible
 
