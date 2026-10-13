@@ -336,19 +336,22 @@ def build(script_md, raw, outdir):
     # assemble: takes + gaps
     fc, labels, t, prev = [], [], 0.0, None
     for k, e in enumerate(edl):
-        if prev:
+        flows = prev and abs(prev["segs"][-1][1] - e["segs"][0][0]) < 0.02    # read straight on: keep it as spoken
+        if prev and not flows:
             g = GAP_SECT if e["section"] != prev["section"] else GAP_PARA if e["para"] != prev["para"] else GAP_SENT
             fc.append(f"anullsrc=r=48000:cl=mono,atrim=0:{g}[g{k}]"); labels.append(f"[g{k}]"); t += g
         e["out_start"] = round(t, 3)
+        nxt = edl[k + 1] if k + 1 < len(edl) else None
         for q, (x, y) in enumerate(e["segs"]):
             d = y - x; t += d
-            fc.append(f"[0:a]atrim={x}:{y},asetpts=PTS-STARTPTS,afade=t=in:d=0.02,afade=t=out:st={max(d - 0.04, 0):.3f}:d=0.04[s{k}_{q}]")
+            fin = "" if (q == 0 and flows) else "afade=t=in:d=0.02,"                       # no fades on a seamless join
+            fout = "" if (q == len(e["segs"]) - 1 and nxt and abs(y - nxt["segs"][0][0]) < 0.02) else f",afade=t=out:st={max(d - 0.04, 0):.3f}:d=0.04"
+            fc.append(f"[0:a]atrim={x}:{y},asetpts=PTS-STARTPTS,{fin}anull{fout}[s{k}_{q}]")
             labels.append(f"[s{k}_{q}]")
         e["out_end"] = round(t, 3); prev = e
     fc.append("".join(labels) + f"concat=n={len(labels)}:v=0:a=1[c]")
     # Voice E (Mike, 2026-10-13, Rode NT-USB+ in the office): the room echo made the voice sound "separate from
-    # the video". Full DeepFilterNet repair (no reduction cap), warm EQ, then a gentle expander that closes the
-    # room ring between words (tails ~54 dB under the voice instead of ~33). Voice D (12 dB cap) was too roomy.
+    # the video". Full DeepFilterNet repair (no reduction cap) + warm EQ. Voice D (12 dB cap) was too roomy.
     fc.append("[c]anull[o]")
     out = os.path.join(outdir, "narration.wav"); cut, rep = out + ".cut.wav", out + ".dfn.wav"
     run("ffmpeg", "-v", "error", "-y", "-i", raw, "-filter_complex", ";".join(fc), "-map", "[o]", "-ar", "48000", "-ac", "1", cut)
@@ -356,8 +359,9 @@ def build(script_md, raw, outdir):
     if os.path.exists(dfn): run(dfn, os.path.join(os.path.dirname(os.path.abspath(__file__)), "denoise.py"), cut, rep)
     else: print("WARNING: ~/.venvs/enhance missing, voice repair skipped"); os.replace(cut, rep)
     run("ffmpeg", "-v", "error", "-y", "-i", rep, "-af",
+        # no gate: measured 10-13, the agate turned 67% of word endings down ~11 dB on quieter takes (Mike: "end of
+        # words cropping"); full DeepFilterNet alone keeps the room ~56 dB under the voice in pauses
         "highpass=f=55,lowshelf=f=140:g=7,equalizer=f=250:t=q:w=1:g=2,equalizer=f=550:t=q:w=0.9:g=-3,"
-        "agate=threshold=0.02:ratio=3:attack=5:release=120:range=0.12,"
         "acompressor=threshold=-24dB:ratio=2:attack=10:release=150,loudnorm=I=-16:TP=-1.5:LRA=9",
         "-ar", "48000", "-ac", "1", out)
     for f in (cut, rep):
