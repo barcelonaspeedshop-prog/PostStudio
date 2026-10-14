@@ -143,7 +143,8 @@ def diffuser_scene(img, cue):
         fl = A("Start with the floor", 0.6, 1.2)
         if fl: glow_line(L, [(FLOOR_X0, FLOOR_Y), (FLOOR_X0 + (FLOOR_X1 - FLOOR_X0) * fl, FLOOR_Y)], GOLD, 1, 6)
         tag(ds, (W / 2, 900), "THE FLOOR", A("Start with the floor", 1.0) * out("Air rushing under"))
-        for s in OVER: s.draw(d, t, 0.75 * A("Air rushing under"))
+        for s in OVER: s.draw(d, t, 0.35 + 0.4 * A("Air rushing under"))       # air is always moving, from the first frame
+        tag(ds, (W / 2, 60), "WHAT IS A DIFFUSER?", ramp(t, 0.2, 0.8) * out("Air rushing under"), GOLD, 52)
         # under the floor: squeezed, faster, then choked, then let out by the diffuser
         free = A("Air rushing under") * out("But there's a catch", 0.6)
         choke = A("But there's a catch", 0.3) * out("That's the diffuser's job", 0.9)
