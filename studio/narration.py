@@ -24,9 +24,10 @@ def script_sentences(md_path):
     started = False
     for raw in open(md_path).read().split("\n\n"):
         block = raw.strip()
+        if block.lower().startswith("## fact notes"): break                   # notes for us, never read out
         if block.startswith("## "): sect += 1; started = True; continue
-        if not started or not block or block.startswith(("#", "---", "**[", ">")): continue
-        text = re.sub(r"\*\*\[.*?\]\*\*", "", block).replace("*", "").strip()
+        if not started or not block or block.startswith(("#", "---", "**[", ">", "[")): continue
+        text = re.sub(r"\*\*\[.*?\]\*\*|\[[^\]]*\]", "", block).replace("*", "").strip()
         if not text: continue
         para += 1
         for s in re.split(r"(?<=[.?!])\s+(?=[A-Z0-9\"'“])", text):

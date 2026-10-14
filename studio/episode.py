@@ -15,12 +15,14 @@ import glob, json, math, os, subprocess, sys
 from storykit import *
 
 INTRO = 5.0                                   # wordless open: stamp + title over footage, music from frame 0
-STORY = C = M = A = AI = OUT = None; SENTS = []; _cr = {}; SERIES = "banned"
+STORY = C = M = A = NA = AI = OUT = None; SENTS = []; _cr = {}; SERIES = "banned"
 
-def init(story, series="banned"):
-    global STORY, C, M, A, AI, OUT, SENTS, _cr, SERIES
+def init(story, series="banned", narration="audio/"):
+    """narration = the folder (inside the story) holding this cut's narration.wav + sentences.json; music stays in audio/."""
+    global STORY, C, M, A, NA, AI, OUT, SENTS, _cr, SERIES
     STORY = story; SERIES = series; C, M, A, AI = (story + p for p in ("media/commons/", "media/mike/", "audio/", "media/ai/")); OUT = story + "video/"
-    SENTS = json.load(open(A + "sentences.json"))
+    NA = story + narration
+    SENTS = json.load(open(NA + "sentences.json"))
     _cr = {c["file"]: c for c in json.load(open(C + "credits.json"))} if os.path.exists(C + "credits.json") else {}
 
 def sent(snip):
@@ -166,10 +168,10 @@ def impossible_end(this):
 def main(scenes, final, music_gain=0.35):
     scenes = [x for x in scenes if x is not None]
     os.makedirs(OUT, exist_ok=True)
-    nd = float(subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", A + "narration.wav"]))
+    nd = float(subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", NA + "narration.wav"]))
     total = INTRO + nd + 3.0
     voice, audio = OUT + "voice.wav", OUT + "audio_mix.wav"
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", A + "narration.wav", "-filter_complex",
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", NA + "narration.wav", "-filter_complex",
                     f"anullsrc=r=48000:cl=mono,atrim=0:{INTRO}[i];anullsrc=r=48000:cl=mono,atrim=0:3[e];[i][0:a][e]concat=n=3:v=0:a=1[o]",
                     "-map", "[o]", voice], check=True)
     tracks = sorted(t for t in glob.glob(A + "*.mp3") if not os.path.basename(t).startswith(("narration", "voice_test")))
