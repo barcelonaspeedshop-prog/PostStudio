@@ -142,7 +142,7 @@ And months were all Brawn needed.
 
 Melbourne. The twenty-ninth of March, 2009. The team's first ever race.
 
-Jenson Button put the car on pole position. His Brazilian team-mate qualified second. [On screen: Rubens Barrichello]
+Jenson Button put the car on pole position. Rubens Barrichello qualified second.
 
 On Sunday, they finished exactly where they started. First and second.
 
@@ -156,19 +156,19 @@ Six wins from the first seven races.
 
 But the money was running out. And the big teams were catching up fast.
 
-Red Bull brought their own double diffuser. Their young German star was winning races. [On screen: Sebastian Vettel] And Brawn simply couldn't afford to keep developing the car.
+Red Bull brought their own double diffuser. Their young star, Sebastian Vettel, was winning races. And Brawn simply couldn't afford to keep developing the car.
 
 There was another problem, too. The Brawn was gentle on its tyres, which sounds like a good thing. But on cold days, it couldn't get heat into them. And a cold tyre has no grip.
 
-In the second half of the season, Button didn't win a single race. His team-mate won twice, but Button's lead shrank, race by race.
+In the second half of the season, Button didn't win a single race. Barrichello won twice, but Button's lead shrank, race by race.
 
 It all came down to Brazil.
 
-Qualifying was hit by rain, and it went horribly wrong. Button would start fourteenth. His team-mate, at home in front of his own fans, was on pole.
+Qualifying was hit by rain, and it went horribly wrong. Button would start fourteenth. Barrichello, at home in front of his own fans, was on pole.
 
 A podium would have settled it. From fourteenth, that looked a long way off.
 
-But this time, Button didn't need luck. He drove one of the best races of his life, passing car after car, and fought his way up to fifth. His team-mate picked up a puncture and dropped to eighth.
+But this time, Button didn't need luck. He drove one of the best races of his life, passing car after car, and fought his way up to fifth. Barrichello picked up a puncture and dropped to eighth.
 
 It was enough.
 

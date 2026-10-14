@@ -28,12 +28,13 @@ Rules for every video:
 
 ## Cadence
 
-- **Start with one long video a week**, per channel we're running. Each video goes to **one home channel**, not three: the same video on three channels splits views, comments and subscribers three ways.
+- **Start with one long video a week**, per channel we're running. Each video goes to **one channel** (agreed 14 Oct), not three: the same video on three channels splits views, comments and subscribers three ways.
   - Omnira F1: F1 stories (best Shorts performer so far, start here)
   - Gentlemen of Fuel: wider motorsport and car stories
   - Omnira Football: football stories
   - Road & Trax: paused until before next season
-- **Shorts every day** on each active channel, cut from that week's long video. Each Short gets its Related video set to the full episode.
+- **Shorts every day** on each active channel, cut from that week's long video. One teaser Short the day before the long video; the rest go out after it, each with its Related video set to the full episode so viewers can click straight through.
+- **No release dates until the content is finished.** Dates are set once a video is built and approved.
 - **Built one week ahead.** Script written and checked → Mike narrates → build → Mike reviews → schedule. One video at a time.
 
 ## Measure every week (YouTube Studio)
