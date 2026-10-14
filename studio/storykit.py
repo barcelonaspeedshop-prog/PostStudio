@@ -196,9 +196,13 @@ class Photo(Scene):
             x0 = min(max(cx * w - vw / 2, 0), w - vw); y0 = min(max(cy * h - vh / 2, 0), h - vh)
             return src.transform((W, H), Image.EXTENT, (x0, y0, x0 + vw, y0 + vh), Image.BICUBIC)
         # contain: picture fitted to 92% height, gently zooming, over blurred fill
-        s = min(W * 0.92 / w, H * 0.90 / h) * z; tw, th = int(w * s), int(h * s)
-        fg = src.resize((tw, th), Image.BICUBIC)
-        im = self._bg.copy(); im.paste(fg, ((W - tw) // 2, (H - th) // 2)); return im
+        # sub-pixel: map the whole frame back onto the source, so the zoom never steps by whole pixels (it shook)
+        s = min(W * 0.92 / w, H * 0.90 / h) * z; x0, y0 = w / 2 - W / (2 * s), h / 2 - H / (2 * s)
+        box = (x0, y0, x0 + W / s, y0 + H / s)
+        fg = src.transform((W, H), Image.EXTENT, box, Image.BICUBIC)
+        if not hasattr(self, "_white"): self._white = Image.new("L", src.size, 255)
+        mask = self._white.transform((W, H), Image.EXTENT, box, Image.BILINEAR)
+        im = self._bg.copy(); im.paste(fg, (0, 0), mask); return im
 
 # ---------------------------------------------------------------- video clip (AI footage)
 class Clip(Scene):

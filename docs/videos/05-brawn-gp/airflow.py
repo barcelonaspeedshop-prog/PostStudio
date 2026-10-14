@@ -54,6 +54,11 @@ class Stream:
 TOP = [(-60, 585), (120, 560), (330, 480), (700, 425), (900, 405), (1120, 290), (1600, 270), (1990, 255)]   # just above the car
 OVER = [Stream([(x, y - 12 - s) for x, y in TOP], [1] * len(TOP), n=12, rate=0.20, colour=False, base=CREAM, width=4, seed=i)
         for i, s in enumerate([0, 40, 80, 120, 160])]
+# air that runs down the engine cover, hits the rear wing and is thrown upward over it (Mike 10-14: "they really should")
+WING = [(-60, 600), (120, 578), (330, 500), (700, 445), (900, 418), (985, 282), (1090, 272), (1260, 300), (1450, 348),
+        (1590, 392), (1628, 368), (1670, 298), (1780, 238), (1990, 175)]
+OVER += [Stream([(x, y - s) for x, y in WING], [1, 1, 1, 1, 1, 1, 1, 1, 0.9, 0.7, 0.6, 0.9, 1.2, 1.3], n=12, rate=0.20,
+                colour=False, base=CREAM, width=4, seed=20 + i) for i, s in enumerate([0, 32])]
 def under(vgap, vexit, exit_pts):
     pts = [(-60, GAP_Y), (300, GAP_Y), (FLOOR_X0, GAP_Y), (1100, GAP_Y), (FLOOR_X1, GAP_Y)] + exit_pts
     vs = [1.0, 1.0, vgap, vgap, vgap] + vexit
@@ -76,7 +81,7 @@ def camera(frame, keys, t):
         k0 = k1
     else: z, cx, cy = keys[-1][1:]
     w, h = W / z, H / z; x0 = min(max(cx - w / 2, 0), W - w); y0 = min(max(cy - h / 2, 0), H - h)
-    return frame.convert("RGB").crop((round(x0), round(y0), round(x0 + w), round(y0 + h))).resize((W, H), Image.LANCZOS)
+    return frame.convert("RGB").transform((W, H), Image.EXTENT, (x0, y0, x0 + w, y0 + h), Image.BICUBIC)   # sub-pixel: no shake
 
 def glow_line(L, pts, colour, a, width=8):
     if a <= 0: return

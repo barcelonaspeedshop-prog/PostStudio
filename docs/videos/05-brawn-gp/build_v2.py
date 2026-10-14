@@ -300,9 +300,9 @@ def split_bg(left, right, amount=0.45):
     """Two photos side by side (each cover-cropped to half the frame), dimmed, with a slow push-in."""
     def half(path, t):
         im = load(path); w, h = W // 2, H; z = 1.0 + 0.004 * t
-        s_ = max(w / im.width, h / im.height) * z; im = im.resize((int(im.width * s_) + 1, int(im.height * s_) + 1), Image.BICUBIC)
-        x0, y0 = (im.width - w) // 2, (im.height - h) // 2
-        return im.crop((x0, y0, x0 + w, y0 + h))
+        s_ = max(w / im.width, h / im.height) * z; vw, vh = w / s_, h / s_      # sub-pixel push-in (whole-pixel steps shook)
+        x0, y0 = (im.width - vw) / 2, (im.height - vh) / 2
+        return im.transform((w, h), Image.EXTENT, (x0, y0, x0 + vw, y0 + vh), Image.BICUBIC)
     def bg(t):
         im = Image.new("RGB", (W, H)); im.paste(half(left, t), (0, 0)); im.paste(half(right, t), (W // 2, 0))
         im = Image.blend(im, Image.new("RGB", (W, H), NAVY_D), amount)
@@ -721,7 +721,7 @@ scenes = [
     CuS("He was the engineer behind seven", seven_titles),
     # III. the gamble
     CP("So Ross Brawn refused to let it die", "Ross Brawn", zoom=(1.12, 1.0), chapter=CH("III", "THE GAMBLE")),
-    CP("With the chief executive, Nick Fry", "Nick Fry", zoom=(1.0, 1.08), strap=("Nick Fry", "CHIEF EXECUTIVE", 0.4)),
+    PS("With the chief executive, Nick Fry", "nick-fry-2.jpg", zoom=(1.0, 1.08), focus=((0.45, 0.45), (0.45, 0.42)), strap=("Nick Fry", "CHIEF EXECUTIVE", 0.4)),
     CuS("The price?", price_tag),
     AS("It wasn't quite as good a deal", "ai_for_sale_b.png", zoom=(1.0, 1.1),
        texts=[(S("Honda helped with the bills") - S("It wasn't quite as good a deal", -0.15), "Honda paid some of the bills.", "mid")]),
