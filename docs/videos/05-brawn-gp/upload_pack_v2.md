@@ -60,6 +60,25 @@ Music: "Seasons" by ANBR and "Hidden" by LaFaye (YouTube Audio Library).
 
 #F1 #Formula1 #BrawnGP #JensonButton #RossBrawn #F1History #DoubleDiffuser #Motorsport #Impossible
 
+## Settings (YouTube Studio, long video)
+
+- **Tags** (Show more › Tags): Brawn GP, Jenson Button, Ross Brawn, double diffuser, F1 2009, Formula 1 history, F1 diffuser explained, Rubens Barrichello, Brawn BGP 001, IMPOSSIBLE
+- **Audience:** No, it's not made for kids
+- **Altered or synthetic content:** Yes (the AI scenes look like real places and events). It adds a small label; it doesn't hurt reach.
+- **Subtitles:** upload IMPOSSIBLE 01 v2 - Brawn GP.en.srt (video folder), language English
+- **Category:** Sports. **Video language:** English
+- **Playlist:** create "IMPOSSIBLE" and add this video (every episode goes in it)
+- **End screen** (last 20 s, over the IMPOSSIBLE end card): Subscribe + "Best for viewer" video
+- **Card** at 10:15 ("In the next video…"): the IMPOSSIBLE playlist
+- **Comments:** on, then post and **pin** your own comment: "Diffuser, Honda's car, or Ross Brawn? What won it?"
+- Leave as default: licence Standard YouTube, allow embedding, paid promotion No, Shorts remixing on
+
+## Settings (each Short)
+
+- Same tags, audience and altered-content answers as the long video
+- **Related video:** the full episode
+- No subtitle file needed (captions are burnt in)
+
 ## Shorts (files in 01 Brawn GP › shorts › v2)
 
 Each description ends: "Full episode on this channel: IMPOSSIBLE, episode one. #F1 #Formula1 #BrawnGP #F1History #motorsport #impossible"
