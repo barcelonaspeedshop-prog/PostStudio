@@ -363,7 +363,8 @@ def build(script_md, raw, outdir):
     else: os.replace(cut, rep)
     run("ffmpeg", "-v", "error", "-y", "-i", rep, "-af",
         # no gate, ever: measured 10-13, an agate turned 67% of word endings down ~11 dB on quieter takes
-        "highpass=f=70,equalizer=f=200:t=q:w=1:g=-1.5,equalizer=f=550:t=q:w=0.9:g=-2,equalizer=f=3200:t=q:w=1:g=2,"
+        # Voice G (Mike 10-15 on Istanbul v2: "On the sound we need more bass"): Voice F + a 4 dB low shelf at 120 Hz
+        "highpass=f=60,lowshelf=f=120:g=4,equalizer=f=550:t=q:w=0.9:g=-2,equalizer=f=3200:t=q:w=1:g=2,"
         "acompressor=threshold=-24dB:ratio=2:attack=10:release=150,loudnorm=I=-16:TP=-1.5:LRA=9",
         "-ar", "48000", "-ac", "1", out)
     for f in (cut, rep):

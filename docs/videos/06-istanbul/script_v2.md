@@ -192,9 +192,25 @@ Both teams scored. Then Dida saved one from Riise. Then both teams scored again,
 
 Which left Shevchenko. The European Footballer of the Year. He had to score, or Milan were finished.
 
-Dudek dived, and stopped it with his left hand.
+He walked up from the halfway line on his own. Every eye in the stadium on him.
 
-Liverpool were champions of Europe.
+He bent down and placed the ball on the spot.
+
+And on his line, Dudek was dancing again. Bouncing from foot to foot, arms everywhere.
+
+Shevchenko ran up and went straight down the middle, hoping the keeper would dive out of the way.
+
+Dudek did dive, to his right. But he left his left hand up, and the ball hit it.
+
+For a second, nobody moved.
+
+Then the Liverpool end exploded. The players sprinted from the halfway line and buried Dudek under a pile of red shirts.
+
+Back home, pubs all over Liverpool went mad. Strangers hugging in the street. Grown men in tears.
+
+In Milan, people just stared at their screens. Three–nil up at half-time. How had they lost this?
+
+The Istanbul miracle was complete. Liverpool were champions of Europe.
 
 ## 11. What happened next
 
@@ -240,6 +256,7 @@ In the next video, someone else does the impossible. Make sure you're here when 
 - Second half: Gerrard 54' (header, Riise cross), Šmicer 56', Alonso 60' (penalty saved by Dida, rebound in; Gerrard fouled by Gattuso). Dudek double save from Shevchenko ~117'.
 - Half-time: Hamann on for Finnan (injured); Benítez had intended to take off Traoré (reported in many player/manager accounts, incl. Traoré "in the shower"); switch to three at the back (Carragher, Hyypiä, Traoré), Hamann holding, Gerrard further forward, Riise/Šmicer wide. Hamann's job widely described as stopping Kaká.
 - Shoot-out: Serginho over, Hamann ✓, Pirlo saved, Cissé ✓, Tomasson ✓, Riise saved, Kaká ✓, Šmicer ✓, Shevchenko saved. 3–2. Hamann reportedly played on with a broken bone in his foot ("reportedly").
+- Shevchenko's penalty: down the middle; Dudek dived to his right and saved with his left hand (widely described). Celebrations at home are general colour, no specific claims.
 - Carragher's Grobbelaar advice: from Dudek/Carragher accounts ("reportedly").
 - ~40,000 Liverpool fans: widely reported estimate ("around").
 - Opta 0.55% / 36.7%: kept from v1.

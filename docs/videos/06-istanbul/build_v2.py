@@ -289,7 +289,7 @@ def tracker(kicker, events, needed, needed_at=None, clock=None, note=None, stamp
             txt, n0, col = note; b = ramp(t, T(n0, sc), T(n0, sc) + 0.3)
             tracked(d, (W / 2, 940), txt, cond(46, 8), rgba(col, b), 8, "center")
         if stamp:
-            txt, s0, col = stamp; place_stamp(L, 1500, 760, ramp(t, T(s0, sc), T(s0, sc) + 0.2), text=txt, size=110, color=col, rot=-7)
+            txt, s0, col = stamp; place_stamp(L, W / 2, 965, ramp(t, T(s0, sc), T(s0, sc) + 0.2), text=txt, size=120, color=col, rot=-5)   # below the balls (Mike 10-15: was half hidden)
     return draw
 
 def gerrard_goal(d, L, t, sc):
@@ -373,7 +373,7 @@ def portraits(d, L, t, sc):
 def player_card(path, name, sub):
     """A small original photo shown at (near) its own size in a frame, never blown up, with the name beside it."""
     def draw(d, L, t, sc):
-        im = load(C + path); h = min(760, int(im.height * 1.15)); w_ = int(im.width * h / im.height)
+        im = load(C + path if os.path.exists(C + path) else M + path); h = min(760, int(im.height * 1.15)); w_ = int(im.width * h / im.height)
         if w_ > 900: w_ = 900; h = int(im.height * w_ / im.width)
         a = ramp(t, 0, 0.4); x0 = 640 - w_ // 2 - int(60 * (1 - ease(min(1, t / 0.6)))); y0 = 540 - h // 2
         d.rectangle((x0 - 14, y0 - 14, x0 + w_ + 14, y0 + h + 14), fill=rgba(CREAM, a))
@@ -561,7 +561,7 @@ def shootout(d, L, t, sc):
     text_top(d, (W / 2, 780), f"{tally[0]}–{tally[1]}", pf(110, 900), rgba(CREAM, a), "center")
     tracked(d, (W / 2 - 150, 820), "MILAN", cond(40, 8), rgba(CREAM, 0.8 * a), 6, "right")
     tracked(d, (W / 2 + 150, 820), "LIVERPOOL", cond(40, 8), rgba(CREAM, 0.8 * a), 6, "left")
-    k = at("Dudek dived", sc) + 1.6
+    k = at("For a second, nobody moved", sc) + 0.9
     if t > k:
         place_stamp(L, W / 2, 1000, ramp(t, k, k + 0.2), text="LIVERPOOL WIN 3–2", size=70, color=GOLD, rot=-6)
 
@@ -728,7 +728,8 @@ def tactics_change(d, L, t, sc):
     g = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     ImageDraw.Draw(g).rectangle(GAP, fill=rgba(LFC, 0.3 * a * (1 - ham)) if ham < 1 else rgba(GOLD, 0.18 * a))
     L.alpha_composite(g.filter(ImageFilter.GaussianBlur(8)))
-    tracked(d, ((GAP[0] + GAP[2]) / 2, GAP[3] + 20), "GAP CLOSED" if ham >= 1 else "THE GAP", cond(36, 8), rgba(GOLD if ham >= 1 else CREAM, a), 8, "center")
+    if ham <= 0 or ham >= 1:                                              # hidden while Hamann walks through it (Mike 10-15)
+        tracked(d, ((GAP[0] + GAP[2]) / 2, GAP[3] + 20), "GAP CLOSED" if ham >= 1 else "THE GAP", cond(36, 8), rgba(GOLD if ham >= 1 else CREAM, a), 8, "center")
     # Finnan leaves (already gone by the start of this scene, fading out over the first second)
     fx, fy = LFC1["FINNAN"]; fo = ramp(t, 0, 1.0)
     if fo < 1: label_dot(d, fx, fy + 200 * fo, LFC, a * (1 - fo), "FINNAN OFF", below=True)
@@ -745,12 +746,12 @@ def tactics_change(d, L, t, sc):
     if wb >= 1: sx += 230 * math.sin((t - wb0) * 1.6 + 2.5)
     label_dot(d, sx, sy, LFC, a, "ŠMICER" if wb else None, below=True)
     # Hamann comes on from the touchline into the gap, then shadows Kaká
-    on = ramp(t, 0.3, 1.3); hx, hy = lerp((600, FY1 + 60), (630, 560), max(on * 0.4, ham))
+    on = ramp(t, 0.3, 1.3); hx, hy = lerp((600, FY1 + 50), (630, 560), ham)          # waits on the touchline, then walks in
     kx, ky = MILAN["KAKÁ"]
     if t > shadow0:                                                       # Kaká tries the gap; Hamann is always there
         u = ((t - shadow0) % 3.0) / 3.0; kx, ky = lerp((930, FYM), (690, 470 + 140 * (int((t - shadow0) / 3.0) % 2)), ramp(u, 0.1, 0.5))
         hx, hy = lerp((630, 560), (kx - 55, ky + 10), ramp(u, 0.25, 0.6))
-    label_dot(d, hx, hy, LFC, a * on, "HAMANN", ring=GOLD)
+    label_dot(d, hx, hy, LFC, a * on, "HAMANN", ring=GOLD, below=hy > FY1 - 40)
     mil = dict(MILAN); mil["KAKÁ"] = (kx, ky)
     draw_side(d, mil, WHITE, a, names=("KAKÁ",) if t > c("Hamann sat right in front") else ())
     if t > shadow0 and ((t - shadow0) % 3.0) / 3.0 > 0.55:
@@ -771,7 +772,7 @@ KICKS[:] = [("SERGINHO", 0, False, ("Milan's first taker blazed", 1.2)), ("HAMAN
             ("PIRLO", 0, False, ("Then Pirlo stepped up", 1.3)), ("CISSÉ", 1, True, ("Both teams scored.", 0.1)),
             ("TOMASSON", 0, True, ("Both teams scored.", 0.8)), ("RIISE", 1, False, ("Then Dida saved one", 0.6)),
             ("KAKÁ", 0, True, ("Then both teams scored again", 0.1)), ("ŠMICER", 1, True, ("Then both teams scored again", 0.9)),
-            ("SHEVCHENKO", 0, False, ("Dudek dived", 1.3))]
+            ("SHEVCHENKO", 0, False, ("For a second, nobody moved", 0.0))]
 
 def what_next2(d, L, t, sc):
     """Three panels: the change at half-time, the fans, the dancing keeper. Then YOU DECIDE."""
@@ -810,7 +811,7 @@ scenes = [
     PS("This is the story of Liverpool's", M_CONFETTI, zoom=(1.0, 1.1), focus=((0.5, 0.45), (0.52, 0.4))),
     # I. the outsiders
     PS("Liverpool shouldn't really", KOP_OUT, zoom=(1.0, 1.1), chapter=CH("I", "THE OUTSIDERS"), strap=("Anfield", "LIVERPOOL FC", 0.6)),
-    PS("They had a new Spanish manager", BENITEZ, zoom=(1.05, 1.18), focus=((0.45, 0.45), (0.42, 0.42)), strap=("Rafael Benítez", "MANAGER  ·  FIRST SEASON", 0.5)),
+    PC("They had a new Spanish manager", BENITEZ, "Rafael Benítez", "MANAGER  ·  FIRST SEASON", bg=C + KOP_IN),
     CuS("In the Premier League, they finished", league_table, bg=bg_of(C + KOP_IN, 0.84)),
     CuS("And in Europe, they nearly", calendar, bg=bg_of(C + KOP_IN, 0.84)),
     PS("In their last group game", KOP_IN, zoom=(1.0, 1.12), strap=("Liverpool v Olympiacos", "ANFIELD  ·  8 DECEMBER 2004", 0.5)),
@@ -821,9 +822,9 @@ scenes = [
            note=("THREE GOALS  ·  45 MINUTES", ("Now they needed three", 1.4), CREAM)), bg=bg_of(C + KOP_IN, 0.84)),
     PS("Benítez sent on a young French", PONGOLLE, zoom=(1.0, 1.1), strap=("Florent Sinama-Pongolle", "SUBSTITUTE", 0.4)),
     CuS("Two minutes after the restart", tracker("47'  ·  SINAMA-PONGOLLE", [(0, 0, 1), (("One–one.", -0.1), 1, 1)], 1), bg=bg_of(C + KOP_IN, 0.84)),
-    PC("With nine minutes left", MELLOR, "Neil Mellor", "81'  ·  2–1"),
+    PC("With nine minutes left", "mellor_celebrates.jpg", "Neil Mellor", "81'  ·  2–1"),
     CuS("But that still wasn't enough", tracker("81'  ·  NEIL MELLOR", [(0, 2, 1)], 2, clock=(81, 86), note=("STILL ONE SHORT", 0.4, LFC)), bg=bg_of(C + KOP_IN, 0.84)),
-    PS("Then, with four minutes to go", GERRARD12, zoom=(1.0, 1.1), focus=((0.55, 0.45), (0.55, 0.4)), strap=("Steven Gerrard", "CAPTAIN", 0.5)),
+    PS("Then, with four minutes to go", "gerrard_2005.jpg", zoom=(1.0, 1.1), focus=((0.55, 0.4), (0.55, 0.35)), strap=("Steven Gerrard", "CAPTAIN", 0.5)),
     Custom(SF("Then, with four minutes to go", 0.55), gerrard_goal),
     CuS("Three–one.", tracker("86'  ·  STEVEN GERRARD", [(0, 2, 1), (0.15, 3, 1)], 3, stamp=("THROUGH", ("Liverpool were through", 0.0), GOLD)), bg=bg_of(C + KOP_IN, 0.84)),
     AS("Looking back, it was a sign", "ai_trophy_fireworks.png", zoom=(1.0, 1.12), texts=[(0.6, "A sign of things to come.", "mid")]),
@@ -843,7 +844,7 @@ scenes = [
     PC("A free kick came in, and the Milan captain", MALDINI, "Paolo Maldini", "MILAN CAPTAIN  ·  0:50"),
     CuS("About fifty seconds on the clock", fifty_seconds),
     CuS("Then Liverpool lost Harry Kewell", sub_board("23'  ·  INJURY", "KEWELL", "ŠMICER")),
-    PS("A Czech midfielder", SMICER, zoom=(1.0, 1.1), focus=((0.5, 0.35), (0.5, 0.3)), strap=("Vladimír Šmicer", "ON FOR KEWELL", 0.4),
+    PS("A Czech midfielder", "smicer_celebrates.jpg", zoom=(1.15, 1.3), focus=((0.75, 0.4), (0.75, 0.35)), strap=("Vladimír Šmicer", "ON FOR KEWELL", 0.4),
        texts=[(S("Remember him.") - S("A Czech midfielder", -0.15), "Remember him.", "big")]),
     CuS("Six minutes before the break", play("39'  ·  SHEVCHENKO CROSSES  ·  CRESPO SCORES",
         [("SHEVCHENKO", WHITE, [(0.2, 1250, 260), (1.4, 1530, 230)]), ("CRESPO", WHITE, [(0.2, 1300, 640), (2.2, 1600, 580)]),
@@ -851,7 +852,7 @@ scenes = [
         [(0.2, 1100, 300), (1.4, 1530, 245), (2.2, 1585, 575, 0, 40), (2.6, PX1 + 22, PYM + 30)],
         events=[(2.6, "GOAL", GOLD, 1420, 820)], score=("MILAN", "LIVERPOOL", [(0, 1, 0), (2.7, 2, 0)]),
         others=[(LFC, 1450, 420), (LFC, 1480, 640), (LFC, 1380, 520), (LFC, 1200, 740)])),
-    Custom(SF("Six minutes before the break", 0.74), player_card(CRESPO, "Hernán Crespo", "39'  ·  2–0"), bg=bg_of(C + STADIUM_IN, 0.78)),
+    Custom(SF("Six minutes before the break", 0.74), player_card("crespo_milan.jpg", "Hernán Crespo", "39'  ·  2–0"), bg=bg_of(C + STADIUM_IN, 0.78)),
     PC("Right on half-time, Kaká", KAKA, "Kaká", "MILAN'S PLAYMAKER"),
     Custom(SF("Right on half-time, Kaká", 0.5), play("44'  ·  KAKÁ'S PASS  ·  CRESPO'S CHIP",
         [("KAKÁ", WHITE, [(0, 760, 600)]), ("CRESPO", WHITE, [(0.3, 1050, 360), (1.9, 1450, 440), (2.6, 1560, 470)]),
@@ -860,7 +861,7 @@ scenes = [
         events=[(3.3, "GOAL", GOLD, 1420, 820), (2.6, "CHIPPED", CREAM, 1500, 300)], score=("MILAN", "LIVERPOOL", [(0, 2, 0), (3.4, 3, 0)]),
         others=[(LFC, 1250, 380), (LFC, 1180, 560), (LFC, 1250, 720), (LFC, 1000, 470)])),
     # IV. what was going wrong (one continuous explainer)
-    PS("Three–nil to Milan at the break", M_HURDLE, zoom=(1.0, 1.1), focus=((0.5, 0.55), (0.55, 0.6)), chapter=CH("IV", "WHAT WAS GOING WRONG"),
+    AS("Three–nil to Milan at the break", "ai_istanbul_night.png", zoom=(1.1, 1.22), focus=((0.4, 0.45), (0.35, 0.45)), chapter=CH("IV", "WHAT WAS GOING WRONG"),
        texts=[(0.4, "Half-time. Milan 3–0 Liverpool.", "mid")]),
     CuS("So what was going wrong", tactics_wrong),
     Custom(S("Years later, the data company", -0.15), odds_low, bg=bg_of(DRESSING, 0.85)),
@@ -882,7 +883,7 @@ scenes = [
        strap=("John Arne Riise", "LEFT-BACK  ·  THE CROSS", 0.5)),
     CuS("Gerrard rose and headed it in", scoreboard("54'  ·  GERRARD  ·  HEADER", [(0, 3, 0), (0.5, 3, 1)], sub=("GAME ON?", 1.4)), bg=bg_of(RED_END, 0.8)),
     AS("He jogged back to the halfway line", "ai_red_end_halftime.png", zoom=(1.0, 1.15), focus=((0.4, 0.5), (0.3, 0.5)), texts=[(0.9, "Come on.", "big"), (2.4, "Make some noise.", "big+")]),
-    PS("Two minutes later, Šmicer", SMICER, zoom=(1.12, 1.25), focus=((0.5, 0.35), (0.5, 0.3)), strap=("Vladimír Šmicer", "56'", 0.4)),
+    PS("Two minutes later, Šmicer", "smicer_celebrates.jpg", zoom=(1.0, 1.12), focus=((0.6, 0.45), (0.65, 0.4)), strap=("Vladimír Šmicer", "56'", 0.4)),
     CuS("It skidded past the Milan keeper", play("56'  ·  ŠMICER  ·  PAST DIDA",
         [("ŠMICER", LFC, [(0, 1080, 640)]), ("DIDA", KEEPER, [(0, PX1 - 25, PYM), (0.9, PX1 - 30, PYM + 40)])],
         [(0.1, 1095, 635), (1.0, PX1 + 20, PYM + 58)], events=[(1.0, "GOAL", GOLD, 1420, 300)],
@@ -901,7 +902,7 @@ scenes = [
         others=[(WHITE, 1150, 420), (WHITE, 1150, 680), (LFC, 1170, 550)])),
     CuS("Three goals in six minutes", six_minutes),
     # VII. the save
-    AS("After that, Milan took control", "ai_extra_time.png", zoom=(1.0, 1.12), chapter=CH("VII", "THE SAVE")),
+    AS("After that, Milan took control", "ai_extra_time.png", zoom=(1.0, 1.04), chapter=CH("VII", "THE SAVE")),
     AS("Liverpool clung on into extra time", "ai_cramp.png", zoom=(1.0, 1.12), focus=((0.45, 0.55), (0.5, 0.5)), texts=[(0.5, "Extra time. Cramp everywhere.", "mid")]),
     AS("With three minutes left", "ai_sheva_close.png", zoom=(1.0, 1.12), strap=("Andriy Shevchenko", "117'  ·  IN FRONT OF GOAL", 0.5),
        fallback=AS("With three minutes left", "ai_shootout_behind_goal.png", zoom=(1.05, 1.18), strap=("Andriy Shevchenko", "117'  ·  IN FRONT OF GOAL", 0.5))),
@@ -918,20 +919,31 @@ scenes = [
     CuS("He later called it the save", save_quote, bg=bg_of(C + DUDEK, 0.8)),
     # VIII. penalties
     AS("And so the game was going to penalties", "ai_shootout_behind_goal.png", zoom=(1.0, 1.12), chapter=CH("VIII", "PENALTIES")),
-    PS("Before the shoot-out, Jamie Carragher", CARRA, zoom=(1.0, 1.08), focus=((0.5, 0.3), (0.5, 0.25)), strap=("Jamie Carragher", "LIVERPOOL DEFENDER", 0.6),
+    PS("Before the shoot-out, Jamie Carragher", "carragher_0607.jpg", zoom=(1.0, 1.1), focus=((0.45, 0.35), (0.45, 0.3)), strap=("Jamie Carragher", "LIVERPOOL DEFENDER", 0.6),
        texts=[(S("Put them off, he said.") - S("Before the shoot-out, Jamie Carragher", -0.15), "“Put them off.”", "big")]),
     PS("Do what Bruce Grobbelaar", GROBBELAAR, zoom=(1.0, 1.1), focus=((0.35, 0.45), (0.32, 0.4)), strap=("Bruce Grobbelaar", "LIVERPOOL KEEPER  ·  ROME 1984", 0.5)),
     VS("So Dudek danced on his line", "ai_shootout_clip.mp4", end=1.6),
     AS("Wobbly legs.", "ai_keeper_legs.png", zoom=(1.05, 1.2), focus=((0.4, 0.6), (0.4, 0.62)),
        texts=[(0.15, "Wobbly legs.", "mid"), (S("Arms everywhere.") - S("Wobbly legs.", -0.15), "Arms everywhere.", "mid+")]),
     CuS("Milan's first taker blazed", shootout, bg=bg_of(SHOOTOUT, 0.84)),
-    PS("And he took that penalty", HAMANN_P, zoom=(1.0, 1.1), strap=("Dietmar Hamann", "SCORED  ·  REPORTEDLY WITH A BROKEN FOOT", 0.4)),
+    PS("And he took that penalty", "hamann_final.jpg", zoom=(1.0, 1.12), focus=((0.6, 0.45), (0.68, 0.4)), strap=("Dietmar Hamann", "SCORED  ·  REPORTEDLY WITH A BROKEN FOOT", 0.4)),
     PC("Then Pirlo stepped up", PIRLO, "Andrea Pirlo", "SAVED BY DUDEK"),
     CuS("Both teams scored.", shootout, bg=bg_of(SHOOTOUT, 0.84)),
-    AS("Which left Shevchenko", "ai_sheva_walk.png", zoom=(1.0, 1.1), strap=("Andriy Shevchenko", "EUROPEAN FOOTBALLER OF THE YEAR", 0.4),
-       fallback=PC("Which left Shevchenko", SHEVA, "Andriy Shevchenko", "EUROPEAN FOOTBALLER OF THE YEAR")),
-    CuS("Dudek dived", shootout, bg=bg_of(SHOOTOUT, 0.84)),
-    VS("Liverpool were champions of Europe", "ai_trophy_fireworks_clip.mp4", texts=[(0.4, "Champions of Europe.", "big")]),
+    PC("Which left Shevchenko", SHEVA, "Andriy Shevchenko", "EUROPEAN FOOTBALLER OF THE YEAR", bg=SHOOTOUT),
+    AS("He walked up from the halfway line", "ai_sheva_walk.png", zoom=(1.0, 1.12), strap=("Andriy Shevchenko", "THE FIFTH PENALTY", 0.6)),
+    VS("He bent down and placed the ball", "ai_ball_on_spot_clip.mp4", fallback=AS("He bent down and placed the ball", "ai_shootout_behind_goal.png", zoom=(1.0, 1.15), focus=((0.55, 0.6), (0.55, 0.62)))),
+    VS("And on his line, Dudek was dancing", "ai_keeper_dance_clip.mp4", fallback=AS("And on his line, Dudek was dancing", "ai_keeper_legs.png", zoom=(1.15, 1.0), focus=((0.4, 0.55), (0.4, 0.5)))),
+    CuS("Shevchenko ran up and went straight", play("THE FIFTH PENALTY  ·  SHEVCHENKO  v  DUDEK",
+        [("SHEVCHENKO", WHITE, [(0, 1260, PYM + 40), (0.9, 1360, PYM + 10)]),
+         ("_DUDEK", KEEPER, [(0, PX1 - 25, PYM), (0.5, PX1 - 25, PYM - 18), (0.7, PX1 - 25, PYM + 18), (("Dudek did dive", 0.0), PX1 - 25, PYM),
+                             (("Dudek did dive", 0.6), PX1 - 40, PYM + 85)])],
+        [(0, 1380, PYM), (("Dudek did dive", 0.2), 1380, PYM), (("Dudek did dive", 0.8), PX1 - 30, PYM - 4), (("Dudek did dive", 1.6), 1500, PYM - 60, 0, 60)],
+        events=[(("Dudek did dive", 0.9), "SAVED", GOLD, 1420, 300)], score=("MILAN", "LIVERPOOL", [(0, 2, 3)]))),
+    CuS("For a second, nobody moved", shootout, bg=bg_of(SHOOTOUT, 0.84)),
+    VS("Then the Liverpool end exploded", "ai_pile_on_clip.mp4", fallback=VS("Then the Liverpool end exploded", "ai_red_end_clip.mp4")),
+    VS("Back home, pubs all over Liverpool", "ai_pub_clip.mp4", fallback=AS("Back home, pubs all over Liverpool", "ai_red_end_halftime.png", zoom=(1.1, 1.25))),
+    VS("In Milan, people just stared", "ai_milan_stunned_clip.mp4", fallback=AS("In Milan, people just stared", "ai_istanbul_night.png", zoom=(1.0, 1.15))),
+    VS("The Istanbul miracle was complete", "ai_trophy_fireworks_clip.mp4", texts=[(0.4, "The Istanbul miracle.", "big"), (S("Liverpool were champions of Europe") - S("The Istanbul miracle was complete", -0.15), "Champions of Europe.", "big+")]),
     # IX. what happened next
     PS("It was Liverpool's fifth European Cup", MEDAL, zoom=(1.0, 1.1), focus=((0.5, 0.6), (0.5, 0.7)), chapter=CH("IX", "WHAT HAPPENED NEXT"),
        strap=("The winners' medal", "ISTANBUL  ·  2005", 0.4)),
@@ -940,12 +952,12 @@ scenes = [
     PS("But there was a problem", M_LIFT, zoom=(1.0, 1.1), focus=((0.55, 0.35), (0.55, 0.3)),
        texts=[(S("Liverpool's fifth place in the league") - S("But there was a problem", -0.15), "5th in the league.", "mid"),
               (S("Liverpool's fifth place in the league") - S("But there was a problem", -0.15) + 2.0, "No place next season.", "mid+")]),
-    CuS("UEFA made an exception", qualifying, bg=bg_of(C + PARADE, 0.84)),
-    PS("And Šmicer never played", SMICER, zoom=(1.0, 1.1), focus=((0.5, 0.4), (0.5, 0.35)), strap=("Vladimír Šmicer", "NEXT CLUB: BORDEAUX", 0.6),
+    CuS("UEFA made an exception", qualifying, bg=bg_of(M + "parade_bus.jpg", 0.84)),
+    PS("And Šmicer never played", "smicer_celebrates.jpg", zoom=(1.2, 1.35), focus=((0.72, 0.42), (0.74, 0.38)), strap=("Vladimír Šmicer", "NEXT CLUB: BORDEAUX", 0.6),
        texts=[(S("That penalty in Istanbul") - S("And Šmicer never played", -0.15), "His last kick for Liverpool.", "mid")]),
     PS("Two years later, the same two teams", ATHENS, zoom=(1.0, 1.1), strap=("Athens", "LIVERPOOL FANS  ·  23 MAY 2007", 0.8)),
     CuS("Milan won it, two–one.", scoreboard("THE 2007 FINAL  ·  ATHENS", [(0, 0, 0), (0.3, 2, 1)]), bg=bg_of(C + ATHENS, 0.82)),
-    PS("But in Liverpool, one word", PARADE, zoom=(1.0, 1.1), strap=("Liverpool", "THE PARADE  ·  26 MAY 2005", 0.5)),
+    PC("But in Liverpool, one word", "parade_bus.jpg", "The parade", "LIVERPOOL  ·  26 MAY 2005", bg=M + "parade_bus.jpg"),
     PF("But in Liverpool, one word", 0.8, M_KISS, zoom=(1.0, 1.1), focus=((0.6, 0.45), (0.62, 0.4)), texts=[(0.5, "Istanbul.", "big")]),
     # X. what if
     AS("So here's the question", "ai_tactics_board.png", zoom=(1.12, 1.0), chapter=CH("X", "WHAT IF"),
