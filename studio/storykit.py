@@ -113,9 +113,22 @@ def draw_credit(L, credit, a=0.7):
     d.text((W - 40 - w, H - 38), credit, font=f, fill=rgba(CREAM, 0.75 * a))
 
 # ---------------------------------------------------------------- scene base
+def draw_dyk(L, dyk, t, dur):
+    """Top-right panel: red DID YOU KNOW? tab, the fact underneath; slides in, leaves before the cut."""
+    at, txt = dyk; a = min(ramp(t, at, at + 0.45), 1 - ramp(t, (dur or 99) - 0.5, (dur or 99) - 0.1))
+    if a <= 0: return
+    d = ImageDraw.Draw(L); f = pf(42, 700); lines = wrap(txt, f, 620); off = 80 * (1 - ease(a))
+    x1 = W - 70 + off; x0 = x1 - 680; y0 = 90
+    d.rounded_rectangle((x0, y0 + 46, x1, y0 + 64 + 56 * len(lines)), 12, fill=rgba(NAVY_D, 0.86 * a))
+    d.rectangle((x0, y0 + 46, x0 + 6, y0 + 64 + 56 * len(lines)), fill=rgba(RED, a))
+    d.rounded_rectangle((x0, y0, x0 + 36 + cond(30, 8).getlength("DID YOU KNOW?") + 6 * 13, y0 + 44), 8, fill=rgba(RED, a))
+    tracked(d, (x0 + 18, y0 + 6), "DID YOU KNOW?", cond(30, 8), rgba(CREAM, a), 6)
+    for i, ln in enumerate(lines): text_top(d, (x0 + 26, y0 + 60 + 56 * i), ln, f, rgba(CREAM, a), "left")
+
 class Scene:
-    def __init__(self, start, chapter=None, strap=None, credit=None, texts=None, dim=0.0):
+    def __init__(self, start, chapter=None, strap=None, credit=None, texts=None, dim=0.0, dyk=None):
         self.start = start; self.dur = None
+        self.dyk = dyk                  # (at, "a fact most viewers won't know"): a DID YOU KNOW panel slides in (Mike 10-16)
         self.chapter = chapter          # "II  ·  THE PROBLEM"
         self.strap = strap              # (title, sub, at_seconds) local time
         self.credit = credit
@@ -134,6 +147,7 @@ class Scene:
             title, sub, at = self.strap
             draw_strap(L, title, sub, min(ramp(t, at, at + 0.5), 1 - ramp(t, self.dur - 0.6, self.dur - 0.1)))
         if self.texts: self._texts(L, t)
+        if self.dyk: draw_dyk(L, self.dyk, t, self.dur)
         draw_credit(L, self.credit)
         im = im.convert("RGBA"); im.alpha_composite(L); return im.convert("RGB")
     def _texts(self, L, t):

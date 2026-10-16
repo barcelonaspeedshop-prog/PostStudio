@@ -52,3 +52,20 @@ We look at these together every Monday and change one thing at a time.
 2. **Week 2:** Brawn goes out on Omnira F1 with its Shorts. Istanbul gets the same detail pass.
 3. **Week 3:** Istanbul out on Omnira Football. Fan car rewritten with a "how the fan worked" centrepiece.
 4. **Week 4:** first Monday review of the numbers. Decide whether GoF joins as a second weekly channel.
+
+## Standalone Shorts (added 16 Oct)
+
+On top of the Shorts cut from each long video, every active channel gets **3 standalone Shorts a week** that aren't part of a long video. Same rule as the long videos: each Short is made for one channel's audience, not copied across all of them.
+
+Four formats, all 30–50 seconds, all built with the same kit (AI clip library, Commons photos, our graphics):
+1. **One-minute story:** a whole story with one twist ("The keeper who danced a final away").
+2. **Explained:** one idea, one animated graphic ("How a diffuser sucks an F1 car down", "Why the offside trap works").
+3. **Did you know?:** one surprising fact with a strong picture ("Crespo scored twice in the final for Milan, while on loan from Chelsea").
+4. **On this day:** anniversaries give a reason to post, and they come round every year.
+
+Narration: Mike records a batch of 6–10 Short scripts in one sitting (about 5 minutes of audio). Some formats (Did you know?) work with captions and music only.
+
+## TikTok and X
+
+- **TikTok: yes, start now.** The same vertical Shorts go straight on, so it costs no extra production, and TikTok shows new accounts' videos to people who don't follow them yet. Start with Omnira F1 and Omnira Football. Posting starts by hand or with TikTok's own scheduler (up to 10 days ahead); automated posting needs TikTok to approve an app, like the YouTube audit, so we apply in parallel.
+- **X: later.** X is strong for live news and arguments, weak for evergreen story videos from new accounts, and its posting API is paid. Revisit once TikTok and YouTube are running smoothly.
