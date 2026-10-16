@@ -1017,7 +1017,7 @@ scenes = [
     AS("He walked up from the halfway line", "ai_sheva_walk.png", zoom=(1.0, 1.12), strap=("Andriy Shevchenko", "THE FIFTH PENALTY", 0.6)),
     VS("He bent down and placed the ball", "ai_ball_on_spot_clip.mp4", skip=3.4, fallback=AS("He bent down and placed the ball", "ai_shootout_behind_goal.png", zoom=(1.0, 1.15), focus=((0.55, 0.6), (0.55, 0.62)))),
     VS("And on his line, Dudek was dancing", "ai_keeper_dance_clip.mp4", fallback=AS("And on his line, Dudek was dancing", "ai_keeper_legs.png", zoom=(1.15, 1.0), focus=((0.4, 0.55), (0.4, 0.5)))),
-    AS("Shevchenko ran up and went straight", "ai_save.png", zoom=(1.0, 1.28), focus=((0.45, 0.45), (0.38, 0.45)),
+    AS("Shevchenko ran up and went straight", "ai_save.png", zoom=(1.0, 1.22), focus=((0.45, 0.5), (0.3, 0.45)),
        texts=[(0.8, "Straight down the middle.", "mid"), (S("Dudek did dive") - S("Shevchenko ran up and went straight", -0.15), "Dudek dives right...", "mid"),
               (S("But he left his left hand up") - S("Shevchenko ran up and went straight", -0.15), "...but his left hand stays up.", "mid+")]),
     CuS("For a second, nobody moved", shootout, bg=bg_of(SHOOTOUT, 0.84)),
