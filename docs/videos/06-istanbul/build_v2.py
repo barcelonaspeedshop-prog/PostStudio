@@ -771,6 +771,53 @@ def tactics_change(d, L, t, sc):
         gx, gy = LFC2["GERRARD"]; d.line((gx + 30, gy, FX1, FYM), fill=rgba(GOLD, 0.7 * close), width=4)
         tracked(d, ((gx + FX1) / 2, gy - 90), "CLOSER TO GOAL", cond(34, 8), rgba(GOLD, close), 6, "center")
 
+
+def penalty_save(d, L, t, sc):
+    """The fifth penalty, from behind the taker: the goal fills the frame, Dudek dives to his right (screen left),
+    the ball comes down the middle in slow motion and hits his trailing left hand."""
+    k0, k1, k2 = at("Shevchenko ran up", sc), at("Dudek did dive", sc), at("But he left his left hand up", sc)
+    a = ramp(t, 0, 0.4)
+    tracked(d, (W / 2, 70), "THE FIFTH PENALTY  ·  SHEVCHENKO  v  DUDEK", cond(40, 8), rgba(GOLD, a), 10, "center")
+    gx0, gx1, gy0, gy1 = 380, 1540, 250, 770
+    for k in range(13):                                                    # the net
+        x = gx0 + (gx1 - gx0) * k / 12; d.line((x, gy0, x, gy1), fill=rgba(CREAM, 0.18 * a), width=2)
+    for k in range(7):
+        y = gy0 + (gy1 - gy0) * k / 6; d.line((gx0, y, gx1, y), fill=rgba(CREAM, 0.18 * a), width=2)
+    d.line((gx0, gy1, gx0, gy0, gx1, gy0, gx1, gy1), fill=rgba(CREAM, a), width=16, joint="curve")
+    d.line((200, gy1 + 4, 1720, gy1 + 4), fill=rgba(CREAM, 0.6 * a), width=5)
+    # keeper: standing and waving, then the dive to his right (screen left), his left hand trailing in the middle
+    dv = ease(ramp(t, k1, k1 + 0.6)); wave = 0 if dv else 22 * math.sin(t * 7)
+    stand = {"lf": (900, 765), "rf": (1020, 765), "hip": (960, 650), "sh": (960, 540), "head": (960, 495), "rh": (850, 455 + wave), "lh": (1070, 455 - wave)}
+    dive = {"lf": (1000, 765), "rf": (1060, 745), "hip": (905, 640), "sh": (790, 575), "head": (745, 552), "rh": (640, 545), "lh": (965, 585)}
+    P = {k: lerp(stand[k], dive[k], dv) for k in stand}
+    kc = KEEPER
+    for a_, b_, w in (("lf", "hip", 26), ("rf", "hip", 26), ("hip", "sh", 46), ("sh", "rh", 20), ("sh", "lh", 20)):
+        d.line((P[a_], P[b_]), fill=rgba(kc, a), width=w)
+    hx, hy = P["head"]; d.ellipse((hx - 30, hy - 30, hx + 30, hy + 30), fill=rgba(kc, a))
+    for h in ("rh", "lh"):
+        x, y = P[h]; d.ellipse((x - 16, y - 16, x + 16, y + 16), fill=rgba(CREAM, a))
+    tracked(d, (P["head"][0], P["head"][1] - 80), "DUDEK", cond(34, 8), rgba(CREAM, a), 6, "center")
+    # the ball: on the spot (close to us), then down the middle in slow motion, onto the left hand, then away
+    hit = k2 + 1.3
+    if t < k1 + 0.3: bx, by, r = W / 2, 975, 46
+    elif t < hit:
+        f = ease((t - (k1 + 0.3)) / max(0.5, hit - (k1 + 0.3))); bx, by = lerp((W / 2, 975), (965, 585), f); r = 46 - 28 * f
+    else:
+        f = min(1.0, (t - hit) / 0.7); bx, by = lerp((965, 585), (1290, 260), ease(f)); r = 18 - 4 * f
+    if k1 + 0.3 < t < hit: d.line((W / 2, 975, bx, by), fill=rgba(GOLD, 0.35 * a), width=6)
+    d.ellipse((bx - r, by - r, bx + r, by + r), fill=rgba(CREAM, a), outline=rgba(NAVY_D, a), width=4)
+    if t < k1: tracked(d, (W / 2, 1020), "SHEVCHENKO  ·  STRAIGHT DOWN THE MIDDLE", cond(38, 8), rgba(CREAM, ramp(t, k0, k0 + 0.5)), 8, "center")
+    if k1 < t < hit: tracked(d, (W / 2, 1020), "SLOW MOTION", cond(32, 8), rgba(GOLD, 0.8), 14, "center")
+    lb = ramp(t, k2, k2 + 0.4)
+    if lb > 0 and t < hit + 2:
+        x, y = dive["lh"]; rr = 44 + 10 * math.sin(t * 8)
+        d.ellipse((x - rr, y - rr, x + rr, y + rr), outline=rgba(GOLD, lb), width=6)
+        tracked(d, (x + 70, y + 40), "HIS LEFT HAND", cond(36, 8), rgba(GOLD, lb), 6)
+    if t > hit:
+        fl = max(0.0, 1 - (t - hit) / 0.4)
+        if fl > 0: d.ellipse((965 - 120 * (1 - fl), 585 - 120 * (1 - fl), 965 + 120 * (1 - fl), 585 + 120 * (1 - fl)), outline=rgba(CREAM, fl), width=8)
+        place_stamp(L, W / 2, 930, ramp(t, hit + 0.2, hit + 0.45), text="SAVED", size=150, color=GOLD, rot=-6)
+
 # ---------------------------------------------------------------- v2 helpers (new lines in the script)
 PAIRS[:] = [("Maldini and Nesta at the back", "DEFENCE", [("3", "Paolo Maldini", "CAPTAIN"), ("13", "Alessandro Nesta", "CENTRE-BACK")]),
             ("Pirlo, who could pass", "MIDFIELD", [("21", "Andrea Pirlo", "PLAYMAKER"), ("22", "Kaká", "ATTACKING MIDFIELD")]),
@@ -947,12 +994,7 @@ scenes = [
     AS("He walked up from the halfway line", "ai_sheva_walk.png", zoom=(1.0, 1.12), strap=("Andriy Shevchenko", "THE FIFTH PENALTY", 0.6)),
     VS("He bent down and placed the ball", "ai_ball_on_spot_clip.mp4", fallback=AS("He bent down and placed the ball", "ai_shootout_behind_goal.png", zoom=(1.0, 1.15), focus=((0.55, 0.6), (0.55, 0.62)))),
     VS("And on his line, Dudek was dancing", "ai_keeper_dance_clip.mp4", fallback=AS("And on his line, Dudek was dancing", "ai_keeper_legs.png", zoom=(1.15, 1.0), focus=((0.4, 0.55), (0.4, 0.5)))),
-    CuS("Shevchenko ran up and went straight", play("THE FIFTH PENALTY  ·  SHEVCHENKO  v  DUDEK",
-        [("SHEVCHENKO", WHITE, [(0, 1260, PYM + 40), (0.9, 1360, PYM + 10)]),
-         ("_DUDEK", KEEPER, [(0, PX1 - 25, PYM), (0.5, PX1 - 25, PYM - 18), (0.7, PX1 - 25, PYM + 18), (("Dudek did dive", 0.0), PX1 - 25, PYM),
-                             (("Dudek did dive", 0.6), PX1 - 40, PYM + 85)])],
-        [(0, 1380, PYM), (("Dudek did dive", 0.2), 1380, PYM), (("Dudek did dive", 0.8), PX1 - 30, PYM - 4), (("Dudek did dive", 1.6), 1500, PYM - 60, 0, 60)],
-        events=[(("Dudek did dive", 0.9), "SAVED", GOLD, 1420, 300)], score=("MILAN", "LIVERPOOL", [(0, 2, 3)]))),
+    CuS("Shevchenko ran up and went straight", penalty_save, bg=bg_of(DUSK, 0.86)),
     CuS("For a second, nobody moved", shootout, bg=bg_of(SHOOTOUT, 0.84)),
     VS("Then the Liverpool end exploded", "ai_pile_on_clip.mp4", fallback=VS("Then the Liverpool end exploded", "ai_red_end_clip.mp4")),
     VS("Back home, pubs all over Liverpool", "ai_pub_clip.mp4", fallback=AS("Back home, pubs all over Liverpool", "ai_red_end_halftime.png", zoom=(1.1, 1.25))),
