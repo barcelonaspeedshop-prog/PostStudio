@@ -1,0 +1,239 @@
+<title>PostStudio Call Sheet</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600;1,800&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: a production call sheet. Date strip on top, today's jobs split by who does them, carry-overs flagged red, the week ahead below. */
+:root {
+  --bg: #eef0f3; --surface: #ffffff; --ink: #1b2a4a; --muted: #5d6779; --line: #d5dae3;
+  --gold: #a8832f; --late: #c0283c; --late-bg: #fbe9ec;
+  --lane-long: #1b2a4a; --lane-shorts: #a8832f; --lane-pub: #2f7a55; --lane-chan: #8a3d8f;
+  --display: "Playfair Display", Georgia, serif; --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1626; --surface: #172138; --ink: #e6e9ef; --muted: #9aa4b6; --line: #2a3650;
+  --gold: #d6b86a; --late: #ff6b7d; --late-bg: #3a1a24;
+  --lane-long: #9fb4e0; --lane-shorts: #d6b86a; --lane-pub: #6cc79a; --lane-chan: #d29ad6; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f1626; --surface: #172138; --ink: #e6e9ef; --muted: #9aa4b6; --line: #2a3650;
+  --gold: #d6b86a; --late: #ff6b7d; --late-bg: #3a1a24;
+  --lane-long: #9fb4e0; --lane-shorts: #d6b86a; --lane-pub: #6cc79a; --lane-chan: #d29ad6; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font: 16px/1.45 var(--body); }
+.wrap { max-width: 1080px; margin: 0 auto; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 28px; }
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; border-bottom: 2px solid var(--ink); padding-bottom: 14px; }
+h1 { font: italic 800 clamp(30px, 5vw, 44px)/1.05 var(--display); margin: 0; text-wrap: balance; }
+.date { font: 500 13px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.stats { display: flex; gap: 18px; font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.stats b { color: var(--ink); font-size: 20px; display: block; }
+.stats .late b { color: var(--late); }
+h2 { font: italic 600 22px var(--display); margin: 0 0 10px; display: flex; align-items: baseline; gap: 10px; }
+h2 small { font: 500 12px var(--mono); color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+.col { min-width: 0; }
+.who { font: 700 13px var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+ul.tasks { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+ul.tasks li { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; padding: 10px 12px; border-top: 1px solid var(--line); }
+ul.tasks li:first-child { border-top: 0; }
+ul.tasks li.late { background: var(--late-bg); box-shadow: inset 4px 0 0 var(--late); }
+ul.tasks li.done .t { text-decoration: line-through; color: var(--muted); }
+.t { min-width: 0; overflow-wrap: anywhere; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; font: 500 11px var(--mono); }
+.lane { padding: 1px 7px; border-radius: 3px; border: 1px solid currentColor; letter-spacing: .04em; }
+.lane.long { color: var(--lane-long); } .lane.shorts { color: var(--lane-shorts); } .lane.pub { color: var(--lane-pub); } .lane.chan { color: var(--lane-chan); }
+.from { color: var(--late); letter-spacing: .04em; }
+.owner { color: var(--muted); }
+input[type=checkbox] { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--gold); cursor: pointer; }
+input[type=checkbox]:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.empty { padding: 14px 12px; color: var(--muted); background: var(--surface); border: 1px dashed var(--line); border-radius: 6px; }
+.week { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.day { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px; min-width: 0; }
+.day h3 { margin: 0 0 6px; font: 500 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }
+.day ol { margin: 0; padding-left: 16px; font-size: 13px; color: var(--ink); display: grid; gap: 3px; }
+.day .who-tag { color: var(--muted); font: 500 10px var(--mono); }
+form.add { display: flex; flex-wrap: wrap; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 12px; }
+form.add input[type=text] { flex: 1 1 240px; min-width: 0; }
+form.add input, form.add select, button { font: 15px var(--body); padding: 7px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink); }
+button { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 700; cursor: pointer; }
+.note { font-size: 13px; color: var(--muted); }
+details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+@media (prefers-reduced-motion: no-preference) { ul.tasks li { transition: background .2s; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="date" id="today">Today</div>
+      <h1>Call Sheet</h1>
+    </div>
+    <div class="stats" aria-live="polite">
+      <div><b id="n-today">–</b>today</div>
+      <div class="late"><b id="n-late">–</b>carried over</div>
+      <div><b id="n-done">–</b>done today</div>
+    </div>
+  </header>
+
+  <section id="late-sec" hidden>
+    <h2>Carried over <small>not finished on the day, so they're on today</small></h2>
+    <div class="cols" id="late-cols"></div>
+  </section>
+
+  <section>
+    <h2>Today <small id="weekday"></small></h2>
+    <div class="cols" id="today-cols">
+      <div class="empty" id="loading">Loading the schedule. Today's jobs appear here, split between Mike and Claude; anything not ticked off moves to tomorrow on its own.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Add a job</h2>
+    <form class="add" id="add">
+      <label class="note" for="a-title" hidden>Job</label>
+      <input type="text" id="a-title" placeholder="e.g. Record Istanbul pickups" required>
+      <select id="a-owner" aria-label="Who">
+        <option>Mike</option><option>Claude</option><option>Both</option>
+      </select>
+      <select id="a-lane" aria-label="Type of work">
+        <option value="long">Long video</option><option value="shorts">Shorts</option><option value="pub">Publishing</option><option value="chan">Channel</option>
+      </select>
+      <input type="date" id="a-due" aria-label="Day">
+      <button type="submit">Add</button>
+    </form>
+    <p class="note" id="ro" hidden>You can view this schedule but not change it.</p>
+  </section>
+
+  <section>
+    <h2>The week ahead <small>the weekly rhythm, plus anything added</small></h2>
+    <div class="week" id="week"></div>
+  </section>
+
+  <section>
+    <details id="done-box"><summary>Done today</summary><ul class="tasks" id="done-list"></ul></details>
+  </section>
+</div>
+
+<script>
+const LANES = { long: "Long video", shorts: "Shorts", pub: "Publishing", chan: "Channel" };
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const pad = n => String(n).padStart(2, "0");
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parse = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const short = s => { const d = parse(s); return `${DAYS[d.getDay()].slice(0, 3)} ${d.getDate()} ${d.toLocaleString("en-GB", { month: "short" })}`; };
+const TODAY = iso(new Date());
+
+document.getElementById("today").textContent = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+document.getElementById("weekday").textContent = DAYS[new Date().getDay()];
+document.getElementById("a-due").value = TODAY;
+
+let tasks = [], template = [], canWrite = true, db = null, generated = false;
+
+function el(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) { if (k === "class") e.className = v; else if (k === "text") e.textContent = v; else e.setAttribute(k, v); }
+  for (const k of kids) if (k) e.append(k);
+  return e;
+}
+
+function row(t, late) {
+  const cb = el("input", { type: "checkbox", "aria-label": "Done: " + t.title });
+  cb.checked = !!t.done; cb.disabled = !canWrite;
+  cb.addEventListener("change", () => toggle(t, cb.checked));
+  const meta = el("div", { class: "meta" }, el("span", { class: "lane " + t.lane, text: LANES[t.lane] || t.lane }));
+  if (t.owner === "Both") meta.append(el("span", { class: "owner", text: "Mike + Claude" }));
+  if (late) meta.append(el("span", { class: "from", text: "from " + short(t.due) }));
+  if (t.note) meta.append(el("span", { class: "owner", text: t.note }));
+  return el("li", { class: (late ? "late " : "") + (t.done ? "done" : "") }, cb, el("div", {}, el("div", { class: "t", text: t.title }), meta));
+}
+
+function columns(container, list, late) {
+  container.replaceChildren();
+  for (const who of ["Mike", "Claude"]) {
+    const mine = list.filter(t => t.owner === who || t.owner === "Both");
+    const col = el("div", { class: "col" }, el("p", { class: "who", text: who }));
+    if (!mine.length) col.append(el("div", { class: "empty", text: late ? "Nothing carried over." : "Nothing for " + who + " today." }));
+    else { const ul = el("ul", { class: "tasks" }); mine.forEach(t => ul.append(row(t, late))); col.append(ul); }
+    container.append(col);
+  }
+}
+
+function render() {
+  document.getElementById("loading")?.remove();
+  const order = (a, b) => (a.order ?? 50) - (b.order ?? 50) || a.title.localeCompare(b.title);
+  // a daily job that has a newer copy isn't carried over; the newest copy stands for it
+  const newestDaily = {};
+  for (const t of tasks) if (t.daily && t.due <= TODAY) newestDaily[t.key] = newestDaily[t.key] > t.due ? newestDaily[t.key] : t.due;
+  const late = tasks.filter(t => !t.done && t.due < TODAY && !(t.daily && newestDaily[t.key] > t.due)).sort((a, b) => a.due.localeCompare(b.due) || order(a, b));
+  const today = tasks.filter(t => t.due === TODAY && !t.done).sort(order);
+  const doneToday = tasks.filter(t => t.done && (t.doneOn === TODAY)).sort(order);
+  document.getElementById("late-sec").hidden = !late.length;
+  columns(document.getElementById("late-cols"), late, true);
+  columns(document.getElementById("today-cols"), today, false);
+  document.getElementById("n-today").textContent = today.length;
+  document.getElementById("n-late").textContent = late.length;
+  document.getElementById("n-done").textContent = doneToday.length;
+  const dl = document.getElementById("done-list"); dl.replaceChildren(...doneToday.map(t => row(t, false)));
+  // the week ahead: template jobs for each coming day, plus one-off jobs already dated
+  const week = document.getElementById("week"); week.replaceChildren();
+  for (let i = 1; i <= 6; i++) {
+    const d = addDays(new Date(), i), ds = iso(d);
+    const items = template.filter(x => !x.daily && x.days?.includes(d.getDay())).map(x => ({ title: x.title, owner: x.owner, order: x.order }))
+      .concat(tasks.filter(t => t.due === ds && !t.key).map(t => ({ title: t.title, owner: t.owner, order: t.order }))).sort(order);
+    const ol = el("ol"); items.forEach(x => ol.append(el("li", {}, x.title + " ", el("span", { class: "who-tag", text: x.owner === "Both" ? "Mike + Claude" : x.owner }))));
+    week.append(el("div", { class: "day" }, el("h3", { text: short(ds) }), items.length ? ol : el("p", { class: "note", text: "Daily jobs only." })));
+  }
+}
+
+async function toggle(t, done) {
+  try { await db.collection("tasks").doc(t.id).update({ done, doneOn: done ? TODAY : null }); }
+  catch (e) { readOnly(); }
+}
+
+function readOnly() {
+  canWrite = false;
+  document.getElementById("add").hidden = true; document.getElementById("ro").hidden = false; render();
+}
+
+// today's (and any missed days') copies of the template jobs; idempotent ids, so two open tabs can't double up
+async function generate() {
+  const meta = db.doc("meta/gen");
+  const lease = await meta.acquire({ holder: "gen-" + Math.random().toString(36).slice(2), ttlMs: 20000 }).catch(() => ({ acquired: false }));
+  if (!lease.acquired) return;
+  const snap = await meta.get();
+  const last = snap.exists && snap.data().last ? parse(snap.data().last) : addDays(new Date(), -1);
+  let d = addDays(last, 1); const floor = addDays(new Date(), -7); if (d < floor) d = floor;
+  while (iso(d) <= TODAY) {
+    const ds = iso(d);
+    for (const x of template) {
+      if (!(x.daily || x.days?.includes(d.getDay()))) continue;
+      const ref = db.collection("tasks").doc(ds + "_" + x.key);
+      if ((await ref.get()).exists) continue;
+      await ref.set({ title: x.title, owner: x.owner, lane: x.lane, due: ds, done: false, doneOn: null, key: x.key, daily: !!x.daily, order: x.order ?? 50 });
+    }
+    d = addDays(d, 1);
+  }
+  await meta.set({ last: TODAY });
+}
+
+document.getElementById("add").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const title = document.getElementById("a-title").value.trim(); if (!title || !db) return;
+  try {
+    await db.collection("tasks").add({ title, owner: document.getElementById("a-owner").value, lane: document.getElementById("a-lane").value,
+      due: document.getElementById("a-due").value || TODAY, done: false, doneOn: null, order: 40 });
+    document.getElementById("a-title").value = "";
+  } catch (e) { readOnly(); }
+});
+
+(async () => {
+  db = await claude.use("db");
+  if (!db) { document.getElementById("loading").textContent = "The schedule couldn't load here. Open it from claude.ai while signed in."; return; }
+  const user = await claude.use("user");
+  if (user && (await user.can("data.write")) === false) readOnly();
+  db.collection("template").onSnapshot(s => {
+    template = s.docs.map(d => ({ key: d.id, ...d.data() }));
+    if (canWrite && template.length && !s.metadata.fromCache && !generated) { generated = true; generate().catch(() => {}); }
+    render();
+  }, () => {});
+  db.collection("tasks").onSnapshot(s => { tasks = s.docs.map(d => ({ id: d.id, ...d.data() })); render(); }, () => {});
+})();
+</script>
