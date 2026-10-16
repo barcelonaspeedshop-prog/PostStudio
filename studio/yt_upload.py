@@ -5,6 +5,7 @@
     $PY studio/yt_upload.py whoami "Road & Trax"         # which channel a saved sign-in posts to
     $PY studio/yt_upload.py upload "Road & Trax" FILE.mp4 --title "..." --desc "..." --at "2026-10-14 19:00" [--thumb x.jpg]
     $PY studio/yt_upload.py queue jobs.json [--max 6]     # uploads the next jobs not yet done (YouTube allows ~6 a day)
+    $PY studio/yt_upload.py show "Road & Trax" [VIDEO_ID]  # read an upload back from YouTube (default: the newest 3)
 
 --at is Spain time (Europe/Madrid). The video goes up private with publishAt, so YouTube publishes it then.
 Needs ~/.config/poststudio/yt_client.json (Google Cloud > Clients > Desktop app > Download JSON).
@@ -67,6 +68,21 @@ def upload(ch, path, title, desc, at=None, tags=None, thumb=None, category="17")
     if thumb: yt.thumbnails().set(videoId=vid, media_body=MediaFileUpload(thumb)).execute()
     return vid
 
+def show(ch, vid="latest", n=3):
+    """Read back what YouTube holds for an upload (videos.list) — the proof that an upload landed on the channel.
+    vid='latest' lists the channel's newest uploads from its uploads playlist."""
+    yt = service(ch)
+    if vid == "latest":
+        up = yt.channels().list(part="contentDetails", mine=True).execute()["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
+        items = yt.playlistItems().list(part="contentDetails", playlistId=up, maxResults=n).execute().get("items", [])
+        ids = [it["contentDetails"]["videoId"] for it in items]
+    else: ids = [vid]
+    r = yt.videos().list(part="snippet,status", id=",".join(ids)).execute()
+    for it in r.get("items", []):
+        sn, st = it["snippet"], it["status"]
+        print(f"  {it['id']}  '{sn['title']}'  channel: {sn['channelTitle']}  uploaded: {sn['publishedAt'][:16].replace('T', ' ')} UTC"
+              f"  privacy: {st['privacyStatus']}  upload status: {st['uploadStatus']}  https://youtu.be/{it['id']}")
+
 def queue(jobs_path, most):
     jobs = json.load(open(jobs_path)); done_p = os.path.splitext(jobs_path)[0] + ".done.json"
     done = json.load(open(done_p)) if os.path.exists(done_p) else {}
@@ -87,8 +103,10 @@ if __name__ == "__main__":
     u = sp.add_parser("upload"); u.add_argument("channel"); u.add_argument("file"); u.add_argument("--title", required=True)
     u.add_argument("--desc", default=""); u.add_argument("--at"); u.add_argument("--thumb"); u.add_argument("--tags", nargs="*")
     q = sp.add_parser("queue"); q.add_argument("jobs"); q.add_argument("--max", type=int, default=6)
+    sh = sp.add_parser("show"); sh.add_argument("channel"); sh.add_argument("video", nargs="?", default="latest")
     x = ap.parse_args()
     if x.cmd == "auth": auth(x.channel)
     elif x.cmd == "whoami": whoami(x.channel)
     elif x.cmd == "upload": upload(x.channel, x.file, x.title, x.desc, x.at, x.tags, x.thumb)
+    elif x.cmd == "show": show(x.channel, x.video)
     else: queue(x.jobs, x.max)
