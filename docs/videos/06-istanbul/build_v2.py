@@ -818,6 +818,29 @@ def penalty_save(d, L, t, sc):
         if fl > 0: d.ellipse((965 - 120 * (1 - fl), 585 - 120 * (1 - fl), 965 + 120 * (1 - fl), 585 + 120 * (1 - fl)), outline=rgba(CREAM, fl), width=8)
         place_stamp(L, W / 2, 930, ramp(t, hit + 0.2, hit + 0.45), text="SAVED", size=150, color=GOLD, rot=-6)
 
+
+GOLIATH = [("6", "EUROPEAN CUPS"), ("2003", "CHAMPIONS OF EUROPE"), ("17", "LEAGUE TITLES"), ("2004", "CHAMPIONS OF ITALY"),
+           ("3", "WORLD CLUB TITLES"), ("No. 1", "THEIR STRIKER: BEST PLAYER IN THE WORLD, 2004")]
+GOL_POS = [(470, 300, -6), (1420, 260, 5), (760, 610, 3), (1250, 640, -4), (520, 880, 6), (1330, 900, -3)]
+def goliath(d, L, t, sc):
+    """Mike 10-16: Milan's honours pile up fast until they almost cover the picture; the name comes on the next card."""
+    end = max(2.5, sc.dur - 0.6); step = (end - 0.5) / len(GOLIATH)
+    tracked(d, (W / 2, 70), "THE GOLIATH", cond(44, 8), rgba(GOLD, ramp(t, 0, 0.4)), 14, "center")
+    for i, ((big, lab), (cx, cy, rot)) in enumerate(zip(GOLIATH, GOL_POS)):
+        k = 0.4 + i * step; a = ramp(t, k, k + 0.12)
+        if a <= 0: continue
+        f = min(1.0, (t - k) / 0.25); sq = 1 + 0.35 * (1 - ease(f))
+        w, h = int(660 * sq), int(250 * sq)
+        card = Image.new("RGBA", (w, h), (0, 0, 0, 0)); cd = ImageDraw.Draw(card)
+        cd.rounded_rectangle((0, 0, w - 1, h - 1), 14, fill=rgba(NAVY_D, 0.94 * a), outline=rgba(GOLD, a), width=5)
+        cd.rectangle((0, 0, 14, h), fill=rgba(RED, a))
+        text_top(cd, (44, int(30 * sq)), big, pf(int(110 * sq), 900), rgba(CREAM, a), "left")
+        for j, ln in enumerate(wrap(lab, cond(int(34 * sq), 8), w - 90)):
+            tracked(cd, (46, int((160 + 40 * j) * sq)), ln, cond(int(34 * sq), 8), rgba(GOLD, a), 5)
+        card = card.rotate(rot, resample=Image.BICUBIC, expand=True)
+        sh = 10 * (1 - f) * math.sin(t * 60)
+        L.alpha_composite(card, (int(cx - card.width / 2 + sh), int(cy - card.height / 2)))
+
 # ---------------------------------------------------------------- v2 helpers (new lines in the script)
 PAIRS[:] = [("Maldini and Nesta at the back", "DEFENCE", [("3", "Paolo Maldini", "CAPTAIN"), ("13", "Alessandro Nesta", "CENTRE-BACK")]),
             ("Pirlo, who could pass", "MIDFIELD", [("21", "Andrea Pirlo", "PLAYMAKER"), ("22", "Kaká", "ATTACKING MIDFIELD")]),
@@ -887,7 +910,7 @@ scenes = [
     CuS("After that, they knocked out", route, bg=bg_of(NIGHT, 0.82)),
     PS("And somehow, they were in the final", STADIUM_IN, zoom=(1.0, 1.1)),
     # II. the giants
-    AS("Waiting for them in Istanbul", "ai_istanbul_night.png", zoom=(1.0, 1.12), focus=((0.6, 0.4), (0.65, 0.35)), chapter=CH("II", "THE GIANTS")),
+    CuS("Waiting for them in Istanbul", goliath, bg=bg_of(AI + "ai_istanbul_night.png", 0.3), chapter=CH("II", "THE GIANTS")),
     CuS("AC Milan.", milan, bg=bg_of(C + STADIUM_IN, 0.84)),
     Custom(S("Maldini and Nesta at the back", -0.35), portraits),
     PS("The final was at the national stadium", STADIUM_OUT, zoom=(1.0, 1.1), dyk=(2.2, "It was built for Istanbul's bid to host the 2008 Olympics"), strap=("Atatürk Olympic Stadium", "ISTANBUL  ·  25 MAY 2005", 0.8)),
@@ -989,16 +1012,19 @@ scenes = [
     FC("Then Pirlo stepped up", PIRLO, "Andrea Pirlo", "SAVED BY DUDEK", focus=(0.5, 0.35),
        facts=[(0.8, "Started out as an attacking midfielder"), (2.4, "Moved back to be a deep playmaker, it made him", True)]),
     CuS("Both teams scored.", shootout, bg=bg_of(SHOOTOUT, 0.84)),
-    FC("Which left Shevchenko", SHEVA, "Andriy Shevchenko", "EUROPEAN FOOTBALLER OF THE YEAR", focus=(0.5, 0.35),
-       facts=[(1.0, "Two years earlier, he scored the winning penalty in the final", True)]),
+    PS("Which left Shevchenko", "Andriy_Shevchenko_-_2004_-_AC_Milan_(1).jpg", zoom=(1.0, 1.12), focus=((0.5, 0.4), (0.52, 0.35)),
+       strap=("Andriy Shevchenko", "EUROPEAN FOOTBALLER OF THE YEAR", 0.5), dyk=(2.2, "Two years earlier, he scored the winning penalty in the final")),
     AS("He walked up from the halfway line", "ai_sheva_walk.png", zoom=(1.0, 1.12), strap=("Andriy Shevchenko", "THE FIFTH PENALTY", 0.6)),
-    VS("He bent down and placed the ball", "ai_ball_on_spot_clip.mp4", fallback=AS("He bent down and placed the ball", "ai_shootout_behind_goal.png", zoom=(1.0, 1.15), focus=((0.55, 0.6), (0.55, 0.62)))),
+    VS("He bent down and placed the ball", "ai_ball_on_spot_clip.mp4", skip=3.4, fallback=AS("He bent down and placed the ball", "ai_shootout_behind_goal.png", zoom=(1.0, 1.15), focus=((0.55, 0.6), (0.55, 0.62)))),
     VS("And on his line, Dudek was dancing", "ai_keeper_dance_clip.mp4", fallback=AS("And on his line, Dudek was dancing", "ai_keeper_legs.png", zoom=(1.15, 1.0), focus=((0.4, 0.55), (0.4, 0.5)))),
-    CuS("Shevchenko ran up and went straight", penalty_save, bg=bg_of(DUSK, 0.86)),
+    AS("Shevchenko ran up and went straight", "ai_save.png", zoom=(1.0, 1.28), focus=((0.45, 0.45), (0.38, 0.45)),
+       texts=[(0.8, "Straight down the middle.", "mid"), (S("Dudek did dive") - S("Shevchenko ran up and went straight", -0.15), "Dudek dives right...", "mid"),
+              (S("But he left his left hand up") - S("Shevchenko ran up and went straight", -0.15), "...but his left hand stays up.", "mid+")]),
     CuS("For a second, nobody moved", shootout, bg=bg_of(SHOOTOUT, 0.84)),
-    VS("Then the Liverpool end exploded", "ai_pile_on_clip.mp4", fallback=VS("Then the Liverpool end exploded", "ai_red_end_clip.mp4")),
-    VS("Back home, pubs all over Liverpool", "ai_pub_clip.mp4", fallback=AS("Back home, pubs all over Liverpool", "ai_red_end_halftime.png", zoom=(1.1, 1.25))),
-    VS("In Milan, people just stared", "ai_milan_stunned_clip.mp4", fallback=AS("In Milan, people just stared", "ai_istanbul_night.png", zoom=(1.0, 1.15))),
+    AS("Then the Liverpool end exploded", "ai_end_explodes.png", zoom=(1.0, 1.15), focus=((0.6, 0.45), (0.7, 0.4))),
+    AS("The players sprinted from the halfway line", "ai_pile_on.png", zoom=(1.0, 1.2), focus=((0.45, 0.6), (0.55, 0.65))),
+    AS("Back home, pubs all over Liverpool", "ai_pub.png", zoom=(1.0, 1.15), focus=((0.5, 0.5), (0.6, 0.55))),
+    AS("In Milan, people just stared", "ai_milan_bar.png", zoom=(1.0, 1.15), focus=((0.45, 0.5), (0.35, 0.45))),
     VS("The Istanbul miracle was complete", "ai_trophy_fireworks_clip.mp4", texts=[(0.4, "The Istanbul miracle.", "big"), (S("Liverpool were champions of Europe") - S("The Istanbul miracle was complete", -0.15), "Champions of Europe.", "big+")]),
     # IX. what happened next
     PS("It was Liverpool's fifth European Cup", MEDAL, zoom=(1.0, 1.1), focus=((0.5, 0.6), (0.5, 0.7)), chapter=CH("IX", "WHAT HAPPENED NEXT"),
