@@ -1,6 +1,6 @@
 # BANNED: The Minis That Won and Were Thrown Out (v2, the detailed cut)
 
-Script for narration, about 1,450 words, roughly 10 minutes at a relaxed pace.
+Script for narration, about 1,100 words, roughly 8 minutes at a relaxed pace.
 
 Read it naturally and change any wording that doesn't sound like you. [Square brackets] are notes for the edit. Don't read them out.
 
