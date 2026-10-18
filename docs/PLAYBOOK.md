@@ -34,6 +34,11 @@ Brawn v2 and Istanbul v2 are the reference videos. Every long video follows this
 - Numbers that pile up, stamps, counters and diagrams over a dimmed photo, never plain navy.
 - All zooms move by sub-pixel amounts (no shaking).
 - `studio/contact_sheets.py <build> <dir>`: every scene at three points, checked before rendering.
+- Cars in graphics are the real car (a side-on ChatGPT still cut out), never a drawn shape (Minis 10-18: drawn cars "look cheap"). Comparisons use real lengths.
+- Anything that moves (cut-outs, zooms) moves by sub-pixel transforms, never resize + integer paste (it shakes).
+- Labels in boxes are centred on the text as drawn, both ways; check long labels fit inside their panel.
+- Don't cut from an AI clip to the still it was made from; let the clip run (slower) over both lines.
+- Period cars on screen are the competition version when the story is the rally (a road car only when the narration says "production car").
 
 ## 6. Review (Mike)
 - Notes with times. Claude maps each time to the scene and the raw recording before changing anything, fixes all of them, re-checks, re-renders.
