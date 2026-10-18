@@ -20,9 +20,11 @@ def base(name, dark=0.30, blur=2):
     return _bg[path].copy()
 
 def tag(d, xy, text, a, colour=GOLD, size=40):
+    """A label in a box, centred both ways on the text tracked() actually draws (caps height, per-letter widths)."""
     if a <= 0: return
-    x, y = xy; f = cond(size, 8); w = f.getlength(text) + 6 * len(text) + 36
-    d.rounded_rectangle((x - w / 2, y - 8, x + w / 2, y + size + 14), 10, fill=rgba(NAVY_D, 0.85 * a), outline=rgba(colour, a), width=3)
+    x, y = xy; f = cond(size, 8); tw = sum(f.getlength(ch) for ch in text) + 6 * (len(text) - 1)
+    bb = f.getbbox("H"); cap = bb[3] - bb[1]; pad = max(10, size * 0.32)
+    d.rounded_rectangle((x - tw / 2 - 22, y - pad, x + tw / 2 + 22, y + cap + pad), 10, fill=rgba(NAVY_D, 0.85 * a), outline=rgba(colour, a), width=3)
     tracked(d, (x, y), text, f, rgba(colour, a), 6, "center")
 
 def glow(L, xy, r, colour, a):
@@ -96,7 +98,7 @@ def top_view(L, d, t, a, switched):
     d.rounded_rectangle((mx - 38, my - 62, mx + 38, my + 62), 10, fill=rgba(RED, a), outline=rgba(CREAM, a), width=2)
     d.rectangle((mx - 30, my - 20, mx + 30, my + 30), fill=rgba(CREAM, a))       # white roof
     d.rounded_rectangle((ox - 42, oy - 70, ox + 42, oy + 70), 10, fill=rgba((90, 100, 120), a), outline=rgba(CREAM, a), width=2)
-    tag(d, (1640, 1010 - 50), "MAIN LAMPS OFF · OTHER LAMPS ON" if switched > 0.5 else "MAIN BEAM", a, GOLD, 30)
+    tag(d, (1460, 940), "MAIN LAMPS OFF  ·  OTHERS ON" if switched > 0.5 else "MAIN BEAM", a, GOLD, 28)
 
 def headlights_scene(cue):
     c = {k: cue(k) for k in ["A normal headlight bulb", "Flick the switch", "The Minis were using", "But those bulbs",
@@ -161,10 +163,15 @@ def studio(floor_y):
 
 def place(im, car, s, gx, gy):
     """Paste a car cut-out at scale s with its front-wheel contact point at (gx, gy). Returns an image->screen mapper."""
-    c = cutout(car); w, h = int(c.width * s), int(c.height * s)
+    c = cutout(car)
     fx, fy = (car["wheels"][0] - car["box"][0]) * s, (car["floor"] - car["box"][1]) * s
     x, y = gx - fx, gy - fy
-    im.alpha_composite(c.resize((w, h), Image.LANCZOS), (int(x), int(y)))
+    if s < 0.7:                                                          # pre-shrink so bicubic doesn't alias
+        k = ("small", car["file"], round(s, 1))
+        if k not in _cut: _cut[k] = c.resize((int(c.width * round(s, 1)), int(c.height * round(s, 1))), Image.LANCZOS)
+        c, sc_ = _cut[k], s / round(s, 1)
+    else: sc_ = s
+    im.alpha_composite(c.transform(im.size, Image.AFFINE, (1 / sc_, 0, -x / sc_, 0, 1 / sc_, -y / sc_), Image.BICUBIC))
     return lambda px, py: (x + (px - car["box"][0]) * s, y + (py - car["box"][1]) * s)
 
 def bracket(d, x0, x1, y, a, label, colour=GOLD):
@@ -293,5 +300,34 @@ def left_foot_scene(cue):
         tag(d, (W / 2, 50), "LEFT-FOOT BRAKING", A("Left-foot braking"), GOLD, 48)
         tag(d, (1420, 1000), "POWER STAYS ON  ·  LEFT FOOT DABS THE BRAKE", go * (1 - A("It kept the engine")), CREAM, 30)
         tag(d, (1420, 1000), "THE ENGINE KEEPS PULLING", A("It kept the engine"), GREEN, 30)
+        im.alpha_composite(L); return im.convert("RGB")
+    return frame
+
+
+# ---------------------------------------------------------------- section 2: the giant killer, at real size
+def size_scene(cue):
+    c = {k: cue(k) for k in ["The Mini was a tiny", "It beat big American"]}
+    def frame(t):
+        GY = 860; im = studio(GY); L = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(L)
+        f = ease(ramp(t, c["It beat big American"] - 0.2, c["It beat big American"] + 1.2))
+        s_m = 0.85 - 0.35 * f                                                                   # big on its own, real size beside the Ford
+        gx_m = -900 + (612 + 900) * ease(ramp(t, 0, 1.4)) - (612 - 212) * f                     # drives in, then makes room
+        P = place(im, MINI, s_m, gx_m, GY)
+        x0, x1 = P(MINI["x0"], 0)[0], P(MINI["x1"], 0)[0]
+        m = ramp(t, 1.2, 2.0)                                                                   # tape measure along the floor
+        if m:
+            y = GY + 50; d.line([(x0, y), (x0 + (x1 - x0) * m, y)], fill=rgba(GOLD, 1), width=6)
+            for k in range(11):
+                xx = x0 + (x1 - x0) / 10 * k
+                if xx <= x0 + (x1 - x0) * m: d.line([(xx, y - 14), (xx, y + 14)], fill=rgba(GOLD, 1), width=4)
+            tag(d, ((x0 + x1) / 2, y + 40), "ABOUT 10 FEET", m, GOLD, 40)
+        tag(d, (W / 2, 120), "A TINY FAMILY CAR", ramp(t, 0.6, 1.1) * (1 - f), GOLD, 50)
+        if f:
+            s_f = s_m * ((MINI["x1"] - MINI["x0"]) / MINI["metres"]) / ((FALCON["x1"] - FALCON["x0"]) / FALCON["metres"])
+            Pf = place(im, FALCON, s_f, 1027 + (W + 900 - 1027) * (1 - f), GY)
+            fx0, fx1 = Pf(FALCON["x0"], 0)[0], Pf(FALCON["x1"], 0)[0]
+            tag(d, ((fx0 + fx1) / 2, GY + 90), "BIG AMERICAN V8 FORD", f, CREAM, 40)
+            tag(d, (W / 2, 120), "THE GIANT KILLER", f, GOLD, 50)
+            tag(d, ((fx0 + fx1) / 2, 330), "BIGGER  ·  FAR MORE POWER", ramp(t, c["It beat big American"] + 1.0, c["It beat big American"] + 1.5), RED, 34)
         im.alpha_composite(L); return im.convert("RGB")
     return frame

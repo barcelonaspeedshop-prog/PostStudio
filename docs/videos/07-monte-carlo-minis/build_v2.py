@@ -7,7 +7,7 @@ v2 (18 Oct): script_v2.md, narration audio/v2 (Rode, Voice H). Reuses the v1 gra
 telegram, gears, clock, skittles...) and adds the three explainers in explainers.py (how a Mini beat a V8, left-foot
 braking, how the lights worked), fact cards and DID YOU KNOW panels. No memorial card (Mike 10-14).
 """
-import os, sys
+import math, os, sys
 VDIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, VDIR); sys.path.insert(0, os.path.join(VDIR, "..", "..", "..", "studio"))
 _argv = sys.argv; sys.argv = ["build"]
@@ -69,6 +69,25 @@ def checklist(d, L, t, sc):
         if m and lab == "LIGHTS":
             text_top(d, (1300, y + 10), "?", pf(110, 900), rgba(RED, m), "center")
 
+def handicap2(d, L, t, sc):
+    """v1's handicap with the real Mini (the side-on still) under the falling weight."""
+    tracked(d, (W / 2, 120), "THE NEW RULES  ·  1966", cond(38, 2), rgba(GOLD, ramp(t, 0, 0.4)), 8, "center")
+    a = ramp(t, 0.1, 0.5); k = 2.0
+    off, f = V1.drop(t, k, 0.35, 700); sq = 10 * math.sin(min(1, max(0, t - k - 0.35) / 0.4) * math.pi) if t > k + 0.35 else 0
+    dx, dy = V1.shake(t, k + 0.35, 16)
+    if a > 0:
+        car = Image.new("RGBA", (W, H), (0, 0, 0, 0)); X.place(car, X.MINI, 0.6, 300 + dx, 900 + dy + sq)
+        if a < 1: car.putalpha(car.getchannel("A").point(lambda v: int(v * a)))
+        L.alpha_composite(car)
+    tracked(d, (540 + dx, 960), "MODIFIED FOR COMPETITION", cond(40, 8), rgba(CREAM, a), 6, "center")
+    if t > k - 0.4: V1.weight(d, 545 + dx, 330 + off + dy + sq, 420, 260, ramp(t, k - 0.4, k - 0.1))
+    b = ramp(t, k + 0.4, k + 0.8)
+    if b > 0:
+        secs = 10 + min(1, (t - k - 0.4) / 1.2) * 35
+        V1.stopwatch(d, 1480, 520, 230, secs, b, RED)
+        tracked(d, (1480, 820), "+ TIME", cond(64, 8), rgba(RED, b), 10, "center")
+        tracked(d, (1480, 905), "A HEAVY HANDICAP", cond(36, 8), rgba(CREAM, b), 8, "center")
+
 # ---------------------------------------------------------------- media
 NIGHT, HAIR, SCRUT, POD = AI + "ai_turini_night.png", AI + "ai_turini_hairpin.png", AI + "ai_scrutineers.png", AI + "ai_lonely_podium.png"
 FACTORY, GEARS, WAITING, LAMPS = AI + "ai_factory_line.png", AI + "ai_gearbox_bench.png", AI + "ai_crews_waiting.png", AI + "ai_minis_lamps_night.png"
@@ -96,14 +115,14 @@ scenes = [
     PS("Crews set off", ARNHEM, zoom=(1.0, 1.1), strap=("Arnhem, the Netherlands", "A WORKS MINI AT A CONTROL  ·  JANUARY 1966", 0.4)),
     Custom(SF("Crews set off", 0.45), V1.europe_map),
     AS("A final night in the mountains", "ai_turini_night.png", zoom=(1.0, 1.15), focus=((0.45, 0.5), (0.6, 0.55))),
-    PS("The most famous pass", "Col_de_Turini_06PF.jpg", zoom=(1.0, 1.1), strap=("Col de Turini", "THE PASS TODAY", 0.2),
+    PS("The most famous pass", "col_de_turini.jpg", zoom=(1.0, 1.12), focus=((0.5, 0.55), (0.7, 0.6)), strap=("Col de Turini", "1,607 METRES  ·  TODAY", 0.2),
        dyk=(1.0, "The Turini is still often a stage of the Monte today")),
     # II. the giant killer
     PS("In 1964, a Northern", "1963_Morris_Mini_Cooper_S_1964_Monte_Carlo_Rally_winner.jpg", zoom=(1.0, 1.1), chapter=CH("II", "THE GIANT KILLER"),
        strap=("33 EJB", "THE 1964 WINNER  ·  TODAY", 0.4)),
     FC("In 1964, a Northern", "paddy-hopkirk-1964.jpg", "Paddy Hopkirk", "NORTHERN IRELAND  ·  1964 WINNER", start=SF("In 1964, a Northern", 0.45),
        facts=[(0.6, "Car number 37: 33 EJB"), (2.0, "His co-driver was Henry Liddon", True)]),
-    CuS("The Mini was a tiny", V1.size_card),
+    explainer("The Mini was a tiny", X.size_scene),
     CuS("Hopkirk came home", V1.telegram, bg=dimmed(M + "P90141926_highRes.jpg")),
     FC("In 1965, a Finn", "Timo-Makinen-1966.jpg", "Timo Mäkinen", "FINLAND  ·  1965 WINNER", focus=(0.6, 0.35),
        facts=[(1.2, "Won it in a blizzard"), (3.0, "Co-driver: Paul Easter")]),
@@ -117,7 +136,7 @@ scenes = [
        facts=[(0.8, "European Rally Champion, 1965"), (("Today, almost every rally driver", 0.2), "Almost every rally driver brakes with the left foot today", True)]),
     # IV. the new rules
     PS("For 1966, the rules changed", "classic_and_sports_car_MAKINEN_MONTE_carlo_66_LAT_3.jpg", zoom=(1.0, 1.1), chapter=CH("IV", "THE NEW RULES"), texts=[(0.4, "1966: new rules.", "big")]),
-    CuS("Cars that had been modified", V1.handicap, bg=dimmed(SNOW66, 0.82)),
+    CuS("Cars that had been modified", handicap2, bg=dimmed(SNOW66, 0.82)),
     PS("The way to win", "Mini_Cooper_S_1964_(AJB_44B)_-_2016.jpg", zoom=(1.0, 1.1), texts=[(0.4, "The way to win: a standard car.", "mid")]),
     CuS("One that had been built", V1.five_thousand, bg=dimmed(FACTORY, 0.8)),
     AS("So BMC built and sold", "ai_factory_line.png", zoom=(1.0, 1.15), focus=((0.5, 0.5), (0.7, 0.45)),
@@ -131,13 +150,12 @@ scenes = [
     AS("On the final night in the mountains", "ai_turini_hairpin.png", zoom=(1.0, 1.15), focus=((0.45, 0.55), (0.6, 0.5))),
     CuS("Mäkinen won.", V1.classification, bg=dimmed(NIGHT)),
     PS("Roger Clark's", CORTINA, zoom=(1.0, 1.1), strap=("Ford Lotus Cortina", "ROGER CLARK  ·  4TH ON THE ROAD", 0.4)),
-    PS("The Citroën of Pauli", DS_GREY, zoom=(1.0, 1.1), crop=(0, 0, 1, 0.86), strap=("Citroën DS21", "PAULI TOIVONEN  ·  ONLY 5TH", 0.5)),
+    PS("The Citroën of Pauli", "DS Rally Car.jpg", zoom=(1.0, 1.12), focus=((0.5, 0.5), (0.55, 0.45)), strap=("Citroën DS", "PAULI TOIVONEN  ·  ONLY 5TH", 0.5)),
     AS("The crews celebrated in Monaco", "monaco_finish.png", zoom=(1.12, 1.25), focus=((0.4, 0.6), (0.45, 0.65)),
        texts=[(0.4, "A hat-trick.", "big"), (S("A hat-trick of wins") - S("The crews celebrated in Monaco", -0.15) + 0.6, "1st, 2nd, 3rd.", "mid+")]),
     # VI. the longest night
     VS("Then the scrutineers moved in", "ai_scrutineers_clip.mp4", chapter=CH("VI", "THE LONGEST NIGHT"),
-       fallback=AS("Then the scrutineers moved in", "ai_scrutineers.png", zoom=(1.05, 1.2))),
-    AS("The cars were taken into a garage", "ai_scrutineers.png", zoom=(1.05, 1.22), focus=((0.5, 0.5), (0.68, 0.45)), texts=[(1.6, "The doors were shut.", "mid")]),
+       texts=[(S("The cars were taken into a garage", 1.6) - S("Then the scrutineers moved in", -0.15), "The doors were shut.", "mid")]),
     AS("They stripped the Minis down", "ai_gearbox_bench.png", zoom=(1.0, 1.18), focus=((0.4, 0.6), (0.35, 0.65)),
        texts=[(0.3, "Engines. Gearboxes. Suspension.", "mid")]),
     CuS("Hopkirk later said", V1.teeth, bg=dimmed(GEARS, 0.8)),
@@ -159,7 +177,7 @@ scenes = [
     Custom(SF("In all, ten cars", 0.1), V1.skittles, bg=dimmed(SNOW66, 0.86)),
     # IX. the winner nobody wanted
     CuS("The new winner was", V1.reshuffle, bg=dimmed(POD), chapter=CH("IX", "THE WINNER NOBODY WANTED")),
-    PS("His Citroën reportedly", DS_BLACK, zoom=(1.05, 1.25), focus=((0.4, 0.6), (0.3, 0.68)), texts=[(0.5, "Iodine lamps too?", "mid")]),
+    PS("His Citroën reportedly", "DS Rally Car.jpg", zoom=(1.15, 1.35), focus=((0.3, 0.6), (0.25, 0.62)), texts=[(0.5, "Iodine lamps too?", "mid")]),
     PS("But on some DS models", DS_GREY, zoom=(1.1, 1.3), crop=(0, 0, 1, 0.86), focus=((0.5, 0.6), (0.62, 0.7)),
        texts=[(0.8, "Fitted at the factory: allowed.", "mid")]),
     FC("Toivonen was said to be", "Pauli_Toivonen_(1969)_(cropped).jpg", "Pauli Toivonen", "FINLAND  ·  THE NEW WINNER",
@@ -188,10 +206,8 @@ scenes = [
        facts=[(1.0, "Rallying into the 1980s"), (3.2, "Still a guest at classic events in 2025", True)]),
     FC("Pauli Toivonen became", "1968_Rallye_Sanremo_-_Toivonen-Tiukkanen's_Porsche_911_T.jpg", "Pauli Toivonen", "EUROPEAN RALLY CHAMPION  ·  1968",
        facts=[(0.8, "In a Porsche 911"), (2.8, "Sanremo Rally, 1968")]),
-    FC("Twenty years after", "Pauli-Toivonen-1963.jpg", "The Toivonens", "1963",
-       facts=[(0.8, "Pauli with his family"), (2.6, "His son Henri won the Monte in 1986", True)]),
-    PS("Pauli reportedly said", S4, zoom=(1.0, 1.1), strap=("Henri Toivonen's Lancia", "MONTE CARLO RALLY WINNER  ·  1986", 0.2),
-       texts=[(0.6, "The family name, cleared.", "mid")]),
+    PS("Twenty years after", S4, zoom=(1.0, 1.15), focus=((0.5, 0.5), (0.45, 0.55)), strap=("Henri Toivonen's Lancia", "MONTE CARLO RALLY WINNER  ·  1986", 0.6),
+       texts=[(S("Pauli reportedly said") - S("Twenty years after", -0.15) + 0.4, "The family name, cleared.", "mid")]),
     PS("And the Mini?", "Mini_Cooper_33_EJB_(6720779419).jpg", zoom=(1.0, 1.15), focus=((0.5, 0.5), (0.5, 0.45))),
     CuS("More than five million", V1.five_million),
     # XII. what if
