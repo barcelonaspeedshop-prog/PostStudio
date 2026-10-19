@@ -12,6 +12,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
 from storykit import W, H, GOLD, CREAM, RED, NAVY_D, ramp, ease, rgba, tracked, cond, pf, load
 
 AI = "/Volumes/PostDrive/Stories/IMPOSSIBLE series/03 McLaren Le Mans/media/ai/"
+MK = "/Volumes/PostDrive/Stories/IMPOSSIBLE series/03 McLaren Le Mans/media/mike/"
 BLUE, HOT, CARBON = (110, 170, 255), (255, 170, 60), (60, 64, 72)
 
 def tag(d, xy, text, a, colour=GOLD, size=40):
@@ -25,7 +26,9 @@ _bg = {}
 def still(name, dark=0.0):
     k = (name, dark)
     if k not in _bg:
-        im = load(AI + name).resize((W, H), Image.LANCZOS)
+        im = load(MK + name[5:] if name.startswith("mike:") else AI + name)
+        k_ = max(W / im.width, H / im.height); im = im.resize((int(im.width * k_ + 0.5), int(im.height * k_ + 0.5)), Image.LANCZOS)
+        bx, by = (im.width - W) // 2, (im.height - H) // 2; im = im.crop((bx, by, bx + W, by + H))
         if dark: im = Image.blend(im, Image.new("RGB", (W, H), NAVY_D), dark)
         _bg[k] = im.convert("RGBA")
     return _bg[k]
@@ -63,16 +66,16 @@ def f1_build_scene(cue):
         im = side
         L = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(L)
         if top > 0:                                                                     # the cabin from above
-            tv, Pt = camera(still("ai_f1_top.png"), 1.0 + 0.6 * ease(A("First, the seat", 0.3, 1.5)), 0.52, 0.47)
+            tv, Pt = camera(still("mike:F1 seating corrected.png"), 1.0 + 0.6 * ease(A("First, the seat", 0.3, 1.5)), 0.5, 0.485)
             im = Image.blend(side, tv, top)
-            dr = Pt(0.515, 0.46); r = 115 * (1 + 0.6 * ease(A("First, the seat", 0.3, 1.5)))
+            dr = Pt(0.505, 0.485); r = 115 * (1 + 0.6 * ease(A("First, the seat", 0.3, 1.5)))
             ring(d, dr, r, top * A("First, the seat", 1.0), GOLD, 8)
             tag(d, (dr[0], dr[1] - r - 60), "DRIVER: IN THE MIDDLE", top * A("First, the seat", 1.2), GOLD, 40)
             pa = top * A("A passenger sat")
-            for py in (0.35, 0.565):
-                pc = Pt(0.615, py); ring(d, pc, r * 0.8, pa, CREAM, 6)
+            for py in (0.335, 0.635):
+                pc = Pt(0.52, py); ring(d, pc, r * 0.8, pa, CREAM, 6)
             if pa:
-                pb = Pt(0.615, 0.565); tag(d, (min(W - 380, pb[0]), min(H - 150, pb[1] + r * 0.8 + 50)), "PASSENGERS: EITHER SIDE, BEHIND", pa, CREAM, 32)
+                pb = Pt(0.52, 0.635); tag(d, (min(W - 380, pb[0]), min(H - 150, pb[1] + r * 0.8 + 50)), "A PASSENGER EACH SIDE", pa, CREAM, 32)
             bal = top * A("You got a perfect view", 1.6)
             if bal:
                 x = dr[0]; d.line([(x, 40), (x, H - 40)], fill=rgba(GOLD, 0.8 * bal), width=4)
@@ -115,11 +118,23 @@ def f1_build_scene(cue):
                     d.line(pts, fill=rgba(RED, heat * (1 - ph)), width=4)
                     arrow(d, (xx, y0 + 10), (xx + 30, y0 + 60), heat * ph, GOLD, 4, 14)
                 tag(d, (W / 2, H - 90), "GOLD REFLECTS THE HEAT", heat, GOLD, 40)
+        gp = A("And then there was the famous gold", 0.2, 0.6) * out("In 1998, a McLaren F1")
+        if gp > 0:                                                                      # the real gold-lined engine bay
+            gv, Pg = camera(still("mike:Gold.jpg"), 1.0 + 0.12 * ramp(t, c["And then there was the famous gold"], c["In 1998, a McLaren F1"]), 0.5, 0.35)
+            im = Image.blend(im.convert("RGB"), gv.convert("RGB"), gp)
+            L = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(L)
+            tag(d, (W / 2, 70), "REAL GOLD FOIL", gp * A("And then there was the famous gold", 0.6), GOLD, 50)
+            heat = A("Gold is one of the best", 0.4) * gp
+            if heat:
+                for k in range(6):
+                    xx = 380 + k * 240; ph = (t * 1.2 + k * 0.17) % 1.0; y0 = 900 - 500 * ph
+                    d.line([(xx + 14 * math.sin(y0 / 20 + j), y0 - j * 14) for j in range(8)], fill=rgba(RED, heat * (1 - ph)), width=6)
+                tag(d, (W / 2, H - 90), "GOLD REFLECTS THE HEAT", heat, GOLD, 44)
         spd = A("In 1998, a McLaren F1")
         if spd:                                                                         # 240 mph
             n = int(240 * ease(min(1, (t - c["In 1998, a McLaren F1"]) / 2.2)))
             for k in range(14):
-                y = 200 + k * 55; x = W - ((t * 1400 + k * 260) % (W + 400))
+                y = 200 + k * 55; x = ((t * 1400 + k * 260) % (W + 400)) - 400
                 d.line([(x, y), (x + 260, y)], fill=rgba(CREAM, 0.25 * spd), width=3)
             d.rounded_rectangle((W / 2 - 330, 70, W / 2 + 330, 290), 26, fill=rgba(NAVY_D, 0.9 * spd), outline=rgba(GOLD, spd), width=4)
             f = pf(130, 900); txt = f"{n} mph"; d.text((W / 2 - f.getlength(txt) / 2, 92 - f.getbbox("H")[1] + 20), txt, font=f, fill=rgba(GOLD if n >= 240 else CREAM, spd))
