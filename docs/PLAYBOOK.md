@@ -16,7 +16,13 @@ Brawn v2 and Istanbul v2 are the reference videos. Every long video follows this
 - AI stills for places, crowds, atmosphere and moments with no photo: ChatGPT (Mike) or Runway nano-banana (~20 credits). One image per prompt, 16:9, no text, no badges or sponsor logos, never a real person's face as the subject.
 - **One AI video clip per long video, for the moment that decides the story** (~160 credits for 8 s at 1080p). Everything else is carried by photos, graphics and facts.
 - Check every AI image at full size for logos (paint them out) and anything physically wrong (smoke blowing the wrong way, the save with the wrong hand).
-- `studio/media_check.py <build>`: nothing full-screen blown up more than 1.5x; small photos go on a fact card.
+- **Picture quality gate** (Mike 10-19: "if nothing works go automatically to AI"): `studio/media_check.py <build>` before every render.
+  It flags anything blown up more than 1.5x and scores **clarity** (edge strength over grain at screen size; every photo Mike
+  rejected on McLaren scored 22 or less, mostly grainy 1995 slide scans).
+  - **POOR** (clarity < 11, or blown up): don't show it full screen. Use a better photo if one exists; otherwise make an AI still
+    straight away (Runway still, ~20 credits, no waiting) and use that. Small but clean photos go on a fact card instead.
+  - **CHECK** (clarity 11–22): Claude looks at it full size before the cut goes to Mike; replace it the same way if it looks soft or grainy.
+  - Never show a drawn car or a drawn person where a real (or AI) picture can carry it.
 
 ## 3. Recording (Mike)
 - Rode NT-USB+, packaging off, a fist from the mouth, the same spot every time (pickups too), Voice Memos set to Lossless.
