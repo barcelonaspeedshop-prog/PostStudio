@@ -1,7 +1,7 @@
 # IMPOSSIBLE 03 v2 upload pack
 
 - **Video:** IMPOSSIBLE 03 v2 - McLaren F1.mp4 (7:14)
-- **Channel:** **Omnira F1**, or the new IMPOSSIBLE channel once it exists (see the series-channel decision)
+- **Channel:** **Gentlemen of Fuel** (Mike 10-19: a car-world story, not F1)
 - **Title:** IMPOSSIBLE: The Road Car That Won Le Mans
 - **Thumbnails:** run all three in Test & Compare:
   - IMPOSSIBLE 03 v2 - thumbnail A No59.jpg
@@ -60,14 +60,14 @@ Music: YouTube Audio Library.
 - **Category:** Sports
 - **Video language:** English (United Kingdom)
 - **Caption certification:** never aired on US TV
-- **Playlist:** IMPOSSIBLE
-- **End screen** (last 20 s): Subscribe, plus the Brawn GP episode
+- **Playlist:** IMPOSSIBLE (create it on Gentlemen of Fuel)
+- **End screen** (last 20 s): Subscribe, plus the Monte Carlo Minis episode
 - **Card** at 7:00 ("In the next video..."): the IMPOSSIBLE playlist
 - **Pinned comment:** "The car, Lehto in the rain, or was it meant to be? What won Le Mans in 1995?"
 
 ## Shorts (files in 03 McLaren Le Mans › shorts › v2)
 
-Every Short uses the same tags, audience and altered-content answers as the long video. Related video = the full episode. Playlist: "McLaren Le Mans in Shorts" (make it like the Brawn one).
+Every Short uses the same tags, audience and altered-content answers as the long video. Related video = the full episode. Playlist: "McLaren Le Mans in Shorts" on Gentlemen of Fuel.
 
 Each description ends with: "Full episode on this channel: IMPOSSIBLE, episode three. #LeMans #McLarenF1 #motorsport #impossible"
 
