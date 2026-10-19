@@ -269,4 +269,8 @@ def compose(scenes, overlays, caps, channel_line, slate, T, body, end):
         for i, ln in enumerate(lines): stroke_text(d, (SW / 2, y + i * 104), ln, f, rgba(CREAM, s), sw=0)
         tracked(d, (SW / 2, y + len(lines) * 104 + 70), "TELL ME IN THE COMMENTS", cond(46, 8), rgba(GOLD, s), 8, "center")
         if small: tracked(d, (SW / 2, y + len(lines) * 104 + 150), small, cond(36, 2), rgba(CREAM, 0.75 * s), 5, "center")
+        sb = ramp(T, body + 0.6, body + 0.9)                                                    # Mike 10-19: ask for the subscribe
+        if sb:
+            yy = y + len(lines) * 104 + 240; d.rounded_rectangle((SW / 2 - 230, yy, SW / 2 + 230, yy + 96), 18, fill=rgba(RED, sb))
+            tracked(d, (SW / 2, yy + 26), "SUBSCRIBE", cond(52, 8), rgba(CREAM, sb), 10, "center")
     return im

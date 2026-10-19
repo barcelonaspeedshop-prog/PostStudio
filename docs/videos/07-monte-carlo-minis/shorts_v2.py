@@ -133,6 +133,10 @@ def render_short(job):
                 text_top(d, (SW / 2, 930 + i * 104), ln, pf(84, 900), CREAM + (int(255 * s),), "center")
             tracked(d, (SW / 2, 1200), "FULL EPISODE ON THE CHANNEL", cond(44, 8), GOLD + (int(255 * s),), 8, "center")
             tracked(d, (SW / 2, 1270), SLATE_LINE, cond(34, 2), CREAM + (int(170 * s),), 6, "center")
+            sb = ramp(t, dur - SLATE + 0.6, dur - SLATE + 0.9)                       # Mike 10-19: ask for the subscribe
+            if sb > 0:
+                d.rounded_rectangle((SW / 2 - 230, 1350, SW / 2 + 230, 1446), 18, fill=(200, 16, 46, int(255 * sb)))
+                tracked(d, (SW / 2, 1376), "SUBSCRIBE", cond(52, 8), CREAM + (int(255 * sb),), 10, "center")
         wr.stdin.write(im.convert("RGB").tobytes())
     rd.stdout.close(); rd.wait(); wr.stdin.close(); wr.wait()
     return out, round(dur, 1)
