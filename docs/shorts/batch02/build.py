@@ -87,7 +87,7 @@ def tyre_graphic(s, t0):
             if bath:                                                                 # a bath filling, every two seconds
                 fill = ((t - k["That's a full bath"]) % 2.0) / 2.0
                 d.rounded_rectangle((330, 1360, 750, 1460), 30, outline=rgba(CREAM, bath), width=5)
-                d.rounded_rectangle((336, 1460 - 94 * fill, 744, 1454), 24, fill=rgba(BLUE, bath))
+                if fill > 0.08: d.rounded_rectangle((336, 1454 - 88 * fill, 744, 1454), 20, fill=rgba(BLUE, bath))
         return cv.done()
     return fn
 
