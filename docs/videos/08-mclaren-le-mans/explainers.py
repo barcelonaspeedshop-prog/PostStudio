@@ -59,7 +59,6 @@ def f1_build_scene(cue):
         elif t < c["Third, the engine"]: z, fx, fy = 1.25, 0.47, 0.5
         elif t < c["In 1998, a McLaren F1"]: z, fx, fy = 1.35 + 0.05 * ramp(t, c["Third, the engine"], c["In 1998, a McLaren F1"]), 0.68, 0.45
         else: z, fx, fy = 1.0, 0.5, 0.5
-        zs = getattr(frame, "_z", None)
         side, Ps = camera(still("ai_f1_side.png"), z, fx, fy)
         im = side
         L = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(L)
@@ -67,12 +66,13 @@ def f1_build_scene(cue):
             tv, Pt = camera(still("ai_f1_top.png"), 1.0 + 0.6 * ease(A("First, the seat", 0.3, 1.5)), 0.52, 0.47)
             im = Image.blend(side, tv, top)
             dr = Pt(0.515, 0.46); r = 115 * (1 + 0.6 * ease(A("First, the seat", 0.3, 1.5)))
-            ring(d, dr, r, top * A("The driver sat", 0.0) if "The driver sat" in c else top * A("First, the seat", 1.0), GOLD, 8)
+            ring(d, dr, r, top * A("First, the seat", 1.0), GOLD, 8)
             tag(d, (dr[0], dr[1] - r - 60), "DRIVER: IN THE MIDDLE", top * A("First, the seat", 1.2), GOLD, 40)
             pa = top * A("A passenger sat")
             for py in (0.35, 0.565):
                 pc = Pt(0.615, py); ring(d, pc, r * 0.8, pa, CREAM, 6)
-            if pa: tag(d, (Pt(0.615, 0.35)[0] + 330, Pt(0.615, 0.35)[1]), "PASSENGERS: EITHER SIDE, BEHIND", pa, CREAM, 32)
+            if pa:
+                pb = Pt(0.615, 0.565); tag(d, (min(W - 380, pb[0]), min(H - 150, pb[1] + r * 0.8 + 50)), "PASSENGERS: EITHER SIDE, BEHIND", pa, CREAM, 32)
             bal = top * A("You got a perfect view", 1.6)
             if bal:
                 x = dr[0]; d.line([(x, 40), (x, H - 40)], fill=rgba(GOLD, 0.8 * bal), width=4)
@@ -131,48 +131,44 @@ def f1_build_scene(cue):
 
 # ---------------------------------------------------------------- section 6: aquaplaning
 def aqua_scene(cue):
+    """Drawn on the real tyre in ai_tyre_water.png: tyre centre (0.44, 0.47), radius about 0.40 of the height, road at 0.87."""
     c = {k: cue(k) for k in ["When a tyre hits", "The grooves in the tyre", "But go fast enough", "It builds up in a wedge",
                              "That's aquaplaning", "The more weight pressing"]}
     def frame(t):
         A = lambda k, lag=0.0, du=0.5: ramp(t, c[k] + lag, c[k] + lag + du)
-        bg, _ = camera(still("ai_tyre_water.png", 0.62), 1.05 + 0.04 * min(1, t / 20), 0.45, 0.5)
+        bg, P = camera(still("ai_tyre_water.png", 0.25), 1.0 + 0.06 * min(1, t / 25), 0.42, 0.55)
         L = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(L)
-        GY, cx, r = 820, 900, 260
-        wedge = 40 + 260 * A("But go fast enough", 0.3, 2.5)
+        cx, _ = P(0.44, 0.47); _, gy = P(0.44, 0.87); r = (P(0.44, 0.87)[1] - P(0.44, 0.47)[1])
+        film = A("When a tyre hits", 0.2, 0.8)
         press = A("The more weight pressing", 0.6, 1.4)
-        wedge *= 1 - 0.7 * press
-        lift = 45 * A("It builds up in a wedge", 1.6, 1.0) * (1 - press)
-        rot = t * 5.0
-        d.rectangle((0, GY - 22, W, GY), fill=rgba(BLUE, 0.55))                         # standing water
-        d.line([(0, GY), (W, GY)], fill=rgba(CREAM, 0.7), width=4)                     # the road
-        d.polygon([(cx - r * 0.55, GY - 4), (cx - r * 0.55 - wedge * 1.8, GY), (cx - r * 0.55 - wedge * 0.2, GY - wedge * 0.55)], fill=rgba(BLUE, 0.85))
-        cy = GY - r - lift + 4
-        d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=rgba((24, 24, 28), 1), outline=rgba(CREAM, 1), width=5)
-        for k in range(16):                                                              # tread blocks turning
-            an = rot + k * math.pi / 8
-            d.line([(cx + (r - 34) * math.cos(an), cy + (r - 34) * math.sin(an)), (cx + (r - 4) * math.cos(an), cy + (r - 4) * math.sin(an))], fill=rgba((70, 72, 84), 1), width=12)
-        d.ellipse((cx - r * 0.55, cy - r * 0.55, cx + r * 0.55, cy + r * 0.55), fill=rgba((150, 150, 160), 1))
-        for k in range(6): an = rot + k * math.pi / 3; d.line([(cx + 40 * math.cos(an), cy + 40 * math.sin(an)), (cx + r * 0.5 * math.cos(an), cy + r * 0.5 * math.sin(an))], fill=rgba(NAVY_D, 1), width=10)
-        arrow(d, (cx + 600, 200), (cx + 300, 200), ramp(t, 0.2, 0.6), CREAM, 6, 22)
-        tracked(d, (cx + 450, 140), "DIRECTION OF TRAVEL", cond(30, 8), rgba(CREAM, ramp(t, 0.2, 0.6)), 5, "center")
+        wedge = (40 + 330 * A("But go fast enough", 0.3, 2.5)) * (1 - 0.75 * press)
+        under = 26 * A("It builds up in a wedge", 1.4, 1.0) * (1 - press)                 # water forced under the tyre
+        d.rectangle((0, gy - 14, W, gy + 18), fill=rgba(BLUE, 0.55 * film))
+        x0 = cx - r * 0.45
+        d.polygon([(x0, gy - 2), (x0 - wedge * 1.7, gy + 6), (x0 - wedge * 0.25, gy - wedge * 0.6)], fill=rgba(BLUE, 0.8 * film))
+        if under > 1:
+            d.rounded_rectangle((cx - r * 0.5, gy - under, cx + r * 0.3, gy + 4), 10, fill=rgba(BLUE, 0.85))
+            for k in range(3):
+                x = cx - r * 0.3 + k * r * 0.25; arrow(d, (x, gy - under - 10), (x, gy - under - 90), A("It builds up in a wedge", 1.6), RED, 8, 26)
         g = A("The grooves in the tyre") * (1 - A("But go fast enough"))
-        if g:                                                                            # water squeezed out to the sides
-            rng = np.random.default_rng(int(t * 25))
-            for j in range(60):
-                u = rng.random(); x = cx - r * 0.4 - 120 * u; y = GY - 10 - 160 * u * rng.random()
-                d.ellipse((x - 7, y - 7, x + 7, y + 7), fill=rgba(BLUE, g * (1 - u * 0.6)))
-            tag(d, (W / 2, 120), "THE GROOVES SQUEEZE THE WATER OUT", g, BLUE, 40)
-        tag(d, (W / 2, 120), "STANDING WATER", A("When a tyre hits") * (1 - A("The grooves in the tyre")), BLUE, 44)
-        tag(d, (W / 2, 120), "TOO FAST: THE WATER CAN'T ESCAPE", A("But go fast enough") * (1 - A("It builds up in a wedge")), CREAM, 40)
-        tag(d, (W / 2, 120), "A WEDGE OF WATER  ·  THE TYRE RIDES UP", A("It builds up in a wedge") * (1 - A("That's aquaplaning")), BLUE, 40)
+        if g:                                                                            # squeezed out through the grooves
+            for k in range(6):
+                ph = (t * 1.3 + k / 6) % 1.0; y = gy - 30 - 10 * k
+                arrow(d, (cx - r * 0.1, y), (cx - r * 0.1 - 120 - 380 * ph, y - 140 * ph), g * (1 - ph), BLUE, 6, 20)
+                arrow(d, (cx + r * 0.1, y), (cx + r * 0.1 + 120 + 380 * ph, y - 140 * ph), g * (1 - ph), BLUE, 6, 20)
+        arrow(d, (520, 120), (160, 120), ramp(t, 0.2, 0.6), CREAM, 6, 24)
+        tracked(d, (340, 60), "DIRECTION OF TRAVEL", cond(30, 8), rgba(CREAM, ramp(t, 0.2, 0.6)), 5, "center")
+        Y = H - 110
+        tag(d, (W / 2, Y), "STANDING WATER", A("When a tyre hits") * (1 - A("The grooves in the tyre")), BLUE, 44)
+        tag(d, (W / 2, Y), "THE GROOVES SQUEEZE THE WATER OUT", A("The grooves in the tyre") * (1 - A("But go fast enough")), BLUE, 40)
+        tag(d, (W / 2, Y), "TOO FAST: THE WATER CAN'T ESCAPE", A("But go fast enough") * (1 - A("It builds up in a wedge")), CREAM, 40)
+        tag(d, (W / 2, Y), "A WEDGE OF WATER  ·  THE TYRE RIDES UP", A("It builds up in a wedge") * (1 - A("That's aquaplaning")), BLUE, 40)
         aq = A("That's aquaplaning") * (1 - A("The more weight pressing"))
-        if aq:
-            tag(d, (W / 2, 120), "AQUAPLANING", aq, RED, 64)
-            tag(d, (cx, GY + 70), "NO GRIP AT ALL", aq, RED, 40)
+        tag(d, (W / 2, Y), "AQUAPLANING  ·  NO GRIP AT ALL", aq, RED, 52)
         if press:
             for k in range(3):
-                x = cx - 120 + k * 120; bob = 10 * math.sin(t * 5 + k)
-                arrow(d, (x, cy - r - 220 + bob), (x, cy - r - 30 + bob), press, GOLD, 10, 34)
-            tag(d, (W / 2, 120), "MORE WEIGHT: IT SQUEEZES THROUGH", press, GOLD, 44)
+                x = cx - r * 0.4 + k * r * 0.4; bob = 10 * math.sin(t * 5 + k)
+                arrow(d, (x, 60 + bob), (x, 230 + bob), press, GOLD, 12, 38)
+            tag(d, (W / 2, Y), "MORE WEIGHT: IT SQUEEZES THROUGH", press, GOLD, 44)
         bg.alpha_composite(L); return bg.convert("RGB")
     return frame
