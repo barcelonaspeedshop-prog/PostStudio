@@ -43,7 +43,7 @@ He wanted it to be the greatest road car ever made. No compromise. Light, fast, 
 
 [Animated cutaway of the F1 from above, then from the side: each part lights up as it's named.]
 
-So what made it so different?
+So what made the McLaren F1 so different?
 
 First, the seat. The driver sat right in the middle, like in a racing car. A passenger sat on each side, just behind. You got a perfect view of the road, and the car's weight was balanced around you.
 
@@ -51,13 +51,13 @@ Second, the body. The F1 was the first road car built around a carbon fibre tub,
 
 Third, the engine. A six-litre BMW V12, with more than six hundred horsepower, sitting right behind the driver.
 
-And then there was the gold.
+And then there was the famous gold.
 
 [Close-up: the engine bay, the gold lining glowing.]
 
-The engine bay was lined with real gold foil. Not for show. Gold is one of the best materials there is for reflecting heat, and that V12 made a lot of heat.
+The engine bay was lined with real gold foil, but on the F1 it wasn't for show. Gold is one of the best materials there is for reflecting heat, and that V12 made a lot of heat.
 
-In 1998, an F1 hit two hundred and forty miles an hour. For seven years, no production car went faster.
+In 1998, a McLaren F1 hit two hundred and forty miles an hour. For seven years, no production car went faster.
 
 And Murray was clear about one thing. It was a road car. It was not going racing.
 
@@ -151,7 +151,7 @@ Yannick Dalmas went on to win it four times in all.
 
 The win gave McLaren something no other team has managed. The Triple Crown. Victory at the Monaco Grand Prix, the Indianapolis 500, and the Le Mans 24 Hours.
 
-Only one hundred and six McLaren F1s were ever built, racing cars included. In 2021, a road car sold for more than twenty million dollars.
+Only one hundred and six McLaren F1s were ever built, racing cars included. In August 2026, a McLaren F1 GTR, a racing version later converted for the road, sold for more than thirty-four million dollars. The most valuable British car ever sold at auction.
 
 And number fifty-nine, the grey test car that won Le Mans, is still the most famous of them all.
 
@@ -181,6 +181,6 @@ In the next video, someone else does the impossible. Make sure you're here when 
 - **The race:** 1995 BPR wins for the F1 GTR. At Le Mans, WR prototypes took the front row. Rain from early in the race, heavy overnight. #59 was chassis 01R, the development car, run by Kokusai Kaihatsu Racing (Lanzante ran the car), grey with Ueno Clinic logos.
 - **Who led:** the Gulf/GTC McLaren led overnight until its clutch failed. The Harrods #51 (Bell/Bell/Wallace) led into Sunday, then had gearbox trouble and finished 3rd. Courage C34 (Wollek/Hélary/Andretti) finished 2nd. McLarens finished 1st, 3rd, 4th and 5th.
 - **The drivers:** Lehto drove for Benetton in 1994. Dalmas won Le Mans 1992, 1994, 1995 and 1999. Sekiya was the first Japanese winner.
-- **Afterwards:** Triple Crown = Monaco GP, Indy 500 (McLaren cars 1974, 1976) and Le Mans 1995. 106 F1s built in all. 2021: a road car sold for $20.465m.
+- **Afterwards:** Triple Crown = Monaco GP, Indy 500 (McLaren cars 1974, 1976) and Le Mans 1995. 106 F1s built in all. Aug 2026: 1996 F1 GTR chassis 10R (ex-Nick Mason, road-converted) sold for $34.655m at RM Sotheby's Monterey, a record for any McLaren F1 and any British car at auction (Mike's update, checked).
 - **Aquaplaning:** a simplified explainer. Tyre load helps, but so do grooves and speed. Say "can", not "always".
 - **Removed from v1:** "three quarters of a lap ahead" (not sure of the margin), and Murray's "harder than an F1 title" line (couldn't confirm it).
