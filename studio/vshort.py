@@ -190,7 +190,8 @@ def chunks(words):
     res, cur = [], []
     for t, w in words:
         cur.append((t, w))
-        if len(cur) == 3 or w[-1] in ".,?!:" or sum(len(x[1]) for x in cur) > 14: res.append(cur); cur = []
+        initial = len(w.strip(".,")) == 1                                   # "H. H. Stephenson": an initial doesn't end a caption
+        if len(cur) == 3 or (w[-1] in ".,?!:" and not initial) or sum(len(x[1]) for x in cur) > 14: res.append(cur); cur = []
     if cur: res.append(cur)
     out = []
     for i, c in enumerate(res):
