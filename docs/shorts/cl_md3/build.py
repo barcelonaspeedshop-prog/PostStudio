@@ -110,7 +110,7 @@ def short_como():
           Tag(t_fab + 0.2, "CESC FÀBREGAS", sub="PLAYER  ·  PART-OWNER  ·  MANAGER", dur=t_24 - t_fab - 0.4),
           Pop(t_eur, ["FIRST TIME", "IN EUROPE"], t_tn - t_eur - 0.1, y=270, size=100),
           Pop(t_end, ["CAN THE FAIRYTALE", "BEAT UNITED?"], 99, y=280, size=92)]
-    return dict(n=1, name="Como v Man United", tag=" (Kirk)", s=s, scenes=scenes, ov=ov, line="OMNIRA FOOTBALL  ·  CHAMPIONS LEAGUE",
+    return dict(n=1, name="Como v Man United", tag=" (Kirk steady)", s=s, scenes=scenes, ov=ov, line="OMNIRA FOOTBALL  ·  CHAMPIONS LEAGUE",
                 slate=("Can Como beat United?", "FOLLOW FOR MORE FOOTBALL STORIES"), music=[MUS + "Energetic/ANBR - Seasons.mp3"])
 
 # ---------------------------------------------------------------- Bayern v Arsenal

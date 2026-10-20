@@ -16,7 +16,7 @@ The only voices we use for now. UK / US is Mike's ear, not Runway's labels (Runw
 | Elias | US | Storytelling; a bit much, use for big American stories |
 | Noah | US | Very relaxed; calm stories |
 
-**Runway names** for generate_speech: Kirk, Bernard, Malachi, Tom, Benjamin, Chad, Clint, Elias, Noah (model eleven_v3); Adrian and Jordan (model fish-drama-3, about a fifth of the cost).
+**Runway names** for generate_speech: Kirk, Bernard, Malachi, Tom, Benjamin, Chad, Clint, Elias, Noah (**model eleven_multilingual_v2, languageCode en**: the steadier model holds the accent; eleven_v3 drifted American on the Como script with both Malachi and Kirk, Mike 20 Oct); Adrian and Jordan (model fish-drama-3, about a fifth of the cost).
 
 ## Picking a voice for each video (Claude proposes, Mike approves with the script)
 
