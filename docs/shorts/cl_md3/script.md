@@ -1,6 +1,6 @@
 # Omnira Football Shorts: Champions League, Wednesday 21 Oct
 
-Two topical Shorts for tomorrow's games. AI narration (voice: Malachi, UK). About 40–45 seconds each. [Square brackets] are notes for the edit and aren't read out.
+Two topical Shorts for tomorrow's games. AI narration (Como: Kirk, UK; Bayern: Malachi, UK). About 40–45 seconds each. [Square brackets] are notes for the edit and aren't read out.
 
 **Slots (Spain time):** Como at 11am, Bayern v Arsenal at 4pm. The Istanbul Short already has 1pm. Playlist: Omnira Football in Shorts. Related video: Istanbul 2005.
 

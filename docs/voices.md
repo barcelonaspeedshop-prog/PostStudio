@@ -24,4 +24,5 @@ The only voices we use for now. UK / US is Mike's ear, not Runway's labels (Runw
 - **Omnira Football:** big stories (Istanbul, Leicester, Matthews) → Kirk; stats, quizzes, Ballon d'Or and news Shorts → Malachi; tactics explainers → Bernard.
 - **Gentlemen of Fuel:** British and European classics → Tom; American stories → Elias for the long video, Benjamin or Chad for its racing and news Shorts; modern car culture and JDM → Fish Adrian or Fish Jordan; engineering explainers → Clint; calm, reflective stories → Noah.
 - A long video and its Shorts use the same voice, so the teaser sounds like the episode.
+- **Accents can drift between reads** (20 Oct: Malachi came out American on the Como Short, British on Bayern). Mike listens to every read; a wrong accent is re-voiced, not kept. For football stories, Kirk first.
 - Samples: PostDrive › Stories › Gentlemen of Fuel › 01 Chrysler Turbine › audio › voice_tests › chosen voices.

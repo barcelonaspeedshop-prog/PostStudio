@@ -4,7 +4,7 @@ Both: Audience "No, it's not made for kids". Altered or synthetic content: Yes (
 
 ## 1. Como v Man United (out 11am)
 
-- **File:** PostDrive › Shorts › cl_md3 › video › Football - Como v Man United.mp4 (1:14)
+- **File:** PostDrive › Shorts › cl_md3 › video › Football - Como v Man United.mp4 (1:10, Kirk)
 - **Title:** In Serie D in 2017. Tonight they play Man United in the Champions League #Shorts
 - **Description:**
   Como 1907 went from Serie D to the Champions League in nine years: two bankruptcies, the Hartono takeover, Cesc Fàbregas, and a first ever European season. Tonight, Manchester United come to the Sinigaglia on Lake Como.
