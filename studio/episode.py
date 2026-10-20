@@ -78,7 +78,7 @@ def opening(bg_path, title, kicker, credit=None, **photo):
     then the episode title fades in under it. series="gof": the Gentlemen of Fuel mark glows in instead (GofSting)."""
     if SERIES == "gof":
         return GofSting(0.0, bg=Photo(0, bg_path, credit=credit, **({"zoom": (1.0, 1.18)} | photo)), length=INTRO,
-                        items=[{"k": "title", "text": title, "y": 655, "size": 130, "at": 2.2},
+                        items=[{"k": "title", "text": title, "y": 655, "size": 100, "at": 2.2},
                                {"k": "rule", "y": 830, "w": 560, "at": 2.6},
                                {"k": "kicker", "text": kicker, "y": 868, "at": 2.8}])
     if SERIES == "impossible":
