@@ -21,7 +21,13 @@ Brawn v2 and Istanbul v2 are the reference videos. Every long video follows this
 ## 2. Pictures (Mike + Claude)
 - Real photos from Wikimedia Commons (`studio/commons.py`), Mike's own finds in `media/mike`.
 - AI stills for places, crowds, atmosphere and moments with no photo: ChatGPT (Mike) or Runway nano-banana (~20 credits). One image per prompt, 16:9, no text, no badges or sponsor logos, never a real person's face as the subject.
-- **One AI video clip per long video, for the moment that decides the story** (~160 credits for 8 s at 1080p). Everything else is carried by photos, graphics and facts.
+- **AI video in every long video (Mike 20 Oct: "adds movement and gives us the edge over just stills"): 3–4 clips of 5 s** at the
+  strongest moments, image-to-video from the (correct) AI stills. Test one clip on the cheap model first (~5 cr/s, 720p); use the
+  better model (~12 cr/s, 1080p) only if the cheap one loses the car's details. Propose the batch with costs; Mike confirms before
+  any credits are spent. Each clip shows what the narration says; never filler.
+- **Real cars in AI stills: attach real photos** (front, rear, side, details) in a fresh ChatGPT chat per image and describe the
+  car's real details; when one is wrong, start a new chat rather than asking for a fix (Mike 20 Oct: fixes "go a tad crazy").
+  Check against the photos before using it (Turbine v2 had wire wheels and stacked tail lights).
 - Check every AI image at full size for logos (paint them out) and anything physically wrong (smoke blowing the wrong way, the save with the wrong hand).
 - **Picture quality gate** (Mike 10-19: "if nothing works go automatically to AI"): `studio/media_check.py <build>` before every render.
   It flags anything blown up more than 1.5x and scores **clarity** (edge strength over grain at screen size; every photo Mike

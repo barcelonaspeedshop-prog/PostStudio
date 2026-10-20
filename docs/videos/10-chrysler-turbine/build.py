@@ -226,6 +226,23 @@ def ghia(d, L, t, sc):
     tag(d, (W / 2, 140), "GHIA  ·  TURIN, ITALY", ramp(t, 0.2, 0.6), GOLD, 50)
     counter(d, W / 2, 820, int(55 * p), "BODIES BUILT BY HAND", ramp(t, k + 0.4, k + 0.8), GOLD, 120)
 
+def ended(d, L, t, sc):
+    """January 1966: the calendar page, then what the experiment added up to."""
+    a = ramp(t, 0.1, 0.5); x0, y0 = W / 2 - 260, 170
+    d.rounded_rectangle((x0, y0, x0 + 520, y0 + 420), 20, fill=rgba(CREAM, 0.97 * a))
+    d.rounded_rectangle((x0, y0, x0 + 520, y0 + 110), 20, fill=rgba(RED, a)); d.rectangle((x0, y0 + 80, x0 + 520, y0 + 110), fill=rgba(RED, a))
+    tracked(d, (W / 2, y0 + 30), "JANUARY", cond(54, 8), rgba(CREAM, a), 10, "center")
+    text_top(d, (W / 2, y0 + 150), "1966", pf(170, 900), rgba(NAVY_D, a), "center")
+    tag(d, (W / 2, 690), "THE EXPERIMENT ENDS", ramp(t, 0.8, 1.2), GOLD, 50)
+    tag(d, (W / 2, 800), "50 CARS  ·  203 FAMILIES  ·  OVER 1,000,000 MILES", ramp(t, 1.6, 2.0), CREAM, 36)
+
+def destroyed(d, L, t, sc):
+    """Something that still upsets car fans: then the stamp lands on 'It destroyed them.'"""
+    tag(d, (W / 2, 300), "WHAT CHRYSLER DID NEXT", ramp(t, 0.2, 0.6), CREAM, 44)
+    tag(d, (W / 2, 400), "STILL UPSETS CAR FANS TODAY", ramp(t, 1.4, 1.8), GOLD, 40)
+    k = lt("It destroyed them.", sc)
+    place_stamp(L, W / 2, 640, ramp(t, k + 0.1, k + 0.35), text="DESTROYED", size=150, rot=-6)
+
 # ---------------------------------------------------------------- the video
 ROW = "ai_turbine_row.png"
 scenes = [
@@ -284,15 +301,14 @@ scenes = [
     CP("Chrysler's engineers fixed what they could", "1963_Chrysler_Turbine_Ghia_Coupe_at_PB_2022_engine_2.jpg", zoom=(1.0, 1.12),
        texts=[(S("But it was clear") - S("Chrysler's engineers fixed", -0.15), "Not ready yet.", "big")]),
     # VII. the end
-    VS("In January 1966", "ai_row_clip.mp4", chapter=CH("VII", "THE END"),
-       fallback=AS("In January 1966", ROW, zoom=(1.0, 1.2), focus=((0.3, 0.6), (0.5, 0.55)), chapter=CH("VII", "THE END"))),
-    AS("And then Chrysler did something", ROW, zoom=(1.08, 1.2), focus=((0.5, 0.55), (0.6, 0.55)),
-       texts=[(S("It destroyed them.") - S("And then Chrysler did something", -0.15), "It destroyed them.", "big")]),
+    CuS("In January 1966", ended, chapter=CH("VII", "THE END"), bg=bgp("Chrysler_Turbine_Car_Worlds_Fair_1964.jpg", 0.82)),
+    VS("The families gave the cars back", "ai_row_clip.mp4", fallback=AS("The families gave the cars back", ROW, zoom=(1.0, 1.12), focus=((0.3, 0.6), (0.45, 0.55)))),
+    CuS("And then Chrysler did something", destroyed, bg=bgp("Chrysler_Turbine_exhaust.JPG", 0.8)),
     CuS("Of the fifty-five cars built", fifty_five, off=-0.6),
     CuS("The usual explanation is tax", duty, bg=bga(ROW, 0.86)),
     CP("Some say Chrysler also didn't want", "1963_Chrysler_Turbine_Ghia_Coupe_at_PB_2022_engine.jpg", zoom=(1.0, 1.15),
        texts=[(1.2, "No spare parts. No mechanics.", "mid")]),
-    AS("Either way, the jet-age dream", ROW, zoom=(1.0, 1.1), dim=0.25),
+    AS("Either way, the jet-age dream", "ai_turbine_jet_age.png", zoom=(1.15, 1.0), focus=((0.6, 0.6), (0.5, 0.5)), dim=0.35),
     # VIII. the survivors
     CuS("But not quite all of them", survivors, chapter=CH("VIII", "THE SURVIVORS"), bg=bgp("Chrysler_Turbine_Car_--_Walter_P_Chrysler_Museum_10-23-2010_107_N.jpg", 0.85)),
     (FC("And one of them ended up", "Jay_Leno_2019_crop.jpg", "Jay Leno", "TV HOST  ·  CAR COLLECTOR",
