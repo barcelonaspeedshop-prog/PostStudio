@@ -2,6 +2,13 @@
 
 Brawn v2 and Istanbul v2 are the reference videos. Every long video follows this, and every review adds to it.
 
+## The production line (agreed 20 Oct 2026)
+1. Claude researches the story and writes the script. **Mike approves the wording** before anything is made.
+2. Claude builds the video. **Mike reviews it** (step 5) before release.
+- **Runway for everything we generate** (AI video, stills when ChatGPT can't, voice, music). **ChatGPT first for every still** it can do: it costs no credits.
+- **Save credits at all costs, but never at the cost of quality.** Spend credits only where they show on screen. Test on a short piece before a long generation. No speculative batches.
+- Same system and workflow for every video; each video's research, script and explanation are its own. Generic only ever in the back end, never in the final product (YouTube's "inauthentic content" rule targets same-template videos).
+
 ## 1. Script (Claude)
 - Title and thumbnail idea first. If they aren't clickable, change the angle.
 - Cold open: the surprising fact and a promise ("the reason started with a change most people never noticed").
@@ -24,16 +31,14 @@ Brawn v2 and Istanbul v2 are the reference videos. Every long video follows this
   - **CHECK** (clarity 11–22): Claude looks at it full size before the cut goes to Mike; replace it the same way if it looks soft or grainy.
   - Never show a drawn car or a drawn person where a real (or AI) picture can carry it.
 
-## 3. Recording (Mike)
-- Rode NT-USB+, packaging off, a fist from the mouth, the same spot every time (pickups too), Voice Memos set to Lossless.
-- Say "stop" after a fluff and restart the sentence.
-- Pickups: one file, then Claude splices it into the main take where the old lines were (never just appended).
+## 3. Narration (AI, from 20 Oct 2026)
+- AI voice in Runway, chosen per channel and per mood (exciting / authoritative / soft), at least two voices per channel. Samples: PostDrive `Gentlemen of Fuel/01 Chrysler Turbine/audio/voice_tests/`.
+- Generate one 60-second test of the opening first; the full script only once the test sounds right.
+- Hard names: spell them phonetically in the voice text (the script keeps the real spelling).
+- Transcribe the finished track against the script; regenerate only the lines that are wrong, never the whole track.
+- (Mike's own recording, if ever used again: Rode NT-USB+, packaging off, a fist from the mouth, Voice Memos Lossless, `studio/narration.py` Voice H.)
 
-## 4. Narration edit (Claude)
-- `studio/narration.py` (Voice H: light room clean-up + warm EQ).
-- Transcribe the finished track line by line against the script, and listen to the raw take around anything flagged: stops, coughs, breaths and dropped words are fixed in `audio/v2/manual_cuts.json`.
-
-## 5. Build (Claude)
+## 4. Build (Claude)
 - Something on screen moves at all times; no graphic stops with half the screen empty.
 - **Fact cards** (`studio/factcard.py`) for people: the photo, plus two or three short facts landing while Mike talks, one marked DID YOU KNOW.
 - **DID YOU KNOW panels** (`dyk=`) on ordinary photos.
@@ -46,10 +51,10 @@ Brawn v2 and Istanbul v2 are the reference videos. Every long video follows this
 - Don't cut from an AI clip to the still it was made from; let the clip run (slower) over both lines.
 - Period cars on screen are the competition version when the story is the rally (a road car only when the narration says "production car").
 
-## 6. Review (Mike)
+## 5. Review (Mike)
 - Notes with times. Claude maps each time to the scene and the raw recording before changing anything, fixes all of them, re-checks, re-renders.
 
-## 7. Release
+## 6. Release
 - One video on one channel. Shorts cut from the finished video (end-slate question, captions), thumbnails A/B with Test & Compare, an upload pack with chapters, credits, tags and the AI disclosure, and Instagram/Facebook scheduled on the VPS at the same times as YouTube.
 
 ## Next improvements to try
