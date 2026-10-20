@@ -125,6 +125,11 @@ What to paste into YouTube Studio for Gentlemen of Fuel, Omnira F1 and Omnira Fo
 
 **Audience** (Settings › Channel › Advanced settings): "No, set this channel as not made for kids".
 
+**Branding** (Customisation › Profile, at the bottom):
+- **Video watermark:** upload the round M emblem, Display time "Entire video". Files: PostDrive › GOF › Logos › GOF watermark.png; Omnira › F1 › Logos › F1 watermark.png; Omnira › Football › Logos › Football watermark.png.
+- **Contact email:** one address per channel (not mike@misfitmingle.com, which shows publicly).
+- **Links:** that channel's Instagram; add TikTok/X only once they're posting.
+
 **Upload defaults** (Settings › Upload defaults; this saves setting them on every upload):
 - **Title, description, tags:** leave blank. They come from each upload pack.
 - **Visibility:** Private. You schedule each video yourself.
