@@ -143,3 +143,19 @@ What to paste into YouTube Studio for Gentlemen of Fuel, Omnira F1 and Omnira Fo
   - Description: Shevchenko had to score. Dudek was dancing.
 - **The fan car is on two channels.** The fan car long video and four of its Shorts are on both GoF and Omnira F1, and GoF also has "The F1 car with a giant fan on the back" and the April F1 video "The Hidden Science That Decided Every F1 Title". One video, one channel: set the GoF copies to **Private** (Content, tick them, Edit › Visibility › Private). Don't delete them: making them private can be undone and deleting can't. Omnira F1 keeps them all. Group B is only on GoF, so it stays.
 - **Turbine teaser clash:** "Chrysler gave away 50 jet-engined cars" (GoF Short 1) is scheduled for Sat 31 Oct at **1pm**, the same slot as McLaren's last Short ("The $34.7 million McLaren"). The pack says the teaser goes at **7pm**. Move it to 7pm.
+
+---
+
+## 6. BANNED and IMPOSSIBLE playlist descriptions
+
+**Gentlemen of Fuel**
+- BANNED: The cars, the tricks and the races that were outlawed. Group B rally cars too fast to survive, the Monte Carlo Minis disqualified over their headlights, and the rules written to stop them. Full stories and Shorts, newest first.
+- IMPOSSIBLE: The wins nobody thought could happen. A McLaren F1 road car winning Le Mans at its first attempt, and the other days the odds got it wrong. Full stories and Shorts, newest first.
+
+**Omnira F1**
+- BANNED: The tech Formula 1 outlawed. The Brabham fan car that won its only race, the loopholes teams found and the rules written to close them. Full episodes and Shorts, newest first.
+- IMPOSSIBLE: The F1 results nobody saw coming. Brawn GP, the team bought for £1 that won the 2009 world title, and the other days the odds got it wrong. Full episodes and Shorts, newest first.
+
+**Omnira Football**
+- BANNED: The matches and tactics that changed football's rules. Gijón 1982, the World Cup match nobody tried to win, and the back-pass rule that changed goalkeeping. Full episodes and Shorts, newest first.
+- IMPOSSIBLE: The days the odds got it wrong. Istanbul 2005, Liverpool's comeback from 3–0 down against AC Milan, and football's other great upsets. Full episodes and Shorts, newest first.
