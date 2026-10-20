@@ -222,10 +222,11 @@ class Photo(Scene):
 class Clip(Scene):
     """A short video clip (e.g. a 5 s Runway shot). Frames are extracted once, at full frame size, into
     <clip>_frames/ beside it, so render workers just load JPEGs. If the scene is longer than the clip it
-    plays slower (down to min_rate), then holds the last frame with a slow push-in."""
-    def __init__(self, start, path, min_rate=0.6, end=None, skip=0.0, **kw):
+    plays slower (down to min_rate), then holds the last frame with a slow push-in.
+    max_rate caps the speed (Mike 20 Oct: AI clips at full speed "look rushed"; 0.6 = calm, real-time feel)."""
+    def __init__(self, start, path, min_rate=0.6, end=None, skip=0.0, max_rate=1.0, **kw):
         super().__init__(start, **kw)
-        self.path, self.min_rate, self.end = path, min_rate, end         # end: use only the first `end` seconds
+        self.path, self.min_rate, self.end, self.max_rate = path, min_rate, end, max_rate   # end: use only the first `end` seconds
         self.f0 = int(skip * FPS)                                        # skip: drop the first `skip` seconds
         self.fdir = os.path.splitext(path)[0] + "_frames"
         if not (os.path.isdir(self.fdir) and os.listdir(self.fdir)):
@@ -237,7 +238,7 @@ class Clip(Scene):
         if end: self.n = min(self.n, int(end * FPS))
         self.n -= self.f0
     def base(self, t):
-        clip = self.n / FPS; rate = max(self.min_rate, min(1.0, clip / max(self.dur or clip, 0.01)))
+        clip = self.n / FPS; rate = max(min(self.min_rate, self.max_rate), min(self.max_rate, clip / max(self.dur or clip, 0.01)))
         ct = max(0.0, t) * rate; over = max(0.0, ct - clip) / rate
         im = Image.open(os.path.join(self.fdir, f"{self.f0 + min(self.n, int(ct * FPS) + 1):04d}.jpg")).convert("RGB")
         if over > 0:                                    # past the end: hold, creeping in

@@ -51,8 +51,9 @@ def AS(snip, ai, fallback=None, off=-0.15, **kw):
     if has(ai): return Photo(S(snip, off), AI + ai, credit="AI illustration", **kw)
     return fallback
 OPT = AS
+AI_RATE = 1.0                                                                 # a build sets 0.6 for calm AI clips (PLAYBOOK)
 def VS(snip, clip, fallback=None, off=-0.15, **kw):                          # an AI video clip (media/ai/*.mp4)
-    if has(clip): return Clip(S(snip, off), AI + clip, credit="AI illustration", **kw)
+    if has(clip): return Clip(S(snip, off), AI + clip, credit="AI illustration", **({"max_rate": AI_RATE} | kw))
     return fallback
 def CaS(snip, items, off=-0.15, **kw):
     t0 = S(snip, off)

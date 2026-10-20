@@ -15,6 +15,7 @@ E.init("/Volumes/PostDrive/Stories/Gentlemen of Fuel/01 Chrysler Turbine/", seri
 from episode import *
 import explainers as X
 from factcard import FactCard
+E.AI_RATE = 0.6                                                               # AI clips at 60% speed (Mike 20 Oct)
 
 FINAL = "GoF - Chrysler Turbine Car.mp4"
 
@@ -253,7 +254,8 @@ scenes = [
        texts=[(0.6, "1963.", "big")]),
     CP("It built fifty cars with jet engines", "Stahls_Automotive_Collection_December_2021_149_(1963_Chrysler_Turbine_engine).jpg", zoom=(1.0, 1.15),
        texts=[(0.4, "50 cars. Jet engines.", "big")]),
-    AS("Then it handed them to ordinary", "ai_turbine_driveway.png", zoom=(1.0, 1.15), texts=[(1.0, "For free.", "big")]),
+    VS("Then it handed them to ordinary", "ai_driveway_clip.mp4", end=1.8, max_rate=0.5, texts=[(1.0, "For free.", "big")],
+       fallback=AS("Then it handed them to ordinary", "ai_turbine_driveway.png", zoom=(1.0, 1.15), texts=[(1.0, "For free.", "big")])),
     CuS("Two hundred and three families", cold_numbers, bg=bga("ai_turbine_driveway.png", 0.6)),
     AS("And then Chrysler took almost all", ROW, zoom=(1.0, 1.15), texts=[(1.6, "Destroyed.", "big")]),
     CP("This is the story of the Chrysler Turbine Car", "1963_Chrysler_Turbine_Ghia_Coupe_at_PB_2022.jpg", zoom=(1.0, 1.12),
@@ -287,8 +289,8 @@ scenes = [
        texts=[(S("Instead of just showing it") - S("But here's the part", -0.15), "50 cars. Given to the public.", "mid")]),
     CuS("More than thirty thousand people", letters, bg=bga("ai_turbine_driveway.png", 0.85)),
     CuS("Chrysler picked two hundred", usa),
-    CP("They drove them to work", "Chrysler_Turbine_Car_Worlds_Fair_1964.jpg", zoom=(1.0, 1.15), strap=("New York World's Fair", "1964", 0.6)),
-    VS("Neighbours came out to stare", "ai_driveway_clip.mp4", end=1.8, fallback=AS("Neighbours came out to stare", "ai_turbine_driveway.png", zoom=(1.0, 1.2), focus=((0.5, 0.5), (0.6, 0.55)))),
+    CP("They drove them to work", "Chrysler_Turbine_Car_Worlds_Fair_1964.jpg", zoom=(1.0, 1.18), strap=("New York World's Fair", "1964", 0.6),
+       texts=[(S("Neighbours came out to stare") - S("They drove them to work", -0.15), "Neighbours came out to stare.", "mid")]),
     VS("Some drivers said they couldn't fill up", "ai_gas_clip.mp4", texts=[(1.2, "A crowd at every pump.", "mid")],
        fallback=AS("Some drivers said they couldn't fill up", "ai_turbine_gas_station.png", zoom=(1.0, 1.15), texts=[(1.2, "A crowd at every pump.", "mid")])),
     CuS("Between them", miles, bg=bga("ai_turbine_gas_station.png", 0.84)),
@@ -303,7 +305,7 @@ scenes = [
        texts=[(S("But it was clear") - S("Chrysler's engineers fixed", -0.15), "Not ready yet.", "big")]),
     # VII. the end
     CuS("In January 1966", ended, chapter=CH("VII", "THE END"), bg=bgp("Chrysler_Turbine_Car_Worlds_Fair_1964.jpg", 0.82)),
-    VS("The families gave the cars back", "ai_row_clip.mp4", fallback=AS("The families gave the cars back", ROW, zoom=(1.0, 1.12), focus=((0.3, 0.6), (0.45, 0.55)))),
+    VS("The families gave the cars back", "ai_row_clip.mp4", off=-1.4, fallback=AS("The families gave the cars back", ROW, zoom=(1.0, 1.12), focus=((0.3, 0.6), (0.45, 0.55)))),
     CuS("And then Chrysler did something", destroyed, bg=bgp("Chrysler_Turbine_exhaust.JPG", 0.8)),
     CuS("Of the fifty-five cars built", fifty_five, off=-0.6),
     CuS("The usual explanation is tax", duty, bg=bga(ROW, 0.86)),

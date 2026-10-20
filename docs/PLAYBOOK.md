@@ -25,6 +25,8 @@ Brawn v2 and Istanbul v2 are the reference videos. Every long video follows this
   strongest moments, image-to-video from the (correct) AI stills. Test one clip on the cheap model first (~5 cr/s, 720p); use the
   better model (~12 cr/s, 1080p) only if the cheap one loses the car's details. Propose the batch with costs; Mike confirms before
   any credits are spent. Each clip shows what the narration says; never filler.
+- **Playing clips** (Mike 20 Oct, "looks very AI" / "rushed"): never two clips back to back (a photo or graphic between),
+  at 60% speed (`E.AI_RATE = 0.6` in the build), and on screen for at least 3–4 s. Use only the clean part of a clip (`end=`).
 - **Real cars in AI stills: attach real photos** (front, rear, side, details) in a fresh ChatGPT chat per image and describe the
   car's real details; when one is wrong, start a new chat rather than asking for a fix (Mike 20 Oct: fixes "go a tad crazy").
   Check against the photos before using it (Turbine v2 had wire wheels and stacked tail lights).
