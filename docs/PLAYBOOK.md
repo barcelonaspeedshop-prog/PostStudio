@@ -40,6 +40,8 @@ Brawn v2 and Istanbul v2 are the reference videos. Every long video follows this
   - Never show a drawn car or a drawn person where a real (or AI) picture can carry it.
 
 ## 3. Narration (AI, from 20 Oct 2026)
+
+- Voices: only the eleven in docs/voices.md (Mike 20 Oct). F1 and Football use UK voices only. Each script names its voice; Mike approves it with the wording.
 - AI voice in Runway, chosen per channel and per mood (exciting / authoritative / soft), at least two voices per channel. Samples: PostDrive `Gentlemen of Fuel/01 Chrysler Turbine/audio/voice_tests/`.
 - Generate one 60-second test of the opening first; the full script only once the test sounds right.
 - Hard names: spell them phonetically in the voice text (the script keeps the real spelling).
