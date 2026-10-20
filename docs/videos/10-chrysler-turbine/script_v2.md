@@ -16,11 +16,11 @@ Channel: Gentlemen of Fuel. Series: none for now (a one-off GoF story); the outr
 
 ## 1. Cold open
 
-In 1963, Chrysler did something no car company had ever done.
+In 1963, Chrysler did something no car company had ever done, or probably even contemplated.
 
 It built fifty cars with jet engines. Then it handed them to ordinary American families, for free, to use every day.
 
-To go to work. To do the school run. To go to the shops.
+To go to work. To do the school run. To go shopping.
 
 Two hundred and three families drove them for three years, more than a million miles.
 
@@ -72,7 +72,7 @@ And because it just burned a constant flame, it didn't care what you fed it.
 
 Diesel. Kerosene. Jet fuel. Unleaded petrol. Even, they said, perfume.
 
-The story goes that when the President of Mexico was shown one, he asked if it would run on tequila. They filled it up, and it did.
+The story goes that when the President of Mexico was shown one, he asked if it would run on tequila. That hadn't been tried yet, but they filled one up with Mexican tequila, and it worked.
 
 ## 5. The car
 
@@ -84,13 +84,13 @@ The design was by Chrysler's Elwood Engel, and the jet theme was everywhere. The
 
 [Close-ups: the turbine-shaped wheel centres, the rear lights, the jet-style console.]
 
-And it sounded like nothing else on the road. Not a roar. A whoosh, like a vacuum cleaner, or a jet on the runway.
+And it sounded like nothing else on the road. Not the usual V8 roar that most cars gave out at the time. The turbine car was more like a jet on the runway.
 
 ## 6. The experiment
 
-Here's the part that made it famous.
+But here's the part that really made the turbine car famous.
 
-Instead of just showing it at motor shows, Chrysler gave fifty of them to the public.
+Instead of just showing it at motor shows and selling them to the lucky few, Chrysler gave fifty of them to the public.
 
 More than thirty thousand people wrote in, asking to take part.
 
@@ -114,9 +114,7 @@ But there were problems.
 
 Press the accelerator, and there was a pause before anything happened, while the turbine spun up. At a junction, that could feel like a long time.
 
-It wasn't economical, either. It used more fuel than an ordinary car.
-
-And at high altitude, some cars wouldn't start properly.
+It wasn't economical, either. It used much more fuel than an ordinary car, and at high altitude, some cars wouldn't start properly.
 
 None of it was fatal. Chrysler's engineers fixed what they could, and the next engine was better. But it was clear the turbine wasn't ready yet.
 
@@ -144,7 +142,7 @@ But not quite all of them.
 
 Nine Turbine Cars survived. Chrysler kept two. Most of the rest went to museums.
 
-And one of them ended up with Jay Leno.
+And one of them ended up with the TV star and car nut Jay Leno.
 
 [Fact card: the surviving cars and where they are.]
 
