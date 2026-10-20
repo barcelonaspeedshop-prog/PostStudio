@@ -2,7 +2,7 @@
 
 Both: Audience "No, it's not made for kids". Altered or synthetic content: Yes (AI narration voice). Playlist: Omnira Football in Shorts. Related video: Istanbul 2005. Category Sports.
 
-## 1. Como v Man United (out 11am)
+## 1. Como v Man United (out 10am)
 
 - **File:** PostDrive › Shorts › cl_md3 › video › Football - Como v Man United (Kirk steady).mp4 (1:10)
 - **Title:** In Serie D in 2017. Tonight they play Man United in the Champions League #Shorts
@@ -13,7 +13,7 @@ Both: Audience "No, it's not made for kids". Altered or synthetic content: Yes (
 - **Tags:** Como, Como 1907, Manchester United, Man United, Champions League, Fabregas, Serie A, Lake Como
 - **Pinned comment:** Fairytale or reality check? What's the score tonight?
 
-## 2. Bayern v Arsenal (out 4pm)
+## 2. Bayern v Arsenal (out 2:30pm)
 
 - **File:** PostDrive › Shorts › cl_md3 › video › Football - Bayern v Arsenal.mp4 (0:51)
 - **Title:** Kane v Arsenal again: the derby's record scorer waits in Munich #Shorts
