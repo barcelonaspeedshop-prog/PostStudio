@@ -53,6 +53,8 @@ Brawn v2 and Istanbul v2 are the reference videos. Every long video follows this
 - (Mike's own recording, if ever used again: Rode NT-USB+, packaging off, a fist from the mouth, Voice Memos Lossless, `studio/narration.py` Voice H.)
 
 ## 4. Build (Claude)
+
+- Text in a box is centred on the capital letters (cap height from font.getbbox("H")), never top-aligned with padding below; check every chip, row and label on the contact sheet before rendering (Mike 20 Oct: text sitting at the top of boxes, again).
 - Something on screen moves at all times; no graphic stops with half the screen empty.
 - **Fact cards** (`studio/factcard.py`) for people: the photo, plus two or three short facts landing while Mike talks, one marked DID YOU KNOW.
 - **DID YOU KNOW panels** (`dyk=`) on ordinary photos.

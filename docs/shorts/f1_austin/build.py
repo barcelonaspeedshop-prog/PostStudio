@@ -90,7 +90,7 @@ def checklist(t0):
             y = 760 + i * 200
             d.rounded_rectangle((90, y, 990, y + 150), 18, fill=rgba(NAVY_D, 0.9 * p), outline=rgba(GOLD, 0.7 * p), width=3)
             tick(d, (180, y + 75), 46, p, True)
-            tracked(d, (260, y + 46), txt, cond(56, 8), rgba(CREAM, p), 6)
+            f = cond(50, 8); b = f.getbbox("H"); tracked(d, (260, y + 75 - (b[3] - b[1]) / 2), txt, f, rgba(CREAM, p), 6)
         return cv.done()
     return fn
 

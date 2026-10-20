@@ -36,7 +36,8 @@ def bg_of(path, dark=0.62):
 
 def chip(d, xy, text, a, col=GOLD, size=46, fill=NAVY_D):
     x, y = xy; f = cond(size, 8); w = f.getlength(text) + 6 * len(text) + 40
-    d.rounded_rectangle((x - w / 2, y - 10, x + w / 2, y + size + 16), 10, fill=rgba(fill, 0.88 * a), outline=rgba(col, a), width=3)
+    b = f.getbbox("H"); cap = b[3] - b[1]; pad = 0.42 * size                  # box centred on the capitals
+    d.rounded_rectangle((x - w / 2, y - pad, x + w / 2, y + cap + pad), 10, fill=rgba(fill, 0.88 * a), outline=rgba(col, a), width=3)
     tracked(d, (x, y), text, f, rgba(col, a), 6, "center")
 
 def title(d, y, text, a, size=50, col=GOLD):
