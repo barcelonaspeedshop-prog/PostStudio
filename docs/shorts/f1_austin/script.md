@@ -2,7 +2,7 @@
 
 Topical Short for the United States Grand Prix (race Sunday 25 Oct). AI narration (voice: Malachi, UK). About 45 seconds. [Square brackets] are notes for the edit and aren't read out.
 
-**Slot:** Saturday 24 Oct, 1pm (Spain), Omnira F1. Playlist: Omnira F1 in Shorts. Related video: Brawn GP.
+**Slot:** Wednesday 21 Oct, 1pm (Spain), Omnira F1. Playlist: Omnira F1 in Shorts. Related video: Brawn GP.
 
 **Facts, checked 20 Oct** (standings after Singapore, 11 Oct): Antonelli 340, Russell 238, Hamilton 229, Verstappen 221. No sprint in Austin, so 25 points at most. After Austin, 5 races and 125 points are left. A clinch needs: Antonelli wins, Russell 9th or lower, Hamilton 5th or lower. If Russell is 9th the gap is exactly 125, and Antonelli wins on countback (more race wins). Sources: Auto Action, RaceFans, Autosport, RacingNews365. **Check again on Friday 23 Oct** before the render, in case of any penalty or appeal.
 
