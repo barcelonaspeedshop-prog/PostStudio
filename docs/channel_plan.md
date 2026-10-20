@@ -67,6 +67,8 @@ Backlog already written or planned: Chrysler Turbine (script approved today), Mc
 4. Crashgate, Singapore 2008, told with documents and graphics
 5. Antonelli: how a teenager won the title (only once he's won it)
 
+**Radio reconstructions (Mike 20 Oct: "make our own AI radio audio"):** for stories like Crashgate, recreate team radio and key conversations as our own audio. Rules: only words that are on the record (published transcripts, hearing evidence, interviews), never invented lines; a generic AI voice with a radio filter, never a clone or imitation of the real person's voice; "Reconstruction" on screen with the source; tick YouTube's altered-or-synthetic box. Runway won't clone a real person's voice, and YouTube treats a realistic fake of a real person as something that must be labelled.
+
 Shorts: Antonelli's title maths before Austin · youngest champions ranked · what is superclipping · Cadillac's first point taken away · why Vegas races on a Saturday night · why most F1 teams are in England · BANNED: the double diffuser (links back to Brawn) · F1's most famous radio messages, explained.
 
 ---
