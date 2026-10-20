@@ -20,7 +20,7 @@ Brawn v2 and Istanbul v2 are the reference videos. Every long video follows this
 
 ## 2. Pictures (Mike + Claude)
 - Real photos from Wikimedia Commons (`studio/commons.py`), Mike's own finds in `media/mike`.
-- AI stills for places, crowds, atmosphere and moments with no photo: ChatGPT (Mike) or Runway nano-banana (~20 credits). One image per prompt, 16:9, no text, no badges or sponsor logos, never a real person's face as the subject.
+- AI stills for places, crowds, atmosphere and moments with no photo: ChatGPT (Mike) or Runway nano-banana (~20 credits). One image per prompt, 16:9. **Don't write "no faces / no logos / no text" in prompts** (Mike 20 Oct: it dominates the image and distorts the people); paint out any logo or text in the edit. Never a real, named person as the subject.
 - **AI video in every long video (Mike 20 Oct: "adds movement and gives us the edge over just stills"): 3–4 clips of 5 s** at the
   strongest moments, image-to-video from the (correct) AI stills. Test one clip on the cheap model first (~5 cr/s, 720p); use the
   better model (~12 cr/s, 1080p) only if the cheap one loses the car's details. Propose the batch with costs; Mike confirms before
