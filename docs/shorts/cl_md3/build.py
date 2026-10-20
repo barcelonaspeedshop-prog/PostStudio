@@ -110,7 +110,7 @@ def short_como():
           Tag(t_fab + 0.2, "CESC FÀBREGAS", sub="PLAYER  ·  PART-OWNER  ·  MANAGER", dur=t_24 - t_fab - 0.4),
           Pop(t_eur, ["FIRST TIME", "IN EUROPE"], t_tn - t_eur - 0.1, y=270, size=100),
           Pop(t_end, ["CAN THE FAIRYTALE", "BEAT UNITED?"], 99, y=280, size=92)]
-    return dict(n=1, name="Como v Man United", s=s, scenes=scenes, ov=ov, line="OMNIRA FOOTBALL  ·  CHAMPIONS LEAGUE",
+    return dict(n=1, name="Como v Man United", tag=" (Kirk)", s=s, scenes=scenes, ov=ov, line="OMNIRA FOOTBALL  ·  CHAMPIONS LEAGUE",
                 slate=("Can Como beat United?", "FOLLOW FOR MORE FOOTBALL STORIES"), music=[MUS + "Energetic/ANBR - Seasons.mp3"])
 
 # ---------------------------------------------------------------- Bayern v Arsenal
@@ -193,7 +193,7 @@ def short_bayern():
 ALL = [short_como, short_bayern]
 
 def job(k):
-    j = ALL[k - 1](); os.makedirs(OUT, exist_ok=True); out = OUT + f"Football - {j['name']}.mp4"
+    j = ALL[k - 1](); os.makedirs(OUT, exist_ok=True); out = OUT + f"Football - {j['name']}{j.get('tag', '')}.mp4"
     return out, round(V.render(out, NA, j["s"], j["scenes"], j["ov"], j["line"], j["slate"], j["music"]), 1)
 
 def sheet(k):
