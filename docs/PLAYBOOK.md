@@ -68,6 +68,7 @@ Brawn v2 and Istanbul v2 are the reference videos. Every long video follows this
 
 ## 6. Release
 - One video on one channel. Shorts cut from the finished video (end-slate question, captions), thumbnails A/B with Test & Compare, an upload pack with chapters, credits, tags and the AI disclosure, and Instagram/Facebook scheduled on the VPS at the same times as YouTube.
+- Playlists (Mike 20 Oct): every long video goes in "<Channel> stories", every Short in "<Channel> in Shorts", and either one also goes in BANNED or IMPOSSIBLE when it's in that series. A video can be in several playlists. Every upload pack names the playlists to tick.
 
 ## Next improvements to try
 - A short animated "previously / coming up" moment in the first 30 seconds of each chapter, so viewers who skip still get hooked.

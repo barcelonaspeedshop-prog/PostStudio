@@ -159,3 +159,11 @@ What to paste into YouTube Studio for Gentlemen of Fuel, Omnira F1 and Omnira Fo
 **Omnira Football**
 - BANNED: The matches and tactics that changed football's rules. Gijón 1982, the World Cup match nobody tried to win, and the back-pass rule that changed goalkeeping. Full episodes and Shorts, newest first.
 - IMPOSSIBLE: The days the odds got it wrong. Istanbul 2005, Liverpool's comeback from 3–0 down against AC Milan, and football's other great upsets. Full episodes and Shorts, newest first.
+
+---
+
+## 7. Playlist rule for every upload
+
+- **Long video:** "<Channel> stories", plus BANNED or IMPOSSIBLE if it's in that series.
+- **Short:** "<Channel> in Shorts", plus BANNED or IMPOSSIBLE if it's in that series.
+- A video can be in several playlists; adding it to one doesn't take it out of another.
