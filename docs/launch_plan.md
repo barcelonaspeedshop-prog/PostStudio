@@ -17,6 +17,8 @@ Across the three channels that's **3 long videos and 21 Shorts a week**, about 1
 - **Omnira F1:** long video Thursday 7pm (before the race weekend).
 - **Gentlemen of Fuel:** long video Sunday 7pm (weekend viewing).
 - **Shorts:** every day at 1pm on each channel. Topical Shorts go out as soon as they're ready.
+  Each long video gets a teaser Short the day before plus 6 follow-up Shorts (Mike 20 Oct). Saturdays carry two: the last follow-up at 1pm and next day's teaser at 7pm.
+- **Playlists:** one standing long-video playlist and one standing Shorts playlist per channel; no new playlist per video.
 
 We work one week ahead: everything for next week is approved and scheduled by Saturday.
 

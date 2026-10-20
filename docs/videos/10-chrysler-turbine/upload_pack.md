@@ -7,7 +7,7 @@
   - GoF - Turbine - thumbnail A rear.jpg
   - GoF - Turbine - thumbnail B row.jpg
   - GoF - Turbine - thumbnail C pump.jpg
-- **Order:** Short 1 the day before as a teaser, then the long video, then Shorts 2–7, one a day.
+- **Schedule (launch plan, Spain time):** Short 1 Sat 31 Oct 7pm (teaser; McLaren's last Short has the 1pm slot), long video Sun 1 Nov 7pm, Shorts 2–7 Mon 2 – Sat 7 Nov at 1pm. Schedule everything by Sat 24 Oct.
 
 ## Description
 
@@ -65,14 +65,14 @@ Narration: AI voice. Music: YouTube Audio Library.
 - **Category:** Autos & Vehicles
 - **Video language:** English (United Kingdom)
 - **Caption certification:** never aired on US TV
-- **Playlist:** "Gentlemen of Fuel stories" (create it), with McLaren F1 at Le Mans
+- **Playlist:** "Gentlemen of Fuel stories" (one standing playlist for every GoF long video; create it once, add McLaren F1 too)
 - **End screen** (last 20 s): Subscribe, plus the McLaren F1 Le Mans episode
 - **Card** at 6:30 ("What if"): the McLaren F1 Le Mans episode
 - **Pinned comment:** "Brilliant idea killed too soon, or never going to work? Would you have put your name down for one in 1963?"
 
 ## Shorts (files in 01 Chrysler Turbine › shorts)
 
-Every Short uses the same tags, audience and altered-content answers as the long video. Related video = the full story. Playlist: "Chrysler Turbine in Shorts" on Gentlemen of Fuel.
+Every Short uses the same tags, audience and altered-content answers as the long video. Related video = the full story. Playlist: "Gentlemen of Fuel in Shorts" (one standing playlist for every GoF Short; no new playlist per video, Mike 20 Oct).
 
 Each description ends with: "Full story on this channel: The Jet-Engined Car Chrysler Lent to America. #ChryslerTurbine #carhistory #classiccars #gentlemenoffuel"
 
