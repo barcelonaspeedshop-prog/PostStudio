@@ -35,7 +35,11 @@ Brawn v2 and Istanbul v2 are the reference videos. Every long video follows this
 - AI voice in Runway, chosen per channel and per mood (exciting / authoritative / soft), at least two voices per channel. Samples: PostDrive `Gentlemen of Fuel/01 Chrysler Turbine/audio/voice_tests/`.
 - Generate one 60-second test of the opening first; the full script only once the test sounds right.
 - Hard names: spell them phonetically in the voice text (the script keeps the real spelling).
-- Transcribe the finished track against the script; regenerate only the lines that are wrong, never the whole track.
+- Generate one voice file per script section (`audio/v2/parts/01.mp3`, `02.mp3`, ...), same voice and seed, then
+  `studio/ai_narration.py <script> <parts> <audio/v2>` builds narration.wav + sentences.json and lists any sentence Whisper
+  heard differently (narration_check.txt). Don't use narration.py on AI voice: its retake logic gets confused.
+- Regenerate only the section that is wrong, never the whole track.
+- Cut-outs of a car or a person (for graphics): `studio/cutout.swift` (macOS Vision, free) instead of Runway credits.
 - (Mike's own recording, if ever used again: Rode NT-USB+, packaging off, a fist from the mouth, Voice Memos Lossless, `studio/narration.py` Voice H.)
 
 ## 4. Build (Claude)

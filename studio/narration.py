@@ -363,11 +363,12 @@ def build(script_md, raw, outdir):
     if os.environ.get("VOICE_REPAIR", "1") != "0" and os.path.exists(dfn):
         run(dfn, os.path.join(os.path.dirname(os.path.abspath(__file__)), "denoise.py"), cut, rep, "10")
     else: os.replace(cut, rep)
-    run("ffmpeg", "-v", "error", "-y", "-i", rep, "-af",
-        # no gate, ever: measured 10-13, an agate turned 67% of word endings down ~11 dB on quieter takes
-        "highpass=f=60,lowshelf=f=150:g=5,equalizer=f=550:t=q:w=0.9:g=-1.5,highshelf=f=6500:g=-2.5,"
-        "acompressor=threshold=-24dB:ratio=2:attack=10:release=150,loudnorm=I=-16:TP=-1.5:LRA=9",
-        "-ar", "48000", "-ac", "1", out)
+    # AI_VOICE=1 (an AI narration, 20 Oct): already clean and EQ'd, so only a high-pass and the level
+    chain = ("highpass=f=60,loudnorm=I=-16:TP=-1.5:LRA=9" if os.environ.get("AI_VOICE") == "1" else
+             # no gate, ever: measured 10-13, an agate turned 67% of word endings down ~11 dB on quieter takes
+             "highpass=f=60,lowshelf=f=150:g=5,equalizer=f=550:t=q:w=0.9:g=-1.5,highshelf=f=6500:g=-2.5,"
+             "acompressor=threshold=-24dB:ratio=2:attack=10:release=150,loudnorm=I=-16:TP=-1.5:LRA=9")
+    run("ffmpeg", "-v", "error", "-y", "-i", rep, "-af", chain, "-ar", "48000", "-ac", "1", out)
     for f in (cut, rep):
         if os.path.exists(f): os.remove(f)
     run("ffmpeg", "-v", "error", "-y", "-i", out, "-b:a", "160k", os.path.join(outdir, "narration_preview.mp3"))

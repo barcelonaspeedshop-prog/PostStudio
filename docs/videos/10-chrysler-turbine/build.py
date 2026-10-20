@@ -244,7 +244,7 @@ scenes = [
     # I. the jet age
     AS("In the early sixties", "ai_turbine_jet_age.png", zoom=(1.0, 1.18), focus=((0.45, 0.4), (0.5, 0.5)), chapter=CH("I", "THE JET AGE")),
     CP("Airliners had gone from propellers", "OrlyAirport1965-Boeing707-EL-AL.jpg", zoom=(1.0, 1.12), texts=[(0.5, "Propellers out. Jets in.", "mid")]),
-    CP("Everything new had fins", "1963_Chrysler_Turbine_in_Hershey_PA.JPG", zoom=(1.0, 1.15), focus=((0.6, 0.55), (0.75, 0.55)),
+    CP("Everything new had fins", "Chrysler_Turbine_Car_--_Walter_P_Chrysler_Museum_10-23-2010_107_N.jpg", zoom=(1.0, 1.15), focus=((0.5, 0.5), (0.6, 0.5)),
        texts=[(0.4, "Fins. Chrome. Rockets.", "mid")]),
     CP("And Chrysler's engineers had been working", "CHRYSLER_TURBINE_ENGINE_REGENERATOR_WHEEL_-_NARA_-_17443496.jpg", zoom=(1.0, 1.12),
        texts=[(0.8, "A gas turbine for cars. Since the 1940s.", "mid")]),
@@ -286,7 +286,7 @@ scenes = [
     # VII. the end
     VS("In January 1966", "ai_row_clip.mp4", chapter=CH("VII", "THE END"),
        fallback=AS("In January 1966", ROW, zoom=(1.0, 1.2), focus=((0.3, 0.6), (0.5, 0.55)), chapter=CH("VII", "THE END"))),
-    AS("And then Chrysler did something", ROW, zoom=(1.2, 1.35), focus=((0.5, 0.55), (0.6, 0.55)),
+    AS("And then Chrysler did something", ROW, zoom=(1.08, 1.2), focus=((0.5, 0.55), (0.6, 0.55)),
        texts=[(S("It destroyed them.") - S("And then Chrysler did something", -0.15), "It destroyed them.", "big")]),
     CuS("Of the fifty-five cars built", fifty_five, off=-0.6),
     CuS("The usual explanation is tax", duty, bg=bga(ROW, 0.86)),
