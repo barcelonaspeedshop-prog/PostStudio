@@ -288,8 +288,9 @@ scenes = [
     CuS("More than thirty thousand people", letters, bg=bga("ai_turbine_driveway.png", 0.85)),
     CuS("Chrysler picked two hundred", usa),
     CP("They drove them to work", "Chrysler_Turbine_Car_Worlds_Fair_1964.jpg", zoom=(1.0, 1.15), strap=("New York World's Fair", "1964", 0.6)),
-    AS("Neighbours came out to stare", "ai_turbine_driveway.png", zoom=(1.0, 1.2), focus=((0.5, 0.5), (0.6, 0.55))),
-    AS("Some drivers said they couldn't fill up", "ai_turbine_gas_station.png", zoom=(1.0, 1.15), texts=[(1.2, "A crowd at every pump.", "mid")]),
+    VS("Neighbours came out to stare", "ai_driveway_clip.mp4", end=1.8, fallback=AS("Neighbours came out to stare", "ai_turbine_driveway.png", zoom=(1.0, 1.2), focus=((0.5, 0.5), (0.6, 0.55)))),
+    VS("Some drivers said they couldn't fill up", "ai_gas_clip.mp4", texts=[(1.2, "A crowd at every pump.", "mid")],
+       fallback=AS("Some drivers said they couldn't fill up", "ai_turbine_gas_station.png", zoom=(1.0, 1.15), texts=[(1.2, "A crowd at every pump.", "mid")])),
     CuS("Between them", miles, bg=bga("ai_turbine_gas_station.png", 0.84)),
     # VI. what the families found
     CP("So what was it actually like", "chrysler-turbine-car3.jpeg", zoom=(1.1, 1.25), chapter=CH("VI", "WHAT THE FAMILIES FOUND"),

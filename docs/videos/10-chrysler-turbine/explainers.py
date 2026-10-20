@@ -70,7 +70,7 @@ _wheel = {}
 def wheel(r):
     """The real car's rear wheel (from the side-on still), cut out round, r pixels radius."""
     if r not in _wheel:                                                       # rim + whitewall from the still, our own tyre round it
-        im = load(STORY + "ai/ai_turbine_side.png").convert("RGBA"); cx, cy, R = 1228, 572, 80
+        im = load(STORY + "ai/ai_turbine_side.png").convert("RGBA"); cx, cy, R = 1218, 612, 72
         ri = int(r * 0.8); c = im.crop((cx - R, cy - R, cx + R, cy + R)).resize((2 * ri, 2 * ri), Image.LANCZOS)
         m = Image.new("L", c.size, 0); ImageDraw.Draw(m).ellipse((1, 1, 2 * ri - 1, 2 * ri - 1), fill=255); c.putalpha(m)
         w_ = Image.new("RGBA", (2 * r, 2 * r), (0, 0, 0, 0)); wd = ImageDraw.Draw(w_)
