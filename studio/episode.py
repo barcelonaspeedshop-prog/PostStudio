@@ -75,7 +75,12 @@ def bg_of(path, amount=0.8): return lambda t: dim_bg(path, amount)
 # ---------------------------------------------------------------- shared graphics
 def opening(bg_path, title, kicker, credit=None, **photo):
     """The series open: the stamp slams down (BANNED) or "IM" is struck out (IMPOSSIBLE) over moving footage,
-    then the episode title fades in under it."""
+    then the episode title fades in under it. series="gof": the Gentlemen of Fuel mark glows in instead (GofSting)."""
+    if SERIES == "gof":
+        return GofSting(0.0, bg=Photo(0, bg_path, credit=credit, **({"zoom": (1.0, 1.18)} | photo)), length=INTRO,
+                        items=[{"k": "title", "text": title, "y": 655, "size": 130, "at": 2.2},
+                               {"k": "rule", "y": 830, "w": 560, "at": 2.6},
+                               {"k": "kicker", "text": kicker, "y": 868, "at": 2.8}])
     if SERIES == "impossible":
         return ImpossibleSting(0.0, bg=Photo(0, bg_path, credit=credit, **({"zoom": (1.0, 1.18)} | photo)), cy=380, length=INTRO,
                                items=[{"k": "title", "text": title, "y": 655, "size": 130, "at": 2.5},
@@ -164,6 +169,87 @@ def impossible_end(this):
             tracked(d, (W / 2, 858), "SUBSCRIBE", cond(44, 3), rgba(CREAM, s_), 8, "center")
     return draw
 
+# ---------------------------------------------------------------- Gentlemen of Fuel (one-off stories, no series)
+GOF_LOGO = "/Volumes/PostDrive/GOF/Logos/GOF Profile.png"
+_gof = {}
+def gof_mark(h):
+    """The Omnira / Gentlemen of Fuel mark (emblem, wordmark, tagline) lifted off its black badge, h pixels high."""
+    if h not in _gof:
+        im = Image.open(GOF_LOGO).convert("RGB"); cx = cy = im.width / 2; R = im.width * 0.425   # inside the outer ring
+        box = (120, 270, 1134, 830); c = im.crop(box)
+        a = np.asarray(c, np.float32).max(axis=2)
+        a = np.clip((a - 70) * 2.4, 0, 255)                                   # gold stays, the dark marble goes
+        yy, xx = np.mgrid[box[1]:box[3], box[0]:box[2]]
+        a[(xx - cx) ** 2 + (yy - cy) ** 2 > R * R] = 0
+        m = Image.fromarray(np.dstack([np.asarray(c), a.astype(np.uint8)]), "RGBA")
+        _gof[h] = m.resize((int(m.width * h / m.height), h), Image.LANCZOS)
+    return _gof[h]
+
+def _sweep(mark, s):
+    """A soft band of light across the gold, s = 0..1."""
+    if not 0 < s < 1: return mark
+    band = Image.new("L", mark.size, 0); bx = -200 + (mark.width + 400) * s
+    ImageDraw.Draw(band).polygon([(bx, 0), (bx + 110, 0), (bx + 40, mark.height), (bx - 70, mark.height)], fill=170)
+    band = Image.fromarray((np.asarray(band.filter(ImageFilter.GaussianBlur(18)), np.float32) * np.asarray(mark)[..., 3] / 255).astype(np.uint8))
+    lit = Image.new("RGBA", mark.size, (255, 246, 220, 0)); lit.putalpha(band); out = mark.copy(); out.alpha_composite(lit); return out
+
+class GofSting(Scene):
+    """The GoF open: over moving footage the gold mark settles in (slight scale, soft glow), a light sweeps across it,
+    then the episode title fades in below. Quiet and classy: no stamps."""
+    def __init__(self, start=0.0, bg=None, items=None, length=5.0, cy=330, h=360, **kw):
+        super().__init__(start, **kw); self.bgsc, self.length, self.cy, self.h = bg, length, cy, h
+        self.card = Card(0, items, align="center") if items else None
+        if bg: bg.dur = length + XFADE
+        if self.card: self.card.dur = length
+    def base(self, t):
+        bg = self.bgsc.frame(t) if self.bgsc else navy_bg()
+        im = Image.blend(bg, Image.new("RGB", (W, H), (6, 6, 8)), 0.5 + 0.2 * ramp(t, 0.2, 1.4)).convert("RGBA")
+        a = ramp(t, 0.25, 1.3)
+        if a > 0:
+            mk = _sweep(gof_mark(self.h), ramp(t, 1.2, 2.2))
+            z = 1.06 - 0.06 * ease(min(1, t / 2.0))                          # settles in, sub-pixel
+            w_, h_ = mk.width * z, mk.height * z
+            glow = mk.filter(ImageFilter.GaussianBlur(22))
+            for layer_, k in ((glow, 0.55 * a), (mk, a)):
+                big = Image.new("RGBA", (W, H), (0, 0, 0, 0)); big.alpha_composite(layer_, (0, 0))
+                big = big.transform((W, H), Image.AFFINE, (1 / z, 0, -(W / 2 - w_ / 2) / z, 0, 1 / z, -(self.cy - h_ / 2) / z), Image.BICUBIC)
+                if k < 1: big = Image.fromarray((np.asarray(big) * np.array([1, 1, 1, k])).astype(np.uint8))
+                im.alpha_composite(big)
+        if self.card: im = self.card.draw_items(im, t)
+        return im
+
+def gof_end(cue="If you liked this one"):
+    """GoF end card: the mark, what the channel is, then the subscribe button on the cue line."""
+    def draw(d, L, t, sc):
+        a = ramp(t, 0.1, 0.9)
+        if a > 0:
+            mk = _sweep(gof_mark(300), ramp(t, 0.9, 1.9))
+            if a < 1: mk = Image.fromarray((np.asarray(mk) * np.array([1, 1, 1, a])).astype(np.uint8))
+            L.alpha_composite(mk, (int(W / 2 - mk.width / 2), 120))
+        tracked(d, (W / 2, 520), "UNUSUAL CARS  ·  PEOPLE  ·  IDEAS  ·  AND THE STORIES BEHIND THEM", cond(32), rgba(CREAM, ramp(t, 1.4, 1.9)), 6, "center")
+        tracked(d, (W / 2, 600), "A NEW STORY EVERY WEEK", cond(36), rgba(GOLD, ramp(t, 2.2, 2.7)), 8, "center")
+        s_ = ramp(t, at(cue, sc), at(cue, sc) + 0.4)
+        if s_ > 0:
+            d.rounded_rectangle((W / 2 - 220, 760, W / 2 + 220, 850), 14, fill=rgba(RED, s_))
+            tracked(d, (W / 2, 788), "SUBSCRIBE", cond(44, 3), rgba(CREAM, s_), 8, "center")
+    return draw
+
+def gof_sfx(path, length=5.0, sr=48000):
+    """A soft rising whoosh into a warm low swell as the mark settles, and a light shimmer with the sweep. Mono WAV."""
+    import wave
+    n = int(length * sr); t = np.arange(n) / sr; rng = np.random.default_rng(7); noise = rng.standard_normal(n)
+    lp = lambda x, k: np.convolve(x, np.ones(k) / k, mode="same")
+    env = lambda t0, dec: np.where(t >= t0, np.exp(-np.maximum(t - t0, 0) / dec), 0)
+    out = 0.22 * np.clip(t / 1.0, 0, 1) ** 2 * (t < 1.1) * lp(noise, 10)                              # whoosh in
+    out += 0.6 * np.sin(2 * np.pi * 55 * t) * np.clip((t - 0.6) / 0.6, 0, 1) * env(1.2, 1.4)        # low swell
+    out += 0.25 * np.sin(2 * np.pi * 110 * t) * np.clip((t - 0.6) / 0.6, 0, 1) * env(1.2, 1.0)
+    sh = np.clip((t - 1.2) / 0.5, 0, 1) * env(1.7, 0.9) * (t >= 1.2)                                 # shimmer with the sweep
+    out += 0.10 * sh * sum(np.sin(2 * np.pi * f * t) for f in (660, 990, 1320))
+    out = out / np.max(np.abs(out)) * 0.7
+    with wave.open(path, "w") as w:
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr); w.writeframes((out * 32767).astype(np.int16).tobytes())
+    return path
+
 # ---------------------------------------------------------------- render + mix
 def main(scenes, final, music_gain=0.35):
     scenes = [x for x in scenes if x is not None]
@@ -176,7 +262,8 @@ def main(scenes, final, music_gain=0.35):
                     "-map", "[o]", voice], check=True)
     tracks = sorted(t for t in glob.glob(A + "*.mp3") if not os.path.basename(t).startswith(("narration", "voice_test")))
     bed, order = music_bed(tracks, total, OUT + "music_bed.wav"); print("music:", " -> ".join(order))
-    sfx = impossible_sfx(OUT + "sting_sfx.wav", INTRO) if SERIES == "impossible" else stamp_sfx(OUT + "sting_sfx.wav")
+    sfx = (impossible_sfx(OUT + "sting_sfx.wav", INTRO) if SERIES == "impossible" else gof_sfx(OUT + "sting_sfx.wav", INTRO) if SERIES == "gof"
+           else stamp_sfx(OUT + "sting_sfx.wav"))
     fc = (f"[1:a]volume={music_gain * 1.6}[mus];"
           f"[0:a]aresample=48000,pan=stereo|c0=c0|c1=c0,asplit=2[v1][key];[mus][key]sidechaincompress=threshold=0.02:ratio=8:attack=40:release=600[duck];"
           f"[2:a]aresample=48000,pan=stereo|c0=c0|c1=c0,volume=0.8[fx];[v1][duck][fx]amix=inputs=3:normalize=0:duration=first,loudnorm=I=-14:TP=-1.5:LRA=11[o]")

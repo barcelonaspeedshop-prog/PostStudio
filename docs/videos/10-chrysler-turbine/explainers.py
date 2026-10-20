@@ -63,17 +63,21 @@ def flame(d, cx, cy, t, a):
         d.polygon([(cx - 70, cy - h), (cx - 70 + L_, cy), (cx - 70, cy + h)], fill=rgba(col, a * (0.25 + 0.08 * (8 - k))))
 
 # the engine, left to right (screen pixels): duct centre line, and each part's x
-Y0 = 400; DUCT = 135
+Y0 = 450; DUCT = 135
 X_IN, X_COMP, X_BURN, X_T1, X_T2, X_OUT = 170, 420, 730, 1020, 1280, 1600
-GBX, WY, WR = 1280, 790, 150                                                   # gearbox x, wheel centre y and radius
+GBX, WY, WR = 1280, 860, 135                                                   # gearbox x, wheel centre y and radius
 _wheel = {}
 def wheel(r):
     """The real car's rear wheel (from the side-on still), cut out round, r pixels radius."""
-    if r not in _wheel:
-        im = load(STORY + "ai/ai_turbine_side.png").convert("RGBA"); cx, cy, R = 1228, 570, 116
-        c = im.crop((cx - R, cy - R, cx + R, cy + R)).resize((2 * r, 2 * r), Image.LANCZOS)
-        m = Image.new("L", c.size, 0); ImageDraw.Draw(m).ellipse((2, 2, 2 * r - 2, 2 * r - 2), fill=255); c.putalpha(m)
-        _wheel[r] = c
+    if r not in _wheel:                                                       # rim + whitewall from the still, our own tyre round it
+        im = load(STORY + "ai/ai_turbine_side.png").convert("RGBA"); cx, cy, R = 1228, 572, 80
+        ri = int(r * 0.8); c = im.crop((cx - R, cy - R, cx + R, cy + R)).resize((2 * ri, 2 * ri), Image.LANCZOS)
+        m = Image.new("L", c.size, 0); ImageDraw.Draw(m).ellipse((1, 1, 2 * ri - 1, 2 * ri - 1), fill=255); c.putalpha(m)
+        w_ = Image.new("RGBA", (2 * r, 2 * r), (0, 0, 0, 0)); wd = ImageDraw.Draw(w_)
+        wd.ellipse((0, 0, 2 * r - 1, 2 * r - 1), fill=(24, 24, 26, 255), outline=(70, 70, 76, 255), width=4)
+        for k in range(36):                                                   # tread blocks, so the tyre is seen to turn
+            th = k * math.pi / 18; wd.line([(r + (r - 4) * math.cos(th), r + (r - 4) * math.sin(th)), (r + (r - 14) * math.cos(th), r + (r - 14) * math.sin(th))], fill=(55, 55, 60, 255), width=5)
+        w_.alpha_composite(c, (r - ri, r - ri)); _wheel[r] = w_
     return _wheel[r]
 
 def turbine_scene(cue):
@@ -122,7 +126,7 @@ def turbine_scene(cue):
                 arrow(d, (X_BURN - 90, Y0 - DUCT - 10), (X_BURN - 90, Y0 - 92), fa, GOLD, 8, 24)
                 tracked(d, (X_BURN - 160, Y0 - DUCT - 4), "FUEL", cond(30, 8), rgba(GOLD, fa), 6, "center")
                 flame(d, X_BURN + 10, Y0, t, show("Then fuel is sprayed", 0.8))
-                name(X_BURN + 60, "THE FLAME", show("Then fuel is sprayed", 1.0), HOT)
+                name(X_BURN - 30, "THE FLAME", show("Then fuel is sprayed", 1.0), HOT)
             if t1_a:                                                          # turbine one, its shaft back to the compressor
                 rotor(d, X_T1, Y0, 40, DUCT - 12, ang * 1.05, t1_a, GOLD, glow=0.4)
                 name(X_T1, "TURBINE 1", t1_a, GOLD)
@@ -172,7 +176,7 @@ def turbine_scene(cue):
             for k in range(36):                                                # the disc's honeycomb sectors
                 th0 = spin + k * 2 * math.pi / 36
                 # heat: picked up on the right (exhaust) half, given up on the left (air) half
-                heat = max(0.0, min(1.0, 0.5 + 0.7 * math.cos(th0 - 0.9)))
+                heat = max(0.0, min(1.0, 0.5 + 0.7 * math.cos(th0 - 0.35)))
                 col = mix(BLUE, HOT, heat)
                 p = [(cx, cy)] + [(cx + R * 0.94 * math.cos(th0 + j * 0.16), cy + R * 0.94 * math.sin(th0 + j * 0.16)) for j in range(2)]
                 d.polygon(p, fill=rgba(col, 0.75 * r_a * A("So Chrysler fitted", 0.4, 0.8)))
@@ -182,7 +186,7 @@ def turbine_scene(cue):
                 y = cy - 200 + k * 130; q = (t * 0.8 + k * 0.25) % 1.0
                 arrow(d, (cx + R + 220 - 80 * q, y), (cx + R + 40 - 80 * q, y), r_a * A("And there was one more trick", 1.4), RED, 8, 26)
                 arrow(d, (cx - R - 40 + 80 * q, y), (cx - R - 220 + 80 * q, y), r_a * A("So Chrysler fitted", 1.8), HOT, 8, 26)
-            tag(d, (cx + R - 40, cy - R - 70), "HOT EXHAUST HEATS THE DISC", r_a * A("And there was one more trick", 1.4), RED, 32)
+            tag(d, (cx, cy - R - 70), "HOT EXHAUST HEATS THE DISC", r_a * A("And there was one more trick", 1.4), RED, 32)
             tag(d, (cx - R + 40, cy + R + 50), "THE DISC HEATS THE INCOMING AIR", r_a * A("So Chrysler fitted", 1.8), HOT, 32)
             tag(d, (520, 120), "THE REGENERATOR", r_a * A("So Chrysler fitted", 0.2), GOLD, 50)
             tag(d, (520, 200), "TWO SPINNING DISCS", r_a * A("So Chrysler fitted", 0.8), CREAM, 34)
@@ -201,12 +205,12 @@ def turbine_scene(cue):
                     d.ellipse((cx_ - 3, cy_ - 3, cx_ + 3, cy_ + 3), fill=rgba(col, parts))
                 tag(d, (x0, 940), name, parts, col, 40)
             tag(d, (W / 2, 80), "MOVING PARTS", parts, GOLD, 50)
-            tag(d, (1400, 650), "ABOUT 80% FEWER", A("The result was an engine", 2.6), GOLD, 46)
+            tag(d, (1400, 700), "ABOUT 80% FEWER", A("The result was an engine", 2.6), GOLD, 46)
             no = [("NO RADIATOR", 0.0), ("NO ANTIFREEZE", 0.9), ("NO WARM-UP", 1.8)]
             for i, (txt, lag) in enumerate(no):
                 k = A("No radiator.", lag, 0.3)
                 if k <= 0: continue
-                x, y = W / 2, 250 + i * 100
+                x, y = 1400, 260 + i * 110
                 tag(d, (x, y), txt, k, RED, 44)
                 if k > 0.6:
                     w_ = cond(44, 8).getlength(txt) / 2 + 30
