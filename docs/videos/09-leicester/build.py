@@ -41,7 +41,7 @@ CLOCK, MAHREZ_FK, MAHREZ = cm("Leicester Clock Tower wide view.jpg"), cm("Mahrez
 SPURS_PIC, PEARSON, BRIDGE = cm("Manchester United v Tottenham Hotspur, December 2016 (12).JPG"), "Nigel_Pearson.jpg", cm("Stamford Bridge Chelsea v Spurs.jpg")
 # AI stills (Runway)
 BOOKIE, ELVIS, PIZZA, BELL = "ai_bookmaker.png", "ai_elvis.png", "ai_pizza_vespa.png", "ai_training_bell.png"
-HOUSE_TENSE, HOUSE_MAD, HAZARD_AI = "ai_vardys_house_tense.png", "ai_vardys_house.png", "ai_stamford_bridge_night.png"
+HOUSE_TENSE, HOUSE_MAD, HAZARD_AI = "ai_vardys_house_tense2.png", "ai_vardys_house.png", "ai_stamford_bridge_night.png"
 TROPHY_AI, PARADE, BOCELLI, FACTORY = "ai_trophy_lift.png", "ai_parade.png", "ai_bocelli.png", "ai_vardy_factory.png"
 WHISTLE, KANTE_AI, RANIERI_FANS = "ai_final_whistle.png", "ai_kante_tackle.png", "ai_ranieri_fans.png"
 
@@ -55,7 +55,7 @@ def S_nth(snip, n, off=0.0):
     """The n-th (0-based) sentence that is exactly `snip` ("Five thousand to one." is said twice)."""
     return vt([e for e in E.SENTS if e["text"].lower() == snip.lower()][n]["out_start"] + off)
 def FC(snip, path, name, role, facts=(), off=-0.15, start=None, **kw):
-    full = C + path if os.path.exists(C + path) else (AI + path if os.path.exists(AI + path) else path)
+    full = next((d + path for d in (C, M, AI) if os.path.exists(d + path)), path)
     fs = [((lambda sc, v=f[0]: T(v, sc)),) + tuple(f[1:]) for f in facts]
     return FactCard(S(snip, off) if start is None else start, full, name, role, facts=fs, **kw)
 def AF(snip, frac, ai, **kw):
@@ -114,8 +114,8 @@ def odds_slam(d, L, t, sc):
     """'Five thousand to one.' The number slams in and shakes."""
     a = ramp(t, 0.15, 0.3); s = 1 + 0.6 * (1 - ease(min(1, max(0, t - 0.15) / 0.25)))
     if a > 0: text_top(d, (W / 2, 330 - 60 * (s - 1)), "5000–1", pf(int(260 * s), 900), rgba(GOLD, a), "center")
-    tag(d, (W / 2, 720), "LEICESTER CITY TO WIN THE PREMIER LEAGUE", ramp(t, 0.8, 1.2), CREAM, 44)
-    tag(d, (W / 2, 830), "BOOKMAKERS' ODDS  ·  SUMMER 2015", ramp(t, 1.3, 1.7), GOLD, 36)
+    tag(d, (W / 2, 720), "LEICESTER CITY TO WIN THE PREMIER LEAGUE", ramp(t, 0.5, 0.9), CREAM, 44)
+    tag(d, (W / 2, 830), "BOOKMAKERS' ODDS  ·  SUMMER 2015", ramp(t, 0.9, 1.3), GOLD, 36)
 
 def dots(d, L, t, sc):
     """5,001 seasons: one dot each. They fill in as the count runs; one turns gold."""
@@ -291,16 +291,27 @@ def tactics(d, L, t, sc):
             if b > 0: d.ellipse((x - 36, y - 36, x + 36, y + 36), outline=rgba(GOLD, b), width=6); tracked(d, (x, y + 46), "WON IT", cond(26, 6), rgba(GOLD, b), 4, "center")
         tag(d, (W / 2, 990), "WON THE BALL BACK MORE THAN ANYONE IN THE LEAGUE", ramp(t, c("He won the ball back"), c("He won the ball back", 0.4)), GOLD, 34)
 
+_kd = {}
+def _kante_disc(size):
+    """Kanté's photo (Mike's), cropped square on his head and shoulders, at the globe's size; the slice is cut from it."""
+    if size not in _kd:
+        im = load(M + "mike_kante.jpg"); s_ = min(im.width, im.height) * 0.62; cx_, cy_ = im.width * 0.49, im.height * 0.36
+        _kd[size] = im.crop((int(cx_ - s_ / 2), int(cy_ - s_ / 2), int(cx_ + s_ / 2), int(cy_ + s_ / 2))).resize((size, size), Image.LANCZOS).convert("RGBA")
+    return _kd[size].copy()
+
 def globe(d, L, t, sc):
     """'Seventy per cent of the Earth is covered by water... the rest by Kanté.'"""
     cx, cy, r = W / 2, 560, 330; a = ramp(t, 0, 0.4)
     d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=rgba((30, 90, 170), a), outline=rgba(CREAM, a), width=6)
     k = atf("People joked that seventy", 0.62, sc)
     g = ease(min(1, max(0, t - k) / 0.8))
-    if g > 0: d.pieslice((cx - r, cy - r, cx + r, cy + r), -90, -90 + 108 * g, fill=rgba(LCFC_D, a), outline=rgba(GOLD, a), width=6)
+    if g > 0:                                                                # the slice is filled with Kanté himself
+        mask = Image.new("L", (2 * r, 2 * r), 0); ImageDraw.Draw(mask).pieslice((0, 0, 2 * r, 2 * r), -90, -90 + 108 * g, fill=int(255 * a))
+        face = _kante_disc(2 * r); face.putalpha(mask); L.alpha_composite(face, (int(cx - r), int(cy - r)))
+        d.pieslice((cx - r, cy - r, cx + r, cy + r), -90, -90 + 108 * g, outline=rgba(GOLD, a), width=6)
     tag(d, (cx - 520, 330), "70% WATER", ramp(t, 0.6, 1.0), CREAM, 46)
     tag(d, (cx + 520, 330), "30% KANTÉ", ramp(t, k + 0.4, k + 0.8), GOLD, 52)
-    if g > 0.9: paste_box(L, C + KANTE, cx + 70, cy - 230, 180, 180, ramp(t, k + 0.8, k + 1.1), 0.3)
+
 
 # ---------------------------------------------------------------- VI. the run
 STREAK = ["BOURNEMOUTH", "ASTON VILLA", "STOKE", "ARSENAL", "NORWICH", "SOUTHAMPTON", "CRYSTAL PALACE", "WEST BROM", "WATFORD", "NEWCASTLE", "MAN UNITED"]
@@ -369,10 +380,11 @@ def final_table(d, L, t, sc):
     tag(d, (W / 2, 930), "WON 23  ·  DREW 12  ·  LOST 3", ramp(t, l3 + 0.2, l3 + 0.6), CREAM, 46)
 
 # ---------------------------------------------------------------- IX. what happened next
-def award(title, who, path):
+def award(title, who, path, fx=0.5, fy=0.3):
+    full = next(d + path for d in (C, M, AI) if os.path.exists(d + path))
     def draw(d, L, t, sc):
         a = ramp(t, 0.1, 0.5)
-        paste_box(L, C + path, 260, 200, 560, 680, a, 0.3)
+        paste_box(L, full, 260, 200, 560, 680, a, fy, fx)
         d.rectangle((250, 190, 830, 890), outline=rgba(GOLD, a), width=6)
         tracked(d, (1350, 330), title, cond(44, 8), rgba(GOLD, ramp(t, 0.4, 0.8)), 8, "center")
         text_top(d, (1350, 420), who, pf(110, 900), rgba(CREAM, ramp(t, 0.7, 1.1)), "center")
@@ -401,7 +413,7 @@ scenes = [
     opening(AI + BOOKIE, "Leicester City.", "EPISODE FOUR  ·  5000–1", credit="AI illustration", focus=((0.7, 0.4), (0.75, 0.55))),
     # cold open
     CuS("Five thousand to one.", odds_slam, bg=bga(BOOKIE, 0.82)),
-    AS("Those were the odds on Leicester", BOOKIE, zoom=(1.25, 1.55), focus=((0.72, 0.62), (0.76, 0.76)), chapter="LEICESTER  ·  SUMMER 2015"),
+    AF("Those were the odds on Leicester", 0.45, BOOKIE, zoom=(1.25, 1.55), focus=((0.72, 0.62), (0.76, 0.76)), chapter="LEICESTER  ·  SUMMER 2015"),
     PS("The season before, they'd spent months", KP_IN, zoom=(1.0, 1.12), texts=[(0.6, "Bottom of the league.", "mid"),
        (S("Nearly everyone expected them") - S("The season before, they'd spent months", -0.15), "Expected to go down.", "mid")]),
     PS("Nine months later, they were champions", CELEBRATE, zoom=(1.0, 1.12), focus=((0.5, 0.4), (0.5, 0.35)), texts=[(0.6, "Champions of England.", "big")]),
@@ -413,7 +425,7 @@ scenes = [
     CuS("Bookmakers don't guess.", wages, bg=bga(BOOKIE, 0.9)),
     PS("Leicester's whole team reportedly cost", SOTON, zoom=(1.0, 1.15), texts=[(0.8, "A whole team for less than one star.", "mid")]),
     # II. the great escape
-    PS("To understand how unlikely", KP_IN, zoom=(1.15, 1.3), focus=((0.4, 0.5), (0.6, 0.5)), chapter=CH("II", "THE GREAT ESCAPE"), dim=0.15),
+    PS("To understand how unlikely", KP_IN, zoom=(1.0, 1.06), focus=((0.48, 0.5), (0.52, 0.5)), chapter=CH("II", "THE GREAT ESCAPE"), dim=0.15),
     CuS("In 2014–15", escape, bg=bgp(KP_IN, 0.88)),
     FC("But that summer, the manager", PEARSON, "Nigel Pearson", "MANAGER WHO SAVED THEM", facts=[(1.0, "Left the club in June 2015")]),
     FC("And Leicester appointed Claudio Ranieri", RANIERI_SUIT, "Claudio Ranieri", "NEW MANAGER  ·  JULY 2015", facts=[(0.9, "Italian, from Rome")]),
@@ -428,17 +440,17 @@ scenes = [
     PS("Ranieri didn't tear the team up", WALL, zoom=(1.0, 1.12), chapter=CH("IV", "THE TEAM"), texts=[(1.2, "He looked at what he had.", "mid")]),
     FC("Up front, Jamie Vardy.", VARDY, "Jamie Vardy", "STRIKER", focus=(0.5, 0.35), facts=[(0.8, "Joined from non-league Fleetwood in 2012")]),
     AS("Four years earlier he'd been playing", FACTORY, zoom=(1.0, 1.15), focus=((0.3, 0.45), (0.35, 0.4)), texts=[(1.2, "Non-league. Factory shifts.", "mid")]),
-    FC("On the wing, Riyad Mahrez.", MAHREZ, "Riyad Mahrez", "WINGER", focus=(0.5, 0.3), facts=[(1.0, "From Le Havre, French second division"), (2.6, "About £400,000", True)]),
+    FC("On the wing, Riyad Mahrez.", "mike_mahrez_portrait.jpg", "Riyad Mahrez", "WINGER", focus=(0.5, 0.3), facts=[(1.0, "From Le Havre, French second division"), (2.6, "About £400,000", True)]),
     FC("In goal, Kasper Schmeichel", KASPER, "Kasper Schmeichel", "GOALKEEPER", focus=(0.6, 0.3), facts=[(1.0, "Son of Peter Schmeichel", True)]),
-    FC("And in the summer, they signed a quiet", KANTE, "N'Golo Kanté", "MIDFIELDER  ·  FROM CAEN", focus=(0.5, 0.35), facts=[(1.6, "Signed summer 2015, about £5.6m")]),
-    PS("Hardly anyone in England had heard", MAHREZ_FK, zoom=(1.0, 1.15), texts=[(0.6, "Who?", "big")]),
+    FC("And in the summer, they signed a quiet", "mike_kante.jpg", "N'Golo Kanté", "MIDFIELDER  ·  FROM CAEN", focus=(0.5, 0.3), facts=[(1.6, "Signed summer 2015, about £5.6m")]),
+    PS("Hardly anyone in England had heard", "mike_kante_action.jpg", zoom=(1.0, 1.08), texts=[(0.6, "Who?", "big")]),
     # V. how Leicester played
     CuS("So how did a team like that", tactics, chapter=CH("V", "HOW LEICESTER PLAYED")),
     AS("And Kanté was the key", KANTE_AI, zoom=(1.0, 1.15), focus=((0.5, 0.5), (0.55, 0.45)), texts=[(S("He won the ball back") - S("And Kanté was the key", -0.15), "Won the ball back more than anyone.", "mid")]),
     CuS("People joked that seventy per cent", globe, bg=bgp(SOTON, 0.9)),
     # VI. the run
     PS("Leicester started well", RANIERI_ARSENAL, zoom=(1.0, 1.12), chapter=CH("VI", "THE RUN"), texts=[(1.4, "Surely it wouldn't last.", "mid")]),
-    PS("Then Vardy started scoring", VARDY_FAMILY, zoom=(1.15, 1.35), focus=((0.45, 0.3), (0.45, 0.25)), dim=0.1),
+    PS("Then Vardy started scoring", "mike_vardy_scores.jpg", zoom=(1.0, 1.1), focus=((0.55, 0.4), (0.55, 0.35))),
     CuS("He scored in eleven", streak, off=-0.4, bg=bgp(VARDY, 0.88)),
     PS("At Christmas, Leicester were top", CLOCK, zoom=(1.0, 1.12), strap=("Leicester", "CHRISTMAS 2015", 0.2), texts=[(0.5, "Top of the league at Christmas.", "mid")]),
     PS("And in February, they went to Manchester City", ETIHAD, zoom=(1.0, 1.15), strap=("Etihad Stadium", "MANCHESTER CITY  ·  6 FEBRUARY 2016", 0.5)),
@@ -472,8 +484,8 @@ scenes = [
        fallback=AS("A week later, a quarter of a million", PARADE, zoom=(1.0, 1.15), focus=((0.5, 0.55), (0.5, 0.6)), texts=[(1.0, "About 250,000 people.", "big")])),
     CuS("They finished with eighty-one points", final_table, bg=bgp(LIFT, 0.88)),
     # IX. what happened next
-    CuS("Riyad Mahrez was voted", award("PFA PLAYERS' PLAYER OF THE YEAR", "Riyad Mahrez", MAHREZ_FK), bg=bgp(KP_WIDE, 0.88), chapter=CH("IX", "WHAT HAPPENED NEXT")),
-    CuS("Jamie Vardy was the writers'", award("FWA FOOTBALLER OF THE YEAR", "Jamie Vardy", VARDY_FAMILY), bg=bgp(KP_WIDE, 0.88)),
+    CuS("Riyad Mahrez was voted", award("PFA PLAYERS' PLAYER OF THE YEAR", "Riyad Mahrez", "mike_mahrez_action.jpg", fx=0.45, fy=0.4), bg=bgp(KP_WIDE, 0.88), chapter=CH("IX", "WHAT HAPPENED NEXT")),
+    CuS("Jamie Vardy was the writers'", award("FWA FOOTBALLER OF THE YEAR", "Jamie Vardy", "mike_vardy_celebrates.jpg", fx=0.5, fy=0.4), bg=bgp(KP_WIDE, 0.88)),
     PS("N'Golo Kanté went to Chelsea", CHELSEA_LINEUP, zoom=(1.0, 1.15), focus=((0.45, 0.6), (0.4, 0.6)), strap=("N'Golo Kanté", "CHELSEA  ·  2016–17", 0.5)),
     CuS("Two titles in two years", two_titles, off=-0.3, bg=bgp(CHELSEA_LINEUP, 0.88)),
     CuS("Leicester played in the Champions League", ucl, bg=bgp(KP_IN, 0.86)),
