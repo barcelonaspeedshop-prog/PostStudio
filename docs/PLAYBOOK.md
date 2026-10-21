@@ -93,6 +93,12 @@ Brawn v2 and Istanbul v2 are the reference videos. Every long video follows this
 - **Photos in graphics are part of the graphic** (Mike 21 Oct): cut a photo into the shape it belongs in (the globe's slice) rather than a square pasted on top.
 - **Small graphics lines need time**: anything written on a graphic stays up at least 2 s after it lands; if the line is short, start the next picture later rather than cut the text.
 - **Award/fact boxes crop on the subject**: set the crop focus on the person (fx, fy) and check the frame; a central crop cut Mahrez out.
-- **Decisive moments (a ball going in, a car crossing the line) are two stills, not a clip** (Mike 21 Oct): the moment before, then a cut to the moment after, like press photos. AI clips missed Hazard's goal three times, and a ball we animated ourselves looked "like a comic" and stopped in mid air. Use AI video only for loose movement (crowds, celebrations, a wink), never for where an object ends up.
+- **Great AI video for the big moments** (Mike 21 Oct: "we need really cool AI video... that shot to goal would have looked amazing"). We learn to get it right rather than avoid it:
+  1. Start AND end frame, both AI stills of the real moment (the ball leaving the boot, the ball in the top corner).
+  2. Describe the path in plain geometry and the camera: "the ball travels right, BETWEEN the two posts and UNDER the crossbar, into the top corner; camera still".
+  3. Draft cheap first (seedance-2.5 draft 480p, or a 720p model), check it, then make the final at 1080p on a strong model only once the draft is right.
+  4. `studio/clip_check.py` at 10 fps through the moment, read every frame, before it goes in the edit.
+  5. Log every attempt (model, prompt, frames, cost, what went wrong) in docs/ai_clip_library.md, so the next one starts from what worked.
+  Two stills (before, after) are the fallback while a clip isn't right yet, never the rule.
 - **Check every AI clip at 10 frames a second through the moment that matters**: `studio/clip_check.py <clip> t0 t1 --crop ...` writes <clip>_check.jpg. One frame a second missed a ball passing outside the post. No clip goes to Mike without its check sheet read.
 - **Football goals from the side**: anything beyond the near post is the side-netting outside the goal. The ball has to stay between the posts and under the bar.

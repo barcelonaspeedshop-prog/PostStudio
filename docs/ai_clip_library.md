@@ -23,3 +23,16 @@ How each clip is made: a still start frame first (cheap, about 20 credits, check
 | Wet track at night, spray off a single car | any rain race | planned |
 | Empty factory at night, car under a dust sheet | any team in crisis | done (Brawn) |
 | Podium silhouettes, champagne spray | any win | done (Brawn) |
+
+## Attempt log (what worked, what didn't)
+
+| Date | Clip | Model / inputs | Cost | Result |
+|---|---|---|---|---|
+| 21 Oct | Elvis cartoon wink (Leicester) | gen-4-turbo, start frame | 25 | Good. Cartoons animate cleanly |
+| 21 Oct | Parade drone drift (Leicester) | gen-4-turbo, start frame | 25 | Good. Slow crowd/camera moves work |
+| 21 Oct | Players' sofa celebration | gen-4-turbo, start frame | 25 | First 2 s clean, then people shift and morph: use `end=2.0` |
+| 21 Oct | Hazard curler #1 | gen-4-turbo, start frame | 25 | Ball flew away from goal. Start frame alone leaves the path to chance |
+| 21 Oct | Hazard curler #2 | gen-4-turbo, start frame, "moving to the RIGHT" | 25 | Ball went past the top of the bar |
+| 21 Oct | Hazard curler #3 | seedance-2-mini, start + end frame | 75 | Net bulged but the ball passed OUTSIDE the near post (0.4-0.7 s); Hazard's shirt became No. 9. Missed by 1-fps check |
+| 21 Oct | Hazard, players only (ball removed) | gen-4-turbo | 25 | People morphed; the hand-animated ball over it looked like a comic (Mike) |
+| next | Hazard curler #4 | seedance-2.5 draft 480p, start + end frame, path stated as "between the posts, under the bar" | ~100 draft | to try; enhance to 1080p only if the 10-fps check passes |
