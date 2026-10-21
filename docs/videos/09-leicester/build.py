@@ -16,7 +16,7 @@ from episode import *
 from factcard import FactCard
 E.AI_RATE = 0.6                                                               # AI clips at 60% speed (Mike 20 Oct)
 
-FINAL = "IMPOSSIBLE 04 - Leicester v2.mp4"
+FINAL = "IMPOSSIBLE 04 - Leicester v3.mp4"
 LCFC, LCFC_D = (0, 83, 160), (0, 50, 110)                 # Leicester royal blue
 SPURS, CHELSEA, CITY = (245, 245, 240), (3, 70, 148), (108, 171, 221)
 KEEPER = (240, 200, 60)
@@ -469,7 +469,7 @@ scenes = [
         scorers=[(0.3, "KANE 35'"), (0.8, "SON 44'")]), bg=bgp(BRIDGE, 0.85)),
     CuS("Then, in the second half", scoreboard("SECOND HALF", [(0, 0, 2), (0.9, 1, 2)], "CHELSEA", "TOTTENHAM", CHELSEA, SPURS, scorers=[(0.9, "CAHILL 58'")]), bg=bgp(BRIDGE, 0.85)),
     FC("Seven minutes from the end", HAZARD, "Eden Hazard", "CHELSEA  ·  83'", focus=(0.5, 0.3), facts=[(1.2, "PFA Player of the Year the season before", True)]),
-    Clip(SF("Seven minutes from the end", 0.5), AI + "ai_hazard_clip.mp4", credit="AI illustration", max_rate=1.0, skip=0.5) if has("ai_hazard_clip.mp4") else   # skip: the ball hits the net ~4.3 s in
+    Clip(SF("Seven minutes from the end", 0.5), AI + "ai_hazard_clip.mp4", credit="AI illustration", max_rate=0.6, end=2.2) if has("ai_hazard_clip.mp4") else   # start+end frames; only the first 2.2 s (his back shows a wrong No. 9 later)
     AS("He curled it into the top corner", HAZARD_AI, zoom=(1.0, 1.15), focus=((0.6, 0.4), (0.7, 0.35))),
     CuS("Two–two.", scoreboard("83'  ·  EDEN HAZARD", [(0, 1, 2), (0.85, 2, 2)], "CHELSEA", "TOTTENHAM", CHELSEA, SPURS), off=-0.9, bg=bgp(BRIDGE, 0.85)),
     VS("At Vardy's house, the room went mad", "ai_house_clip.mp4", end=2.0, fallback=AS("At Vardy's house, the room went mad", HOUSE_MAD, zoom=(1.0, 1.15), focus=((0.4, 0.4), (0.45, 0.45)))),
