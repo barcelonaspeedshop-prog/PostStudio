@@ -5,7 +5,7 @@
     ~/.venvs/poststudio/bin/python build.py check      # shot check: every picture, its time, the words said over it
 
 script.md (approved by Mike 21 Oct, "script perfect"; section 6 line changed 21 Oct to "far more energy to deploy",
-see the fact notes), AI narration (Malachi, eleven_v3) in audio/v2/. Omnira F1 = series "f1": the gold badge open and
+see the fact notes), AI narration (Kirk, eleven_multilingual_v2, stability 0.6 style 0.1) in audio/v4/. Omnira F1 = series "f1": the gold badge open and
 end card. Pictures follow the narration line by line; every technical idea is shown as a graphic (PLAYBOOK).
 AI stills are Mike's (ChatGPT, ai_prompts.md); the four AI clips were drafted, passed the 10-fps check, then 1080p.
 """
@@ -13,12 +13,12 @@ import math, os, sys
 VDIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(VDIR, "..", "..", "..", "studio"))
 import episode as E
-E.init("/Volumes/PostDrive/Stories/Omnira F1/02 Superclipping/", series="f1", narration="audio/v3/")   # v3 = one continuous take (Mike 21 Oct: separately voiced sections changed voice)
+E.init("/Volumes/PostDrive/Stories/Omnira F1/02 Superclipping/", series="f1", narration="audio/v4/")   # v4 = Kirk, eleven_multilingual_v2 (Mike 21 Oct: v2 only; voiced in two halves, cut at pauses)
 from episode import *
 from factcard import FactCard
 E.AI_RATE = 0.6                                                               # AI clips at 60% speed (Mike 20 Oct)
 
-FINAL = "F1 Explained - Superclipping v4.mp4"
+FINAL = "F1 Explained - Superclipping v5.mp4"
 # Mike 21 Oct: an F1 engine sound under the engine-note graphic. Runway SFX (audio/sfx): rises for 1.5 s, full revs to
 # ~3.6 s, then the note drops away by ~5.5 s, so the drop lands on "If it drops away".
 ENGINE, ENGINE_DROP = E.STORY + "audio/sfx/engine_note_fade.mp3", 3.6
