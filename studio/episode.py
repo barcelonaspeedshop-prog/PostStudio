@@ -312,7 +312,19 @@ def shot_check(scenes, out):
     os.makedirs(os.path.dirname(out), exist_ok=True); sheet.save(out, quality=82)
     return flagged
 
-def main(scenes, final, music_gain=0.35):
+def sfx_track(sting, events, length, out):
+    """The opening sting plus timed effects, one mono WAV: events = [(video_time, path, gain_db)] (Mike 21 Oct: an engine
+    note under the 'listen to the engine note' graphic)."""
+    ins, fl = ["-i", sting], ["[0:a]aresample=48000[s0]"]
+    for i, (at_, path, gain) in enumerate(events, 1):
+        ins += ["-i", path]
+        fl.append(f"[{i}:a]aresample=48000,pan=mono|c0=0.5*c0+0.5*c1,volume={gain}dB,adelay={int(at_ * 1000)}:all=1[s{i}]")
+    fl.append("".join(f"[s{i}]" for i in range(len(events) + 1)) + f"amix=inputs={len(events) + 1}:normalize=0:duration=longest,apad,atrim=0:{length}[o]")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", *ins, "-filter_complex", ";".join(fl), "-map", "[o]", "-ac", "1", out], check=True)
+    return out
+
+def main(scenes, final, music_gain=0.35, effects=()):
+    """effects = [(video_time, path, gain_db)]: timed sound effects mixed in with the opening sting (sfx_track)."""
     scenes = [x for x in scenes if x is not None]
     os.makedirs(OUT, exist_ok=True)
     nd = float(subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", NA + "narration.wav"]))
@@ -325,6 +337,8 @@ def main(scenes, final, music_gain=0.35):
     bed, order = music_bed(tracks, total, OUT + "music_bed.wav"); print("music:", " -> ".join(order))
     sfx = (impossible_sfx(OUT + "sting_sfx.wav", INTRO) if SERIES == "impossible" else gof_sfx(OUT + "sting_sfx.wav", INTRO) if SERIES in ("gof", "f1")
            else stamp_sfx(OUT + "sting_sfx.wav"))
+    sting = sfx
+    if effects: sfx = sfx_track(sting, effects, total, OUT + "sfx_mix.wav")
     fc = (f"[1:a]volume={music_gain * 1.6}[mus];"
           f"[0:a]aresample=48000,pan=stereo|c0=c0|c1=c0,asplit=2[v1][key];[mus][key]sidechaincompress=threshold=0.02:ratio=8:attack=40:release=600[duck];"
           f"[2:a]aresample=48000,pan=stereo|c0=c0|c1=c0,volume=0.8[fx];[v1][duck][fx]amix=inputs=3:normalize=0:duration=first,loudnorm=I=-14:TP=-1.5:LRA=11[o]")
@@ -332,7 +346,7 @@ def main(scenes, final, music_gain=0.35):
     only = (float(sys.argv[1]), float(sys.argv[2])) if len(sys.argv) > 2 else None
     out = OUT + ("preview.mp4" if only else final)
     render(scenes, total, audio, out, workers=9, only=only)
-    for f in (audio, voice, sfx, bed): os.remove(f)
+    for f in {audio, voice, sfx, sting, bed}: os.remove(f)
     import shutil; shutil.rmtree(out.replace(".mp4", "_parts"), ignore_errors=True)
     if not only:                                                              # small copy for review
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", out, "-vf", "scale=1280:-2", "-c:v", "libx264", "-crf", "26", "-preset", "fast",

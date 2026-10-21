@@ -18,7 +18,10 @@ from episode import *
 from factcard import FactCard
 E.AI_RATE = 0.6                                                               # AI clips at 60% speed (Mike 20 Oct)
 
-FINAL = "F1 Explained - Superclipping v1.mp4"
+FINAL = "F1 Explained - Superclipping v2.mp4"
+# Mike 21 Oct: an F1 engine sound under the engine-note graphic. Runway SFX (audio/sfx): rises for 1.5 s, full revs to
+# ~3.6 s, then the note drops away by ~5.5 s, so the drop lands on "If it drops away".
+ENGINE, ENGINE_DROP = E.STORY + "audio/sfx/engine_note_fade.mp3", 3.6
 CYAN, RED_E = (70, 200, 230), (226, 60, 60)              # electric / harvesting
 PETROL = (232, 150, 60)
 
@@ -267,13 +270,17 @@ def motor_backwards(d, L, t, sc):
     pulse(d, MGUK, t, ramp(t, k1, k1 + 0.3), CYAN)
     rev = t > k2; col = RED_E if rev else (110, 220, 130)
     a = ramp(t, k1 + 0.3, k1 + 0.7)
-    if a > 0:                                                   # spinning arrows round the rear wheel
-        x, y = WHEEL_R; r = 175; base = (-1 if rev else 1) * t * 220
+    if a > 0:
+        # Mike 21 Oct: the arrows turned the wrong way. The car faces left, so a forward-rolling wheel turns anticlockwise on
+        # screen, and it keeps doing so as a generator: only the ENERGY changes direction (shown by the flow arrows).
+        x, y = WHEEL_R; r = 175; base = -t * 220
         for i in range(3):
             st = base + i * 120; d.arc((x - r, y - r, x + r, y + r), st, st + 70, fill=rgba(col, a), width=12)
-            ang = math.radians(st + (70 if not rev else 0)); hx, hy = x + r * math.cos(ang), y + r * math.sin(ang)
-            d.ellipse((hx - 14, hy - 14, hx + 14, hy + 14), fill=rgba(col, a))
-        label_box(d, (1880, 860), "GENERATOR" if rev else "MOTOR", "RUNNING BACKWARDS" if rev else "DRIVES THE WHEELS", a, col, "right")
+            th = math.radians(st); px, py = x + r * math.cos(th), y + r * math.sin(th)       # arrowhead on the leading end
+            tx, ty = math.sin(th), -math.cos(th); nx, ny = math.cos(th), math.sin(th)
+            d.polygon([(px + tx * 30, py + ty * 30), (px + nx * 18, py + ny * 18), (px - nx * 18, py - ny * 18)], fill=rgba(col, a))
+        if not rev: flow(d, [BATT, MGUK, WHEEL_R], t, a, (110, 220, 130), n=10, speed=0.5, r=8)   # battery drives the wheels
+        label_box(d, (1880, 860), "GENERATOR" if rev else "MOTOR", "THE WHEELS NOW DRIVE THE MOTOR" if rev else "THE BATTERY DRIVES THE WHEELS", a, col, "right")
     b = ramp(t, k3, k3 + 0.3)
     if b > 0:
         tag(d, (1640, 420), "SLOWS THE CAR", b, RED_E, 38)
@@ -520,7 +527,7 @@ def hud_spot(d, L, t, sc):
     bar(d, 330, 300, 430, 840, 1.0, a, (90, 200, 110), vertical=True)
     v = 318 - 28 * ramp(t, k2 + 0.3, k2 + 4.0)
     num(d, (900, 260), f"{v:.0f}", a, RED_E if t > k2 + 0.6 else CREAM, 240); tracked(d, (900, 560), "KM/H", cond(40, 8), rgba(CREAM, a), 8, "center")
-    amp = 1 - 0.75 * ramp(t, k2 + 0.3, k2 + 3.0); b = ramp(t, k1, k1 + 0.4)
+    amp = 1 - 0.75 * ramp(t, k2 + 0.1, k2 + 2.0); b = ramp(t, k1, k1 + 0.4)            # follows ENGINE: full revs, dropping on k2
     tracked(d, (1380, 300), "ENGINE NOTE", cond(32, 8), rgba(GOLD, b), 6, "center")
     for i in range(24):
         h = (60 + 50 * math.sin(t * 13 + i * 0.9) ** 2) * amp; x = 1170 + i * 18
@@ -615,4 +622,4 @@ scenes = [s for s in scenes if s is not None]
 
 if __name__ == "__main__":
     if sys.argv[1:] == ["check"]: print(shot_check(scenes, OUT.replace("video/", "sheets/") + "check.jpg"))
-    else: main(scenes, FINAL)
+    else: main(scenes, FINAL, effects=[(S("If it drops away before the braking zone") - ENGINE_DROP, ENGINE, -10)])
