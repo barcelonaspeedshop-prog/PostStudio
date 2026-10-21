@@ -350,7 +350,7 @@ def odds_again(d, L, t, sc):
 
 # ---------------------------------------------------------------- VIII. the party
 def crowd(d, L, t, sc):
-    k = 0.0; n = int(250000 * ease(min(1, max(0, t - k - 0.4) / 2.2)))
+    k = 0.0; n = int(round(250000 * ease(min(1, max(0, t - k - 0.4) / 2.2)) / 1000) * 1000)   # lands on 250,000, counts in thousands
     d.rounded_rectangle((W / 2 - 470, 70, W / 2 + 470, 330), 26, fill=rgba(NAVY_D, 0.9 * ramp(t, k, k + 0.3)), outline=rgba(GOLD, ramp(t, k, k + 0.3)), width=4)
     text_top(d, (W / 2, 90), f"{n:,}", pf(120, 900), rgba(GOLD, ramp(t, k, k + 0.3)), "center")
     tracked(d, (W / 2, 265), "PEOPLE ON THE STREETS  ·  ABOUT", cond(34, 8), rgba(CREAM, ramp(t, k, k + 0.3)), 8, "center")
