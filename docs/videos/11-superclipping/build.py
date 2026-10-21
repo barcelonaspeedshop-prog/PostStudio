@@ -585,11 +585,13 @@ scenes = [
     CuS("Because not every car uses its energy", two_cars, bg=lambda t: navy_bg()),
     FC(s6, BEARMAN, "Oliver Bearman", "HAAS", focus=(0.5, 0.3), facts=[(0.8, "Second full season in F1")]),
     FCF(s6, 0.55, COLAPINTO, "Franco Colapinto", "ALPINE", focus=(0.5, 0.3), facts=[(0.6, "The car in front")]),
-    VS("Bearman was using his battery.", "ai_closing_clip.mp4", end=3.4,
+    # Mike 21 Oct: from behind with a moving camera the cars "went backwards". Fixed camera now, both cars drive away and
+    # the Haas closes in; good to 2.3 s (then the cars look merged), played at 45%. The aftermath takes over on "nowhere to go".
+    VS("Bearman was using his battery.", "ai_closing_clip.mp4", end=2.3, min_rate=0.45, max_rate=0.45,
        texts=[(rel("The difference in speed", S("Bearman was using his battery.", -0.15)), "About 50 km/h faster", "big")],
        fallback=AS("Bearman was using his battery.", CLOSING, zoom=(1.0, 1.15), texts=[(1.6, "About 50 km/h faster", "big")])),
-    AS("The Haas went off and hit the barrier.", AFTERMATH, zoom=(1.0, 1.12), focus=((0.55, 0.5), (0.6, 0.5)),
-       texts=[(rel("The impact was measured at fifty G.", S("The Haas went off and hit the barrier.", -0.15)), "Impact: 50G", "big")]),
+    AS("He had nowhere to go.", AFTERMATH, zoom=(1.0, 1.12), focus=((0.55, 0.5), (0.6, 0.5)),
+       texts=[(rel("The impact was measured at fifty G.", S("He had nowhere to go.", -0.15)), "Impact: 50G", "big")]),
     PS("Bearman walked away with bruising.", HAAS, zoom=(1.0, 1.1), focus=((0.5, 0.55), (0.5, 0.55)),
        texts=[(0.3, "Bruising. No fractures.", "mid"), (rel("But drivers said they had seen it coming.", S("Bearman walked away with bruising.", -0.15)), "Drivers had seen it coming.", "mid")]),
     # VI. the fix
