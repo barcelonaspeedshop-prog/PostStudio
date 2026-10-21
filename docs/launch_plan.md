@@ -1,6 +1,6 @@
 # Launch plan (20 Oct 2026)
 
-How we get Gentlemen of Fuel, Omnira F1 and Omnira Football running at the output in the channel plan, and how we get people watching. The daily jobs go on the Call Sheet; this is the plan behind them.
+How we get Gentlemen of Fuel, Omnira F1 and Omnira Football running at the output in the channel plan, and how we get people watching. The work itself is on the Work List (one priority list, same link as the old Call Sheet); this is the plan behind it.
 
 ---
 
