@@ -106,7 +106,7 @@ Sixteen seconds a lap, at full throttle, getting slower.
 
 That was strange. But then it became dangerous.
 
-Because not every car harvests in the same place. One car is pushing with its battery, while the car in front is harvesting. One accelerating, one slowing down, on the same straight.
+Because not every car uses its energy in the same place. One car can have far more energy to deploy than the car in front. One pushing hard, one holding back, on the same straight.
 
 [Two-car diagram: one car's speed rising, the other falling, the gap closing fast.]
 
@@ -190,7 +190,7 @@ This was F1 Explained, on Omnira F1. If you want to know how something in Formul
 - **Superclipping:** MGU-K harvesting at full throttle (end of straights, fast corners); keeps the active aero in straight mode; lift-and-coast harvesting puts the wings into corner mode. Pre-Miami limit 250 kW (braking/lift-and-coast up to 350 kW). Sources: The Race, Racer, Motorsport.com.
 - **Bahrain Turn 12:** about 30 km/h lost, 267 to 233 km/h, in early running (The Race). Alonso's joke about the Aston Martin chef being able to drive the car (The Race, paraphrased, not quoted).
 - **Melbourne:** one analysis estimated about 16 s of superclipping per lap at 250 kW (Speedcafe / arXiv). Keep "analysis suggested".
-- **Suzuka:** Bearman (Haas) behind Colapinto (Alpine), closing speed about 45-50 km/h (Bearman himself said 50); Haas boss Komatsu: Colapinto not at fault, the boost button and deployment difference were the factor; 50G impact; knee contusion, no fractures; FIA meetings in April. Sources: The Race, PlanetF1, Racer, Crash.net, Sky Sports. Note: reports put it down to deployment differences (closing speed), which is the same energy-management problem; the script doesn't claim Colapinto was "superclipping" at that moment, only that one car was harvesting while the other deployed. **Check this wording on build day; if no source says Colapinto was harvesting, change to "one car with more energy to deploy than the other".**
+- **Suzuka:** Bearman (Haas) behind Colapinto (Alpine), closing speed about 45-50 km/h (Bearman himself said 50); Haas boss Komatsu: Colapinto not at fault, the boost button and deployment difference were the factor; 50G impact; knee contusion, no fractures; FIA meetings in April. Sources: The Race, PlanetF1, Racer, Crash.net, Sky Sports. Note: reports put it down to deployment differences (closing speed), which is the same energy-management problem; the script doesn't claim Colapinto was "superclipping" at that moment, only that one car was harvesting while the other deployed. **Checked 21 Oct: no source says Colapinto was harvesting (he said he didn't use boost at Spoon; The Race). Line changed to "far more energy to deploy than the car in front" and section 6 re-voiced.**
 - **Miami changes:** superclipping 250 to 350 kW; qualifying recharge 8 to 7 MJ; unanimously agreed by teams, subject to World Motor Sport Council e-vote; in force from Miami. Sources: Motorsport.com, Autosport, Racer, Insidersport.
 - **Reactions:** Verstappen "more of a tickle" / "not what we need yet" (Sportsdigest); Hamilton: Sunday racing best in two decades (Insidersport); Piastri: closing speeds still "huge" (Yahoo/Motorsport). Gasly: positive step.
 - **Not claimed:** any exact race MJ figure, any team's exact harvest map.

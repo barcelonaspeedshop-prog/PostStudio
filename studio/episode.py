@@ -77,7 +77,7 @@ def bg_of(path, amount=0.8): return lambda t: dim_bg(path, amount)
 def opening(bg_path, title, kicker, credit=None, **photo):
     """The series open: the stamp slams down (BANNED) or "IM" is struck out (IMPOSSIBLE) over moving footage,
     then the episode title fades in under it. series="gof": the Gentlemen of Fuel mark glows in instead (GofSting)."""
-    if SERIES == "gof":
+    if SERIES in ("gof", "f1"):                                           # Omnira F1 wears the same gold badge style
         return GofSting(0.0, bg=Photo(0, bg_path, credit=credit, **({"zoom": (1.0, 1.18)} | photo)), length=INTRO,
                         items=[{"k": "title", "text": title, "y": 655, "size": 100, "at": 2.2},
                                {"k": "rule", "y": 830, "w": 560, "at": 2.6},
@@ -172,19 +172,22 @@ def impossible_end(this):
 
 # ---------------------------------------------------------------- Gentlemen of Fuel (one-off stories, no series)
 GOF_LOGO = "/Volumes/PostDrive/GOF/Logos/GOF Profile.png"
+LOGOS = {"gof": (GOF_LOGO, 0.425), "f1": ("/Volumes/PostDrive/Omnira/F1/Logos/F1 Profile.png", 0.365)}   # badge, mask radius (inside its ring)
 _gof = {}
 def gof_mark(h):
-    """The Omnira / Gentlemen of Fuel mark (emblem, wordmark, tagline) lifted off its black badge, h pixels high."""
-    if h not in _gof:
-        im = Image.open(GOF_LOGO).convert("RGB"); cx = cy = im.width / 2; R = im.width * 0.425   # inside the outer ring
+    """The Omnira / Gentlemen of Fuel mark (emblem, wordmark, tagline) lifted off its black badge, h pixels high.
+    series="f1" uses the Omnira F1 badge (same layout, a tighter ring)."""
+    logo, rr = LOGOS.get(SERIES, LOGOS["gof"])
+    if (logo, h) not in _gof:
+        im = Image.open(logo).convert("RGB"); cx = cy = im.width / 2; R = im.width * rr   # inside the outer ring
         box = (120, 270, 1134, 830); c = im.crop(box)
         a = np.asarray(c, np.float32).max(axis=2)
         a = np.clip((a - 70) * 2.4, 0, 255)                                   # gold stays, the dark marble goes
         yy, xx = np.mgrid[box[1]:box[3], box[0]:box[2]]
         a[(xx - cx) ** 2 + (yy - cy) ** 2 > R * R] = 0
         m = Image.fromarray(np.dstack([np.asarray(c), a.astype(np.uint8)]), "RGBA")
-        _gof[h] = m.resize((int(m.width * h / m.height), h), Image.LANCZOS)
-    return _gof[h]
+        _gof[(logo, h)] = m.resize((int(m.width * h / m.height), h), Image.LANCZOS)
+    return _gof[(logo, h)]
 
 def _sweep(mark, s):
     """A soft band of light across the gold, s = 0..1."""
@@ -229,6 +232,22 @@ def gof_end(cue="If you liked this one"):
             L.alpha_composite(mk, (int(W / 2 - mk.width / 2), 120))
         tracked(d, (W / 2, 520), "UNUSUAL CARS  ·  PEOPLE  ·  IDEAS  ·  AND THE STORIES BEHIND THEM", cond(32), rgba(CREAM, ramp(t, 1.4, 1.9)), 6, "center")
         tracked(d, (W / 2, 600), "A NEW STORY EVERY WEEK", cond(36), rgba(GOLD, ramp(t, 2.2, 2.7)), 8, "center")
+        s_ = ramp(t, at(cue, sc), at(cue, sc) + 0.4)
+        if s_ > 0:
+            d.rounded_rectangle((W / 2 - 220, 760, W / 2 + 220, 850), 14, fill=rgba(RED, s_))
+            tracked(d, (W / 2, 788), "SUBSCRIBE", cond(44, 3), rgba(CREAM, s_), 8, "center")
+    return draw
+
+def f1_end(cue="If you want to know how something"):
+    """Omnira F1 end card (F1 Explained): the gold mark, the series line, then the subscribe button on the cue line."""
+    def draw(d, L, t, sc):
+        a = ramp(t, 0.1, 0.9)
+        if a > 0:
+            mk = _sweep(gof_mark(300), ramp(t, 0.9, 1.9))
+            if a < 1: mk = Image.fromarray((np.asarray(mk) * np.array([1, 1, 1, a])).astype(np.uint8))
+            L.alpha_composite(mk, (int(W / 2 - mk.width / 2), 120))
+        tracked(d, (W / 2, 520), "F1 EXPLAINED  ·  HOW FORMULA ONE REALLY WORKS", cond(34), rgba(CREAM, ramp(t, 1.4, 1.9)), 6, "center")
+        tracked(d, (W / 2, 600), "RACING  ·  HISTORY  ·  ENGINEERING", cond(32), rgba(GOLD, ramp(t, 2.2, 2.7)), 8, "center")
         s_ = ramp(t, at(cue, sc), at(cue, sc) + 0.4)
         if s_ > 0:
             d.rounded_rectangle((W / 2 - 220, 760, W / 2 + 220, 850), 14, fill=rgba(RED, s_))
@@ -304,7 +323,7 @@ def main(scenes, final, music_gain=0.35):
                     "-map", "[o]", voice], check=True)
     tracks = sorted(t for t in glob.glob(A + "*.mp3") if not os.path.basename(t).startswith(("narration", "voice_test")))
     bed, order = music_bed(tracks, total, OUT + "music_bed.wav"); print("music:", " -> ".join(order))
-    sfx = (impossible_sfx(OUT + "sting_sfx.wav", INTRO) if SERIES == "impossible" else gof_sfx(OUT + "sting_sfx.wav", INTRO) if SERIES == "gof"
+    sfx = (impossible_sfx(OUT + "sting_sfx.wav", INTRO) if SERIES == "impossible" else gof_sfx(OUT + "sting_sfx.wav", INTRO) if SERIES in ("gof", "f1")
            else stamp_sfx(OUT + "sting_sfx.wav"))
     fc = (f"[1:a]volume={music_gain * 1.6}[mus];"
           f"[0:a]aresample=48000,pan=stereo|c0=c0|c1=c0,asplit=2[v1][key];[mus][key]sidechaincompress=threshold=0.02:ratio=8:attack=40:release=600[duck];"

@@ -23,6 +23,9 @@ How each clip is made: a still start frame first (cheap, about 20 credits, check
 | Low pass under a car with glowing airflow | any aero explainer | planned |
 | Wet track at night, spray off a single car | any rain race | planned |
 | Empty factory at night, car under a dust sheet | any team in crisis | done (Brawn) |
+| Chase cam behind a 2026 car on a floodlit straight | any night race, any 2026 explainer | done (Superclipping, 02 Superclipping media/ai/ai_bahrain_clip.mp4) |
+| Side-on tracking shot, Mercedes flat out | any speed/straight-line explainer | done (Superclipping, ai_straight_clip.mp4) |
+| Race start from high behind the grid | any race start | done (Superclipping, ai_grid_clip.mp4) |
 | Podium silhouettes, champagne spray | any win | done (Brawn) |
 
 ## Attempt log (what worked, what didn't)
@@ -40,3 +43,7 @@ How each clip is made: a still start frame first (cheap, about 20 credits, check
 
 **What the four Hazard attempts teach:** from a side-on angle with the goal at the frame's edge, every model loses the ball near the frame edge and the crossbar. Next time, set the shot up so it can't: start still from BEHIND the shooter (or behind the goal), goal in the middle of the frame with space round it, ball path fully inside the picture; shorter path (ball already near the goal at frame 1); 3 s clips. Draft that first.
 | 21 Oct | Hazard curler #5 | NEW SET-UP: start still from BEHIND the shooter, goal centred, ball already below the bar in the goal mouth; end still made FROM the start still (ball top right corner, keeper at full stretch); seedance-2.5 draft 480p 4 s, then enhance 1080p | 12 stills + 80 draft + 272 final | PASS at 10 fps: ball inside the posts and under the bar in every frame. The angle was the fix |
+| 21 Oct | Superclipping: Bahrain chase (car from behind, night straight) | Mike's ChatGPT still cropped to 16:9 as start frame; seedance-2.5 draft 4 s, then enhance | 80 + 272 | PASS at 10 fps first time: car centred, never turns. Chase-from-behind is a safe F1 angle |
+| 21 Oct | Superclipping: side-on tracking, car flat out | same | 80 + 272 | PASS; the camera settles in the first 0.5 s, so the build skips it (`skip=0.5`) |
+| 21 Oct | Superclipping: Haas closing on the Alpine, from behind | same, prompt says "never touch, clear gap" | 80 + 272 | PASS to 3.4 s; after 3.5 s the cars look touching, so the build uses `end=3.4`. Ask for a 4 s clip, plan to use 3 |
+| 21 Oct | Superclipping: Miami race start from behind the grid | same, "fixed camera" | 80 + 272 | PASS: rows stay in lane, a little tyre smoke |
