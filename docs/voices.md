@@ -2,6 +2,15 @@
 
 **21 Oct: Bernard dropped ("sounds very AI").**
 
+**21 Oct: the model changes the voice.** All the chosen samples were made on the default model (eleven_v3). On eleven_multilingual_v2 Malachi turns into an over-the-top action voice (Mike). Use the model the sample was made on unless that voice is known to drift (Kirk drifted American on v3 → Kirk on multilingual_v2). Before any full read, make a 10-second test and compare it with the sample.
+
+| Voice | Model (Mike, 21 Oct) |
+|---|---|
+| Malachi | eleven_v3 (the sample model; multilingual_v2 makes him over the top) |
+| Tom | eleven_multilingual_v2 (Surtees Short: "sounds fine") |
+| Kirk | eleven_multilingual_v2 (v3 drifted American) |
+| Others | eleven_v3 until tested |
+
 The only voices we use for now. UK / US is Mike's ear, not Runway's labels (Runway calls Bernard and Malachi American). **Omnira F1 and Omnira Football use UK voices only.** GoF can use either, matched to the story (US story → US voice, British/European classic → UK voice).
 
 | Voice | Accent | Best for |

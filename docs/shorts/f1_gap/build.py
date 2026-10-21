@@ -170,7 +170,7 @@ def short_cota():
           Pop(t_aim, ["AIM AT A POINT", "YOU CAN'T SEE"], t_wide - t_aim - 0.1, y=280, size=96),
           Pop(t_wide, ["BUILT WIDE", "ON PURPOSE"], t_watch - t_wide - 0.1, y=280, size=110),
           Pop(t_watch, ["WATCH THE START", "ON SUNDAY"], 99, y=280, size=100)]
-    return dict(n=1, name="F1-7 The corner drivers can't see (Malachi)", s=s, scenes=scenes, ov=ov, line="OMNIRA F1  ·  EXPLAINED",
+    return dict(n=1, name="F1-7 The corner drivers can't see (Malachi calm)", s=s, scenes=scenes, ov=ov, line="OMNIRA F1  ·  EXPLAINED",
                 slate=("Count the places at Turn 1 on Sunday.", "FOLLOW FOR MORE F1, EXPLAINED"), music=[MUS + "Energetic/ANBR - Seasons.mp3"])
 
 # ================================================================ F1-8: the race with six cars
@@ -262,7 +262,7 @@ def short_indy():
           Tag(t_mon + 0.3, "TIAGO MONTEIRO", sub="3RD  ·  JORDAN", dur=t_pod - t_mon - 0.4),
           Pop(t_pod, ["HIS ONLY", "F1 PODIUM"], t_two - t_pod - 0.1, y=280, size=110),
           Pop(t_two, ["LAST F1 RACE", "AT INDY: 2007"], 99, y=280, size=100)]
-    return dict(n=2, name="F1-8 The race with only six cars (Malachi)", s=s, scenes=scenes, ov=ov, line="OMNIRA F1  ·  DID YOU KNOW?",
+    return dict(n=2, name="F1-8 The race with only six cars (Malachi calm)", s=s, scenes=scenes, ov=ov, line="OMNIRA F1  ·  DID YOU KNOW?",
                 slate=("Should it have gone ahead with six cars?", "FOLLOW FOR MORE F1 STORIES"), music=[MUS + "Energetic/LaFaye - Hidden.mp3"])
 
 # ================================================================ F1-9: Surtees, on this day
