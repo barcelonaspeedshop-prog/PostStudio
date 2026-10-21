@@ -14,8 +14,9 @@ import episode as E
 E.init("/Volumes/PostDrive/Stories/IMPOSSIBLE series/04 Leicester/", series="impossible", narration="audio/v2/")
 from episode import *
 from factcard import FactCard
+E.AI_RATE = 0.6                                                               # AI clips at 60% speed (Mike 20 Oct)
 
-FINAL = "IMPOSSIBLE 04 - Leicester.mp4"
+FINAL = "IMPOSSIBLE 04 - Leicester v2.mp4"
 LCFC, LCFC_D = (0, 83, 160), (0, 50, 110)                 # Leicester royal blue
 SPURS, CHELSEA, CITY = (245, 245, 240), (3, 70, 148), (108, 171, 221)
 KEEPER = (240, 200, 60)
@@ -349,12 +350,6 @@ def odds_again(d, L, t, sc):
     place_stamp(L, W / 2, 800, ramp(t, 0.9, 1.15), text="DONE", size=140, color=GOLD, rot=-6)
 
 # ---------------------------------------------------------------- VIII. the party
-def crowd(d, L, t, sc):
-    k = 0.0; n = int(round(250000 * ease(min(1, max(0, t - k - 0.4) / 2.2)) / 1000) * 1000)   # lands on 250,000, counts in thousands
-    d.rounded_rectangle((W / 2 - 470, 70, W / 2 + 470, 330), 26, fill=rgba(NAVY_D, 0.9 * ramp(t, k, k + 0.3)), outline=rgba(GOLD, ramp(t, k, k + 0.3)), width=4)
-    text_top(d, (W / 2, 90), f"{n:,}", pf(120, 900), rgba(GOLD, ramp(t, k, k + 0.3)), "center")
-    tracked(d, (W / 2, 265), "PEOPLE ON THE STREETS  ·  ABOUT", cond(34, 8), rgba(CREAM, ramp(t, k, k + 0.3)), 8, "center")
-
 TABLE = [("1", "LEICESTER CITY", 81, LCFC), ("2", "ARSENAL", 71, (239, 1, 7)), ("3", "TOTTENHAM", 70, SPURS), ("4", "MAN CITY", 66, CITY)]
 def final_table(d, L, t, sc):
     tracked(d, (W / 2, 120), "PREMIER LEAGUE  ·  FINAL TABLE  ·  2015–16", cond(42, 8), rgba(GOLD, ramp(t, 0, 0.4)), 10, "center")
@@ -413,7 +408,8 @@ scenes = [
     PS("This is the story of how Leicester", KP_WIDE, zoom=(1.0, 1.1), strap=("King Power Stadium", "LEICESTER CITY", 0.4)),
     # I. 5000-1
     CuS("So what does five thousand to one", dots, bg=bga(BOOKIE, 0.9), chapter=CH("I", "WHAT 5000–1 MEANS")),
-    AS("For comparison, some bookmakers", ELVIS, zoom=(1.0, 1.12), focus=((0.55, 0.45), (0.5, 0.4)), texts=[(1.6, "Elvis found alive: 2000–1", "mid")]),
+    VS("For comparison, some bookmakers", "ai_elvis_clip.mp4", texts=[(1.6, "Elvis found alive: 2000–1", "mid")],
+       fallback=AS("For comparison, some bookmakers", ELVIS, zoom=(1.0, 1.12), focus=((0.55, 0.45), (0.5, 0.4)), texts=[(1.6, "Elvis found alive: 2000–1", "mid")])),
     CuS("Bookmakers don't guess.", wages, bg=bga(BOOKIE, 0.9)),
     PS("Leicester's whole team reportedly cost", SOTON, zoom=(1.0, 1.15), texts=[(0.8, "A whole team for less than one star.", "mid")]),
     # II. the great escape
@@ -460,10 +456,11 @@ scenes = [
     CuS("At half-time, Tottenham were", scoreboard("CHELSEA v TOTTENHAM  ·  HALF-TIME", [(0, 0, 0), (0.3, 0, 1), (0.8, 0, 2)], "CHELSEA", "TOTTENHAM", CHELSEA, SPURS,
         scorers=[(0.3, "KANE 35'"), (0.8, "SON 44'")]), bg=bgp(BRIDGE, 0.85)),
     CuS("Then, in the second half", scoreboard("SECOND HALF", [(0, 0, 2), (0.9, 1, 2)], "CHELSEA", "TOTTENHAM", CHELSEA, SPURS, scorers=[(0.9, "CAHILL 58'")]), bg=bgp(BRIDGE, 0.85)),
-    FC("Seven minutes from the end", HAZARD, "Eden Hazard", "CHELSEA  ·  83'", focus=(0.5, 0.3), facts=[(1.2, "His first league goal at Stamford Bridge all season", True)]),
+    FC("Seven minutes from the end", HAZARD, "Eden Hazard", "CHELSEA  ·  83'", focus=(0.5, 0.3), facts=[(1.2, "PFA Player of the Year the season before", True)]),
+    Clip(SF("Seven minutes from the end", 0.5), AI + "ai_hazard_clip.mp4", credit="AI illustration", max_rate=1.0, skip=0.5) if has("ai_hazard_clip.mp4") else   # skip: the ball hits the net ~4.3 s in
     AS("He curled it into the top corner", HAZARD_AI, zoom=(1.0, 1.15), focus=((0.6, 0.4), (0.7, 0.35))),
     CuS("Two–two.", scoreboard("83'  ·  EDEN HAZARD", [(0, 1, 2), (0.85, 2, 2)], "CHELSEA", "TOTTENHAM", CHELSEA, SPURS), off=-0.9, bg=bgp(BRIDGE, 0.85)),
-    AS("At Vardy's house, the room went mad", HOUSE_MAD, zoom=(1.0, 1.15), focus=((0.4, 0.4), (0.45, 0.45))),
+    VS("At Vardy's house, the room went mad", "ai_house_clip.mp4", end=2.0, fallback=AS("At Vardy's house, the room went mad", HOUSE_MAD, zoom=(1.0, 1.15), focus=((0.4, 0.4), (0.45, 0.45)))),
     AS("When the final whistle went", WHISTLE, zoom=(1.0, 1.12), focus=((0.5, 0.5), (0.55, 0.45))),
     Custom(SF("When the final whistle went", 0.55), champions, bg=bga(TROPHY_AI, 0.8)),
     Custom(S_nth("Five thousand to one.", 1, -0.1), odds_again, bg=bga(BOOKIE, 0.88)),
@@ -471,8 +468,8 @@ scenes = [
     PS("Five days later, Leicester lifted", LIFT, zoom=(1.0, 1.15), focus=((0.6, 0.45), (0.62, 0.4)), chapter=CH("VIII", "THE PARTY"),
        strap=("Leicester v Everton", "KING POWER STADIUM  ·  7 MAY 2016", 0.6)),
     AS("The opera singer Andrea Bocelli", BOCELLI, zoom=(1.0, 1.12), focus=((0.6, 0.45), (0.62, 0.4)), strap=("Andrea Bocelli", "NESSUN DORMA  ·  RANIERI BESIDE HIM", 0.8)),
-    AS("A week later, a quarter of a million", PARADE, zoom=(1.0, 1.15), focus=((0.5, 0.55), (0.5, 0.6))),
-    Custom(SF("A week later, a quarter of a million", 0.5), crowd, bg=bga(PARADE, 0.3)),
+    VS("A week later, a quarter of a million", "ai_parade_clip.mp4", texts=[(1.0, "About 250,000 people.", "big")],
+       fallback=AS("A week later, a quarter of a million", PARADE, zoom=(1.0, 1.15), focus=((0.5, 0.55), (0.5, 0.6)), texts=[(1.0, "About 250,000 people.", "big")])),
     CuS("They finished with eighty-one points", final_table, bg=bgp(LIFT, 0.88)),
     # IX. what happened next
     CuS("Riyad Mahrez was voted", award("PFA PLAYERS' PLAYER OF THE YEAR", "Riyad Mahrez", MAHREZ_FK), bg=bgp(KP_WIDE, 0.88), chapter=CH("IX", "WHAT HAPPENED NEXT")),
