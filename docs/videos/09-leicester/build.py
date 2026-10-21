@@ -16,7 +16,7 @@ from episode import *
 from factcard import FactCard
 E.AI_RATE = 0.6                                                               # AI clips at 60% speed (Mike 20 Oct)
 
-FINAL = "IMPOSSIBLE 04 - Leicester v3.mp4"
+FINAL = "IMPOSSIBLE 04 - Leicester v4.mp4"
 LCFC, LCFC_D = (0, 83, 160), (0, 50, 110)                 # Leicester royal blue
 SPURS, CHELSEA, CITY = (245, 245, 240), (3, 70, 148), (108, 171, 221)
 KEEPER = (240, 200, 60)
@@ -408,6 +408,66 @@ def ucl(d, L, t, sc):
     k = atf("Leicester played in the Champions League", 0.68, sc)
     tag(d, (W / 2, 690), "QUARTER-FINALS", ramp(t, k, k + 0.4), GOLD, 60)
 
+# ---------------------------------------------------------------- Hazard's goal: our own ball over the AI players
+class GoalShot(Scene):
+    """Mike 21 Oct: AI clips kept putting the ball in the wrong place (past the outside of the post, over the bar).
+    So the AI only moves the players (a clip made from the ball-free still) and the ball is ours: cut from the original
+    still, flown on a curve we control (inside the far post, under the bar, high by the near post), behind the near post
+    as it goes in, then dropping in the net while the net shakes. Coordinates are in the 2752x1536 still; `fit` maps
+    them onto the frame. With no clip it plays over the still itself."""
+    P0, C1, P2 = (2005, 667), (2250, 745), (2440, 705)          # strike point, curve, crossing the line just inside the far post
+    DEEP, DROP = (2527, 690), (2527, 695)                       # up into the top corner by the near post: always BETWEEN the posts
+    # (from this angle, anything right of the near post is the outside side-netting: Mike 21 Oct)
+    NEAR_POST = (2580, 470, 2622, 1400)                         # repainted over the ball once it's behind it
+    NET = (2395, 480, 2580, 1400)                               # the back net, seen through the mouth
+    def __init__(self, start, plate, ball_src, clip=None, fly=(0.35, 1.25), **kw):
+        super().__init__(start, **kw)
+        self.plate, self.clip, self.fly = load(plate), clip, fly
+        src = load(ball_src); bx, by, r = 2005, 667, 54
+        b = src.crop((bx - r, by - r, bx + r, by + r)).convert("RGBA")
+        m = Image.new("L", b.size, 0); ImageDraw.Draw(m).ellipse((4, 4, 2 * r - 4, 2 * r - 4), fill=255)
+        b.putalpha(m.filter(ImageFilter.GaussianBlur(2))); self.ball = b
+        self.post = self.plate.crop(self.NEAR_POST).convert("RGBA")
+    def base(self, t):
+        if self.clip is not None:
+            self.clip.dur = self.dur; im = self.clip.base(t).convert("RGBA")
+        else:
+            im = cover(self.plate.convert("RGB"), 1.0 + 0.04 * min(1, t / max(self.dur or 4, 1))).convert("RGBA")
+        s = max(W / 2752, H / 1536); ox, oy = (2752 * s - W) / 2, (1536 * s - H) / 2
+        f = lambda x, y: (x * s - ox, y * s - oy)
+        a, b = self.fly; L = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        def put(x, y, r, alpha=1.0, spin=0.0):
+            bb = self.ball.resize((max(4, int(2 * r * s)),) * 2, Image.BICUBIC).rotate(spin, resample=Image.BICUBIC)
+            if alpha < 1: bb.putalpha(bb.getchannel("A").point(lambda v: int(v * alpha)))
+            X, Y = f(x, y); L.alpha_composite(bb, (int(X - bb.width / 2), int(Y - bb.height / 2)))
+        behind = False
+        if t < a: put(*self.P0, 54)
+        elif t < b:                                              # the curl: quadratic bezier, shrinking as it goes away
+            u = (t - a) / (b - a); q = lambda i: (1 - u) ** 2 * self.P0[i] + 2 * (1 - u) * u * self.C1[i] + u * u * self.P2[i]
+            for k in range(3, 0, -1):                            # a short motion trail
+                uu = max(0, u - 0.025 * k); qq = lambda i: (1 - uu) ** 2 * self.P0[i] + 2 * (1 - uu) * uu * self.C1[i] + uu * uu * self.P2[i]
+                put(qq(0), qq(1), 54 - 14 * uu, 0.18 * (4 - k) / 3, -900 * uu)
+            put(q(0), q(1), 54 - 14 * u, 1.0, -900 * u)
+        else:                                                    # in: up into the roof of the net, then dropping
+            v = t - b; behind = True
+            if v < 0.3: g = ease(v / 0.3); x, y = self.P2[0] + (self.DEEP[0] - self.P2[0]) * g, self.P2[1] + (self.DEEP[1] - self.P2[1]) * g; r = 40 + 8 * g
+            else: g = min(1, (v - 0.3) / 0.7); x, y = self.DEEP[0] + (self.DROP[0] - self.DEEP[0]) * g, self.DEEP[1] + (self.DROP[1] - self.DEEP[1]) * g; r = 49
+            put(x, y, r, 1.0)
+        im.alpha_composite(L)
+        if behind:                                               # the near post stays in front of the ball; the net shakes
+            v = t - b; amp = 7 * max(0, 1 - v / 0.9) * math.sin(v * 38)
+            if abs(amp) > 0.3:
+                n0 = f(self.NET[0], self.NET[1]); n1 = f(self.NET[2], self.NET[3])
+                box = (int(n0[0]), int(n0[1]), int(n1[0]), int(n1[1])); piece = im.crop(box)
+                im.paste(piece, (box[0] + int(amp), box[1] + int(amp * 0.4)))
+            p0 = f(self.NEAR_POST[0], self.NEAR_POST[1]); p1 = f(self.NEAR_POST[2], self.NEAR_POST[3])
+            post = self.post.resize((int(p1[0] - p0[0]), int(p1[1] - p0[1])), Image.BICUBIC)
+
+        return im.convert("RGB")
+def cover(im, z=1.0):
+    s = max(W / im.width, H / im.height) * z; w, h = int(im.width * s), int(im.height * s)
+    return im.resize((w, h), Image.BICUBIC).crop(((w - W) // 2, (h - H) // 2, (w - W) // 2 + W, (h - H) // 2 + H))
+
 # ---------------------------------------------------------------- the video
 scenes = [
     opening(AI + BOOKIE, "Leicester City.", "EPISODE FOUR  ·  5000–1", credit="AI illustration", focus=((0.7, 0.4), (0.75, 0.55))),
@@ -469,8 +529,8 @@ scenes = [
         scorers=[(0.3, "KANE 35'"), (0.8, "SON 44'")]), bg=bgp(BRIDGE, 0.85)),
     CuS("Then, in the second half", scoreboard("SECOND HALF", [(0, 0, 2), (0.9, 1, 2)], "CHELSEA", "TOTTENHAM", CHELSEA, SPURS, scorers=[(0.9, "CAHILL 58'")]), bg=bgp(BRIDGE, 0.85)),
     FC("Seven minutes from the end", HAZARD, "Eden Hazard", "CHELSEA  ·  83'", focus=(0.5, 0.3), facts=[(1.2, "PFA Player of the Year the season before", True)]),
-    Clip(SF("Seven minutes from the end", 0.5), AI + "ai_hazard_clip.mp4", credit="AI illustration", max_rate=0.6, end=2.2) if has("ai_hazard_clip.mp4") else   # start+end frames; only the first 2.2 s (his back shows a wrong No. 9 later)
-    AS("He curled it into the top corner", HAZARD_AI, zoom=(1.0, 1.15), focus=((0.6, 0.4), (0.7, 0.35))),
+    GoalShot(SF("Seven minutes from the end", 0.5), AI + "ai_hazard_noball.png", AI + HAZARD_AI, credit="AI illustration"),   # our ball, our path (Mike 21 Oct)
+    AS("He curled it into the top corner", "ai_hazard_endframe.png", off=0.6, zoom=(1.03, 1.08), focus=((0.6, 0.45), (0.62, 0.45))),
     CuS("Two–two.", scoreboard("83'  ·  EDEN HAZARD", [(0, 1, 2), (0.85, 2, 2)], "CHELSEA", "TOTTENHAM", CHELSEA, SPURS), off=-0.9, bg=bgp(BRIDGE, 0.85)),
     VS("At Vardy's house, the room went mad", "ai_house_clip.mp4", end=2.0, fallback=AS("At Vardy's house, the room went mad", HOUSE_MAD, zoom=(1.0, 1.15), focus=((0.4, 0.4), (0.45, 0.45)))),
     AS("When the final whistle went", WHISTLE, zoom=(1.0, 1.12), focus=((0.5, 0.5), (0.55, 0.45))),
