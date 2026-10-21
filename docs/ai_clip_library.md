@@ -8,6 +8,7 @@ How each clip is made: a still start frame first (cheap, about 20 credits, check
 
 | Clip | Use for | Status |
 |---|---|---|
+| **Goal from behind the shooter** (approved by Mike 21 Oct, Leicester v6): start still behind the No. on his back, goal centred, ball already under the bar; end still made FROM the start still; seedance-2.5 draft, 10-fps check, enhance | any goal story | done (Hazard, 04 Leicester media/ai/ai_hazard_goal.mp4) |
 | Hands placing the ball on the penalty spot, white sleeves, keeper bouncing behind | any shoot-out or penalty | test, Istanbul |
 | Keeper bouncing and waving on his line, seen from behind the taker | any shoot-out | planned |
 | Players sprinting and piling on the keeper, seen from distance | any shoot-out win, any late winner | planned |

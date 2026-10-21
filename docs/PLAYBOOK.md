@@ -100,5 +100,6 @@ Brawn v2 and Istanbul v2 are the reference videos. Every long video follows this
   4. `studio/clip_check.py` at 10 fps through the moment, read every frame, before it goes in the edit.
   5. Log every attempt (model, prompt, frames, cost, what went wrong) in docs/ai_clip_library.md, so the next one starts from what worked.
   Two stills (before, after) are the fallback while a clip isn't right yet, never the rule.
+  Approved template for goals (Mike 21 Oct, "that's the release"): camera behind the shooter, goal centred with space round it (docs/ai_clip_library.md).
 - **Check every AI clip at 10 frames a second through the moment that matters**: `studio/clip_check.py <clip> t0 t1 --crop ...` writes <clip>_check.jpg. One frame a second missed a ball passing outside the post. No clip goes to Mike without its check sheet read.
 - **Football goals from the side**: anything beyond the near post is the side-netting outside the goal. The ball has to stay between the posts and under the bar.
