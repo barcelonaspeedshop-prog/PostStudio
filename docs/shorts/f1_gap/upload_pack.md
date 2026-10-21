@@ -23,7 +23,7 @@ Instagram and Facebook are already set on the VPS for the same times. Sunday als
 - **Playlists:** Omnira F1 in Shorts, F1 Explained
 - **Pinned comment:** Best first corner in F1: Austin Turn 1, Eau Rouge, or something else?
 
-## Sat 24 Oct, 1pm: F1-8 The race with only six cars (Malachi calm).mp4 (1:00, voice Malachi)
+## Sat 24 Oct, 1pm: F1-8 The race with only six cars (Malachi calm v2).mp4 (1:00, voice Malachi)
 - **Title:** The F1 race with only six cars #Shorts
 - **Description:**
   Indianapolis 2005: fourteen cars drove into the pits after the formation lap, and only six raced. Why it happened.

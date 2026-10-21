@@ -86,3 +86,4 @@ Brawn v2 and Istanbul v2 are the reference videos. Every long video follows this
 - No photo twice in a Short. A Short about a corner shows cars in that corner, right to the last shot.
 - If Commons has nothing that fits, make an AI still at once (real people and faces are fine) or ask Mike to find one.
 - Search Commons categories ("Category:2005 United States Grand Prix"), not just keywords: the event categories hold the best matches.
+- **Shot check before every render** (Mike 21 Oct, after a 0.7 s Pagoda flash on the Indy Short): `build.py check` writes sheets/checkN.jpg, one row per picture with its time in the video, how long it's up, the words said over it and the on-screen text. Read every row: the picture must show what's being said. Anything under 1.5 s is flagged red unless it's a deliberate list cut marked `V.quick(...)`. Fix the flags, then render. Send Mike the check sheet with the review copy.

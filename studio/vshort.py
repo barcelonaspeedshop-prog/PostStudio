@@ -253,6 +253,50 @@ def render(out, narr_dir, sents, scenes, overlays, channel_line, slate, music, m
     wr.stdin.close(); wr.wait()
     return dur
 
+MIN_SHOT = 1.5          # Mike 10-21: a picture up for less than this reads as a glitch (Indy Pagoda, 0.7 s)
+
+def quick(scene):
+    """Mark a deliberate fast cut (one picture per listed item: "two Ferraris, two Jordans...") so shot_check doesn't flag it."""
+    scene.quick = True; return scene
+
+def shot_check(out, narr_dir, sents, scenes, overlays, channel_line, slate, lead=0.25):
+    """The picture-to-narration check (Mike 10-21: "we need a way to check the image to narration"). One row per picture:
+    a frame from the middle of it, its time in the finished video, how long it's up, the words spoken while it's up and
+    the on-screen text. Pictures shorter than MIN_SHOT are flagged red unless marked quick(). Returns the flagged rows."""
+    t0 = sents[0]["out_start"]; body = sents[-1]["out_end"] - t0
+    words = [(t - t0, w) for t, w in caption_words(narr_dir, sents)]
+    scenes = sorted(scenes, key=lambda s: s.start)
+    for s, n in zip(scenes, scenes[1:]): s.dur = n.start - s.start
+    scenes[-1].dur = body - scenes[-1].start
+    def name(s):
+        if hasattr(s, "path"): return os.path.splitext(os.path.basename(s.path))[0].replace("_", " ")[:70]
+        fn = getattr(s, "fn", None); return "graphic: " + (fn.__qualname__.split(".")[0] if fn else "?")
+    def mmss(t): t = max(0, t + lead); return f"{int(t // 60)}:{t % 60:04.1f}"
+    rows, flagged = [], []
+    for k, s in enumerate(scenes):
+        a, b = s.start, s.start + s.dur
+        said = " ".join(w for t, w in words if a - XF <= t < b - XF)      # a picture fades in over the XF before its start
+        shown = [" / ".join(o.lines) if isinstance(o, Pop) else o.text + (f" / {o.sub}" if getattr(o, "sub", None) else "")
+                 for o in overlays if o.t < b and o.t + o.dur > a]
+        short = s.dur < MIN_SHOT and not getattr(s, "quick", False)
+        thumb = compose(scenes, [], [], channel_line, slate, a + s.dur / 2, body, body + SLATE).convert("RGB").resize((180, 320))
+        rows.append((k + 1, mmss(a), mmss(b), s.dur, name(s), said, shown, short, getattr(s, "quick", False), thumb))
+        if short: flagged.append(f"#{k + 1} {mmss(a)} {s.dur:.1f}s {name(s)}")
+    W, H = 1400, 340; sheet = Image.new("RGB", (W, H * len(rows) + 90), (245, 242, 235)); d = ImageDraw.Draw(sheet)
+    d.text((24, 26), f"SHOT CHECK  ·  {os.path.basename(out)}  ·  red = under {MIN_SHOT}s on screen", font=cond(40, 8), fill=NAVY_D)
+    for i, (n, ta, tb, du, nm, said, shown, short, qk, th) in enumerate(rows):
+        y = 90 + i * H
+        if short: d.rectangle((0, y, W, y + H - 6), fill=(250, 214, 214))
+        sheet.paste(th, (20, y + 10))
+        x = 230; d.text((x, y + 14), f"#{n}   {ta} – {tb}   ({du:.1f} s){'   TOO SHORT' if short else '   quick cut' if qk else ''}",
+                        font=cond(38, 8), fill=RED if short else NAVY_D)
+        d.text((x, y + 66), nm, font=cond(30, 2), fill=(70, 70, 70))
+        for j, ln in enumerate(wrap("SAID: " + (said or "(nothing)"), cond(32, 2), W - x - 30)[:4]):
+            d.text((x, y + 116 + j * 40), ln, font=cond(32, 2), fill=(20, 20, 20))
+        if shown: d.text((x, y + 290), "ON SCREEN: " + "  |  ".join(shown)[:110], font=cond(28, 2), fill=(150, 110, 40))
+    sheet.save(out, quality=85)
+    return flagged
+
 def compose(scenes, overlays, caps, channel_line, slate, T, body, end):
     im = frame_at(scenes, min(T, body - 0.04)); d = ImageDraw.Draw(im)
     d.rectangle((0, 0, SW * min(1, max(0, T / body)), 10), fill=rgba(GOLD, 0.95))                   # progress bar

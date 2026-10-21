@@ -4,6 +4,7 @@ Surtees on this day. narration.md (from script.md) + AI narration (Bernard, Kirk
     ~/.venvs/poststudio/bin/python docs/shorts/f1_gap/build.py            # all three
     ~/.venvs/poststudio/bin/python docs/shorts/f1_gap/build.py 2          # just Indy
     ~/.venvs/poststudio/bin/python docs/shorts/f1_gap/build.py sheet      # contact sheets instead
+    ~/.venvs/poststudio/bin/python docs/shorts/f1_gap/build.py check      # shot check: each picture, its time, the words said over it
 """
 import importlib.util, json, math, os, sys, multiprocessing as mp
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.join(HERE, "..", "..", "..")
@@ -232,17 +233,16 @@ def short_indy():
         "Some threw", "Michael Schumacher won", "And a Jordan", "The only podium", "Two years later"))
     t_fer, t_jor, t_min = (W(s, "Two Ferraris", w, -0.1) for w in ("Ferraris", "Jordans", "Minardis"))
     scenes = [VGraphic(0, countdown(0)),
-              VPhoto(t_ind, PAGODA, ((0.5, 0.3), (0.5, 0.4)), (1.0, 1.1)),                # the Pagoda
-              VPhoto(t_usgp, GATE, ((0.5, 0.35), (0.5, 0.4)), (1.0, 1.12)),               # the speedway gate
+              VPhoto(t_ind, GATE, ((0.5, 0.35), (0.5, 0.4)), (1.0, 1.12)),                # the speedway gate (the Pagoda was up 0.7 s: cut, Mike 10-21)
               VPhoto(t_prac, CRASH, ((0.45, 0.45), (0.5, 0.45)), (1.0, 1.15)),            # AI: the Toyota in the banking
               VPhoto(t_mich, MTYRE, ((0.5, 0.5), (0.55, 0.5)), (1.0, 1.15)),
               VGraphic(T(s, "Michelin, who", 3.0), tyres()),
               VPhoto(t_none, CARTS, ((0.5, 0.5), (0.5, 0.45)), (1.0, 1.12)),
               VGraphic(t_sun - 0.1, pits()),
               VPhoto(t_six, GRID6, ((0.5, 0.6), (0.6, 0.65)), (1.0, 1.12)),              # AI: the six-car grid
-              VPhoto(t_fer, RUB, ((0.5, 0.5), (0.5, 0.5)), (1.05, 1.15)),
-              VPhoto(t_jor, JLOCK, ((0.5, 0.5), (0.45, 0.5)), (1.05, 1.15)),
-              VPhoto(t_min, MINARDI, ((0.5, 0.6), (0.5, 0.55)), (1.0, 1.1)),
+              V.quick(VPhoto(t_fer, RUB, ((0.5, 0.5), (0.5, 0.5)), (1.05, 1.15))),       # one picture per team as it's named
+              V.quick(VPhoto(t_jor, JLOCK, ((0.5, 0.5), (0.45, 0.5)), (1.05, 1.15))),
+              V.quick(VPhoto(t_min, MINARDI, ((0.5, 0.6), (0.5, 0.55)), (1.0, 1.1))),
               VPhoto(t_boo, MOSLEY, ((0.5, 0.4), (0.5, 0.35)), (1.0, 1.1)),                # fans' banners that day
               VPhoto(t_bot, BERNIE, ((0.5, 0.4), (0.5, 0.35)), (1.0, 1.12)),
               VPhoto(t_ms, MSC_W, ((0.5, 0.35), (0.5, 0.3)), (1.0, 1.1)),
@@ -250,8 +250,7 @@ def short_indy():
               VPhoto(t_pod, RESULT, ((0.5, 0.35), (0.5, 0.3)), (1.0, 1.15)),             # the scoreboard pylon
               VPhoto(t_two, IMS_AIR, ((0.5, 0.5), (0.45, 0.5)), (1.0, 1.15))]
     ov = [Pop(0, ["ONLY SIX CARS", "STARTED"], t_ind - 0.2, y=280, size=110),
-          Tag(t_ind + 0.2, "INDIANAPOLIS", sub="19 JUNE 2005", dur=t_usgp - t_ind - 0.3),
-          Tag(t_usgp + 0.2, "UNITED STATES GRAND PRIX", sub="INDIANAPOLIS MOTOR SPEEDWAY", dur=t_prac - t_usgp - 0.3),
+          Tag(t_ind + 0.2, "UNITED STATES GRAND PRIX", sub="INDIANAPOLIS  ·  19 JUNE 2005", dur=t_prac - t_ind - 0.3),
           Tag(t_prac + 0.4, "RALF SCHUMACHER  ·  TOYOTA", sub="FRIDAY PRACTICE  ·  TURN 13", dur=t_mich - t_prac - 0.5),
           Stamp(t_none + 0.3, "NO SAFE TYRE", (SW / 2, 400), t_sun - t_none - 0.4, 100),
           Pop(t_six, ["SIX CARS", "RACED"], t_fer - t_six - 0.1, y=280, size=110),
@@ -262,7 +261,7 @@ def short_indy():
           Tag(t_mon + 0.3, "TIAGO MONTEIRO", sub="3RD  ·  JORDAN", dur=t_pod - t_mon - 0.4),
           Pop(t_pod, ["HIS ONLY", "F1 PODIUM"], t_two - t_pod - 0.1, y=280, size=110),
           Pop(t_two, ["LAST F1 RACE", "AT INDY: 2007"], 99, y=280, size=100)]
-    return dict(n=2, name="F1-8 The race with only six cars (Malachi calm)", s=s, scenes=scenes, ov=ov, line="OMNIRA F1  ·  DID YOU KNOW?",
+    return dict(n=2, name="F1-8 The race with only six cars (Malachi calm v2)", s=s, scenes=scenes, ov=ov, line="OMNIRA F1  ·  DID YOU KNOW?",
                 slate=("Should it have gone ahead with six cars?", "FOLLOW FOR MORE F1 STORIES"), music=[MUS + "Energetic/LaFaye - Hidden.mp3"])
 
 # ================================================================ F1-9: Surtees, on this day
@@ -378,9 +377,13 @@ def sheet(k):
         ImageDraw.Draw(im).text((4, 4), f"{ts[i]:.1f}", fill=(255, 255, 0)); g.paste(im, ((i % 8) * 270, (i // 8) * 480))
     os.makedirs(R + "sheets", exist_ok=True); g.save(R + f"sheets/short{k}.jpg", quality=82); return R + f"sheets/short{k}.jpg"
 
+def check(k):
+    j = ALL[k - 1](); out = R + f"sheets/check{k}.jpg"; os.makedirs(R + "sheets", exist_ok=True)
+    return out, V.shot_check(out, NA, j["s"], j["scenes"], j["ov"], j["line"], j["slate"])
+
 if __name__ == "__main__":
-    args = sys.argv[1:]; mode = "sheet" if args and args[0] == "sheet" else "render"
+    args = sys.argv[1:]; mode = args[0] if args and args[0] in ("sheet", "check") else "render"
     pick = [int(x) for x in args if x.isdigit()] or range(1, len(ALL) + 1)
     V.caption_words(NA, SENTS)          # Whisper (MLX) hangs inside forked workers: fill the cache here first
     with mp.get_context("fork").Pool(len(pick)) as pool:
-        for r in pool.map(sheet if mode == "sheet" else job, pick): print(r)
+        for r in pool.map({"sheet": sheet, "check": check}.get(mode, job), pick): print(r)
