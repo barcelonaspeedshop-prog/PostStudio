@@ -16,7 +16,7 @@ from episode import *
 from factcard import FactCard
 E.AI_RATE = 0.6                                                               # AI clips at 60% speed (Mike 20 Oct)
 
-FINAL = "IMPOSSIBLE 04 - Leicester v4.mp4"
+FINAL = "IMPOSSIBLE 04 - Leicester v5.mp4"
 LCFC, LCFC_D = (0, 83, 160), (0, 50, 110)                 # Leicester royal blue
 SPURS, CHELSEA, CITY = (245, 245, 240), (3, 70, 148), (108, 171, 221)
 KEEPER = (240, 200, 60)
@@ -529,9 +529,10 @@ scenes = [
         scorers=[(0.3, "KANE 35'"), (0.8, "SON 44'")]), bg=bgp(BRIDGE, 0.85)),
     CuS("Then, in the second half", scoreboard("SECOND HALF", [(0, 0, 2), (0.9, 1, 2)], "CHELSEA", "TOTTENHAM", CHELSEA, SPURS, scorers=[(0.9, "CAHILL 58'")]), bg=bgp(BRIDGE, 0.85)),
     FC("Seven minutes from the end", HAZARD, "Eden Hazard", "CHELSEA  ·  83'", focus=(0.5, 0.3), facts=[(1.2, "PFA Player of the Year the season before", True)]),
-    GoalShot(SF("Seven minutes from the end", 0.5), AI + "ai_hazard_noball.png", AI + HAZARD_AI, credit="AI illustration"),   # our ball, our path (Mike 21 Oct)
-    AS("He curled it into the top corner", "ai_hazard_endframe.png", off=0.6, zoom=(1.03, 1.08), focus=((0.6, 0.45), (0.62, 0.45))),
-    CuS("Two–two.", scoreboard("83'  ·  EDEN HAZARD", [(0, 1, 2), (0.85, 2, 2)], "CHELSEA", "TOTTENHAM", CHELSEA, SPURS), off=-0.9, bg=bgp(BRIDGE, 0.85)),
+    AF("Seven minutes from the end", 0.5, HAZARD_AI, zoom=(1.0, 1.06), focus=((0.55, 0.45), (0.62, 0.42))),   # the strike, ball in the air (still)
+    AS("He curled it into the top corner", "ai_hazard_endframe.png", off=0.5, zoom=(1.0, 1.05), focus=((0.62, 0.45), (0.64, 0.45)),
+       texts=[(S("Two–two.") - S("He curled it into the top corner", 0.5), "Chelsea 2–2 Tottenham", "big")]),   # cut: in the net
+    # Mike 21 Oct: no animated ball (AI clips missed the goal three times; our own ball "looks like a comic"). Two stills, like press photos.
     VS("At Vardy's house, the room went mad", "ai_house_clip.mp4", end=2.0, fallback=AS("At Vardy's house, the room went mad", HOUSE_MAD, zoom=(1.0, 1.15), focus=((0.4, 0.4), (0.45, 0.45)))),
     AS("When the final whistle went", WHISTLE, zoom=(1.0, 1.12), focus=((0.5, 0.5), (0.55, 0.45))),
     Custom(SF("When the final whistle went", 0.55), champions, bg=bga(TROPHY_AI, 0.8)),
