@@ -11,7 +11,7 @@ Three standalone Shorts to fill Omnira F1 from Friday to Sunday: one explained, 
 
 ---
 
-## F1-7. The corner you can't see (Explained · voice: Bernard)
+## F1-7. The corner you can't see (Explained · voice: Malachi; Bernard dropped 21 Oct)
 
 **Facts, checked 21 Oct:** Turn 1 at the Circuit of the Americas climbs more than 30 metres from the start line (formula1.com; PlanetF1 gives 133 ft) at about 11 percent (Racer). It's a first-gear hairpin and the apex is blind on the way up. The track is very wide at the entry. Sources: formula1.com, Racer, PlanetF1.
 
@@ -93,7 +93,7 @@ Two years later, Formula One left Indianapolis for good.
 
 ---
 
-## F1-9. Champion on two wheels and four (On this day · voice: Kirk)
+## F1-9. Champion on two wheels and four (On this day · voice: Tom)
 
 **Facts, checked 21 Oct:** Mexican Grand Prix, 25 October 1964, the final round. John Surtees (Ferrari 158) finished second behind Dan Gurney and won the title by one point from Graham Hill, 40 to 39. Hill was knocked off by Surtees's team-mate Lorenzo Bandini; Jim Clark, leading, had an engine failure in the closing laps; Bandini let Surtees through to second. Ferrari raced in the blue and white of the North American Racing Team (NART) after a row with the Italian sporting authority. Surtees had won 7 motorcycle world titles with MV Agusta (500cc 1956, 1958, 1959, 1960; 350cc 1958, 1959, 1960). He's still the only world champion on two wheels and four. Sources: Wikipedia, Ferrari, Motor Sport (December 1964).
 

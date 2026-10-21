@@ -18,24 +18,39 @@ chip, title, arrow = B1.chip, B1.title, B1.arrow
 
 R = "/Volumes/PostDrive/Shorts/f1_gap/"; NA = R + "audio/"; C = R + "commons/"; OUT = R + "video/"
 MUS = "/Volumes/PostDrive/Music/"
+AI = R + "media/ai/"
+def U(n): return C + f"2021_United_States_Grand_Prix_{n}.jpg"      # the 2021 race, shot from the Turn 1 grandstand
 HILL = C + "Main_straight_and_turn_1_hill,_Circuit_of_the_Americas.jpg"
-GP18 = C + "2018 US Grand Prix at the Circuit of the Americas.jpg"
 GP13 = C + "United_states_grand_prix_2013.jpg"
-AERIAL = C + "Circuit_of_the_Americas,_Austin,_TX_(30066328424).jpg"
-CROWD = C + "Crowds_at_Circuit_of_the_Americas.jpg"
+PAGODA = C + "Indianapolis_Motor_Speedway_May_2026_6_(Pagoda).jpg"
+GATE = C + "Indianapolis_Motor_Speedway_Gate_1.jpg"
+IMS_AIR = C + "Indianapolis_Motor_Speedway_Aerial_August_2018.jpg"
+CRASH, GRID6, NART = AI + "indy_crash.png", AI + "indy_six_grid.png", AI + "surtees_nart.png"
+MTYRE = C + "Michelin_tyre_2005_United_States_GP_(19879074).jpg"
+CARTS = C + "Tyre_carts_on_grid_at_USGP_2005.jpg"
 INDY = C + "Schumacher_(Ferrari)_in_practice_at_USGP_2005.jpg"
-R25 = C + "Renault_R25_2005_United_States_GP_(19887965).jpg"
-MICH = C + "Michelin_2005_United_States_GP_(20413746).jpg"
-MSC = C + "Michael_Schumacher_2005_United_States_GP_(19872855).jpg"
+RUB = C + "Barrichello_(Ferrari)_qualifying_at_USGP_2005.jpg"
+JLOCK = C + "Karthikeyan_(Jordan)_locking_brakes_in_qualifying_at_USGP_2005.jpg"
+MINARDI = C + "Minardi_garage.jpg"
+MOSLEY = C + "Blame_Mosley_banner.jpg"
+BERNIE = C + "I_Want_My_Money_Back_BERNIE_2005_United_States_GP_(20414718).jpg"
 MSC_W = C + "Michael_Schumacher_after_2005_United_States_GP_(20413937).jpg"
 MONT = C + "Monteiro_(Jordan)_qualifying_at_USGP_2005.jpg"
+RESULT = C + "Race_result_2005_United_States_GP_(20413835).jpg"
 S56 = C + "John_Surtees,_winnaar_500CC,_Bestanddeelnr_907-8597.jpg"
+S56C = C + "John_Surtees,_winnaar_500CC,_Bestanddeelnr_907-8597_cropped.jpg"
 SMV = C + "John_Surlees_op_MV_Agusta_tijden_de_500cc_race,_Bestanddeelnr_910-4761.jpg"
+SNEW = C + "Training_Grand_Prix_te_Zandvoort,_John_Surtees_bij_zijn_nieuwe_wagen,_Bestanddeelnr_916-4625.jpg"
 S64 = C + "Surtees_at_1964_Dutch_Grand_Prix.jpg"
+S2011 = C + "John_Surtees_at_Goodwood_Revival_2011.jpg"
 START64 = C + "Start_of_1964_Dutch_Grand_Prix.jpg"
+HILLBRM = C + "Training_Zandvoort_Grand_Prix,_Graham_Hill_(BRM),_Bestanddeelnr_917-9726.jpg"
+HILLP = C + "Graham_Hill_au_Grand_Prix_de_Monaco_1966.jpg"
 CLARK = C + "Grand_Prix_van_Nederland,_het_rennersveld_Jim_Clark_in_zijn_Lotus_in_actie,_Bestanddeelnr_916-4688.jpg"
+CLARKP = C + "Clark_at_1964_Dutch_Grand_Prix_(3).jpg"
 F158 = C + "Ferrari_158_F1_1964.jpg"
 F158G = C + "Surtees_Ferrari_158_Goodwood_July_2010.jpg"
+ENZO = C + "Enzo_Ferrari_Monza_1967.jpg"
 FERRARI, GREEN, BLUE, BRIDGE = (220, 30, 40), (70, 190, 110), (40, 90, 200), (230, 60, 50)
 MICH_BLUE, NART_BLUE, WHITE = (30, 80, 180), (25, 60, 160), (245, 245, 245)
 
@@ -43,6 +58,11 @@ SENTS = json.load(open(NA + "sentences.json"))
 def section(k): return [s for s in SENTS if s["section"] == k]
 def T(s, snip, off=0.0):
     e = next(x for x in s if snip.lower() in x["text"].lower()); return round(e["out_start"] - s[0]["out_start"] + off, 3)
+def W(s, snip, word, off=0.0):
+    """Time of `word` inside the sentence containing `snip` (for a picture per word: "two Ferraris, two Jordans...")."""
+    e = next(x for x in s if snip.lower() in x["text"].lower())
+    t = next(t for t, w in V.caption_words(NA, [e]) if w.lower().strip(",.") == word.lower())
+    return round(t - s[0]["out_start"] + off, 3)
 
 class Canvas:
     def __init__(self, path, dark=0.72):
@@ -82,7 +102,7 @@ def climb():
 def brakes(t1):
     """Flat v uphill: the uphill car can brake later."""
     def fn(t, dur):
-        cv = Canvas(GP13, 0.72); d = ImageDraw.Draw(cv.L)
+        cv = Canvas(U("18"), 0.72); d = ImageDraw.Draw(cv.L)
         title(d, 600, "WHERE THEY BRAKE", ramp(t, 0, 0.3), 46)
         for i, (lab, at, k) in enumerate((("ON THE FLAT", 0.38, 0.2), ("UPHILL", 0.6, t1))):
             p = ramp(t, k, k + 0.35)
@@ -128,29 +148,36 @@ def blind(t_reveal):
 
 def short_cota():
     s = section(0)
-    t_aus, t_cl, t_up, t_top, t_hair, t_aim, t_wide, t_watch = (T(s, x) for x in ("At the start in Austin", "They climb", "Going uphill", "But at the top",
-        "It's a hairpin", "So the drivers aim", "And it's built", "Watch the start"))
-    scenes = [VPhoto(0, GP13, ((0.5, 0.45), (0.6, 0.4)), (1.0, 1.18)),
-              VPhoto(t_aus, HILL, ((0.55, 0.97), (0.5, 0.9)), (1.45, 1.3)),
-              VGraphic(t_cl - 0.1, climb()),
-              VGraphic(t_up - 0.1, brakes(T(s, "Gravity slows") - t_up + 0.3)),
+    t_see, t_aus, t_cl, t_ten, t_up, t_grav, t_top, t_hair, t_aim, t_wide, t_watch, t_count = (T(s, x) for x in ("And the drivers can't", "At the start in Austin",
+        "They climb", "That's a ten-storey", "Going uphill", "Gravity slows", "But at the top", "It's a hairpin", "So the drivers aim", "And it's built",
+        "Watch the start", "Count how many"))
+    scenes = [VPhoto(0, U("21"), ((0.5, 0.55), (0.6, 0.5)), (1.0, 1.15)),             # Turn 1 runoff, cars on the way in
+              VPhoto(t_see, U("04"), ((0.4, 0.5), (0.4, 0.4)), (1.0, 1.1)),            # the TURN 1 sign
+              VPhoto(t_aus, GP13, ((0.5, 0.45), (0.6, 0.4)), (1.0, 1.18)),             # the 2013 start
+              VPhoto(t_cl, HILL, ((0.55, 0.97), (0.5, 0.9)), (1.45, 1.3)),             # looking down from the top
+              VGraphic(t_ten - 0.1, climb()),
+              VPhoto(t_up, U("18"), ((0.4, 0.5), (0.5, 0.5)), (1.0, 1.15)),            # braking marks into the hairpin
+              VGraphic(t_grav - 0.1, brakes(0.3)),
               VGraphic(t_top - 0.1, blind(t_hair - t_top + 0.2)),
-              VPhoto(t_aim, GP18, ((0.4, 0.6), (0.55, 0.6)), (1.1, 1.25)),
-              VPhoto(t_wide, AERIAL, ((0.5, 0.5), (0.45, 0.5)), (1.0, 1.15)),
-              VPhoto(t_watch, CROWD, ((0.45, 0.5), (0.55, 0.45)), (1.0, 1.15))]
+              VPhoto(t_aim, U("22"), ((0.45, 0.55), (0.55, 0.5)), (1.0, 1.15)),        # two cars at the apex
+              VPhoto(t_wide, U("02"), ((0.5, 0.5), (0.6, 0.55)), (1.0, 1.12)),         # the wide entry
+              VPhoto(T(s, "And it's built", 2.6), U("15"), ((0.5, 0.6), (0.4, 0.6)), (1.05, 1.18)),
+              VPhoto(t_watch, U("23"), ((0.45, 0.55), (0.55, 0.55)), (1.0, 1.15)),     # Verstappen v Hamilton through Turn 1
+              VPhoto(t_count, U("09"), ((0.4, 0.5), (0.55, 0.5)), (1.0, 1.15))]        # side by side
     ov = [Pop(0, ["THE CORNER", "YOU CAN'T SEE"], t_aus - 0.2, y=280, size=110),
-          Tag(t_aus + 0.3, "LOOKING DOWN FROM TURN 1", sub="CIRCUIT OF THE AMERICAS  ·  AUSTIN", dur=t_cl - t_aus - 0.4),
+          Tag(t_see + 0.2, "TURN 1", sub="CIRCUIT OF THE AMERICAS  ·  AUSTIN", dur=t_aus - t_see - 0.3),
+          Tag(t_cl + 0.2, "LOOKING DOWN FROM TURN 1", sub="THE CLIMB FROM THE START LINE", dur=t_ten - t_cl - 0.3),
           Pop(t_aim, ["AIM AT A POINT", "YOU CAN'T SEE"], t_wide - t_aim - 0.1, y=280, size=96),
           Pop(t_wide, ["BUILT WIDE", "ON PURPOSE"], t_watch - t_wide - 0.1, y=280, size=110),
           Pop(t_watch, ["WATCH THE START", "ON SUNDAY"], 99, y=280, size=100)]
-    return dict(n=1, name="F1-7 The corner drivers can't see", s=s, scenes=scenes, ov=ov, line="OMNIRA F1  ·  EXPLAINED",
+    return dict(n=1, name="F1-7 The corner drivers can't see (Malachi)", s=s, scenes=scenes, ov=ov, line="OMNIRA F1  ·  EXPLAINED",
                 slate=("Count the places at Turn 1 on Sunday.", "FOLLOW FOR MORE F1, EXPLAINED"), music=[MUS + "Energetic/ANBR - Seasons.mp3"])
 
 # ================================================================ F1-8: the race with six cars
 def countdown(t0):
     """20 grid dots; 14 go grey, the number falls to 6."""
     def fn(t, dur):
-        cv = Canvas(INDY, 0.74); d = ImageDraw.Draw(cv.L); a = ramp(t, 0, 0.3)
+        cv = Canvas(PAGODA, 0.74); d = ImageDraw.Draw(cv.L); a = ramp(t, 0, 0.3)
         g = ease(ramp(t, 1.0, 2.6)); n = 20 - round(14 * g)
         for i in range(20):
             c, r = i % 2, i // 2; x, y = 330 + c * 420 + (60 if c else 0), 640 + r * 48
@@ -166,7 +193,7 @@ def countdown(t0):
 def tyres():
     """Who used which tyres: 14 Michelin cars, 6 Bridgestone."""
     def fn(t, dur):
-        cv = Canvas(MICH, 0.72); d = ImageDraw.Draw(cv.L)
+        cv = Canvas(MTYRE, 0.72); d = ImageDraw.Draw(cv.L)
         title(d, 600, "2005  ·  WHO MADE THE TYRES", ramp(t, 0, 0.3), 42)
         for i, (n, cars, teams, col, k) in enumerate((("MICHELIN", 14, "7 TEAMS", MICH_BLUE, 0.2), ("BRIDGESTONE", 6, "FERRARI · JORDAN · MINARDI", BRIDGE, 0.9))):
             p = ramp(t, k, k + 0.35)
@@ -183,7 +210,7 @@ def tyres():
 def pits():
     """All twenty on the formation lap, then fourteen peel off into the pit lane."""
     def fn(t, dur):
-        cv = Canvas(R25, 0.74); d = ImageDraw.Draw(cv.L); a = ramp(t, 0, 0.3)
+        cv = Canvas(CARTS, 0.74); d = ImageDraw.Draw(cv.L); a = ramp(t, 0, 0.3)
         title(d, 600, "AFTER THE FORMATION LAP", a, 44)
         d.rounded_rectangle((90, 1090, 990, 1250), 20, outline=rgba(GOLD, a), width=4, fill=rgba(NAVY_D, 0.6 * a))
         tracked(d, (SW / 2, 1262), "PIT LANE", cond(40, 8), rgba(GOLD, a), 8, "center")
@@ -200,28 +227,42 @@ def pits():
 
 def short_indy():
     s = section(1)
-    t_ind, t_prac, t_mich, t_none, t_sun, t_14, t_six, t_boo, t_ms, t_mon, t_two = (T(s, x) for x in ("Indianapolis, 2005", "In practice", "Michelin, who",
-        "And they had no", "So on Sunday", "Then fourteen", "Six cars raced", "The crowd booed", "Michael Schumacher won", "And a Jordan", "Two years later"))
+    t_ind, t_usgp, t_prac, t_mich, t_none, t_sun, t_14, t_six, t_boo, t_bot, t_ms, t_mon, t_pod, t_two = (T(s, x) for x in ("Indianapolis, 2005",
+        "The United States", "In practice", "Michelin, who", "And they had no", "So on Sunday", "Then fourteen", "Six cars raced", "The crowd booed",
+        "Some threw", "Michael Schumacher won", "And a Jordan", "The only podium", "Two years later"))
+    t_fer, t_jor, t_min = (W(s, "Two Ferraris", w, -0.1) for w in ("Ferraris", "Jordans", "Minardis"))
     scenes = [VGraphic(0, countdown(0)),
-              VPhoto(t_ind, INDY, ((0.45, 0.5), (0.6, 0.5)), (1.0, 1.12)),
-              VPhoto(t_prac, R25, ((0.5, 0.5), (0.5, 0.45)), (1.0, 1.15)),
-              VGraphic(t_mich - 0.1, tyres()),
+              VPhoto(t_ind, PAGODA, ((0.5, 0.3), (0.5, 0.4)), (1.0, 1.1)),                # the Pagoda
+              VPhoto(t_usgp, GATE, ((0.5, 0.35), (0.5, 0.4)), (1.0, 1.12)),               # the speedway gate
+              VPhoto(t_prac, CRASH, ((0.45, 0.45), (0.5, 0.45)), (1.0, 1.15)),            # AI: the Toyota in the banking
+              VPhoto(t_mich, MTYRE, ((0.5, 0.5), (0.55, 0.5)), (1.0, 1.15)),
+              VGraphic(T(s, "Michelin, who", 3.0), tyres()),
+              VPhoto(t_none, CARTS, ((0.5, 0.5), (0.5, 0.45)), (1.0, 1.12)),
               VGraphic(t_sun - 0.1, pits()),
-              VPhoto(t_six, MSC, ((0.5, 0.45), (0.55, 0.45)), (1.0, 1.12)),
-              VPhoto(t_boo, INDY, ((0.7, 0.5), (0.4, 0.5)), (1.1, 1.2)),
-              VPhoto(t_ms, MSC_W, ((0.5, 0.4), (0.5, 0.35)), (1.0, 1.1)),
+              VPhoto(t_six, GRID6, ((0.5, 0.6), (0.6, 0.65)), (1.0, 1.12)),              # AI: the six-car grid
+              VPhoto(t_fer, RUB, ((0.5, 0.5), (0.5, 0.5)), (1.05, 1.15)),
+              VPhoto(t_jor, JLOCK, ((0.5, 0.5), (0.45, 0.5)), (1.05, 1.15)),
+              VPhoto(t_min, MINARDI, ((0.5, 0.6), (0.5, 0.55)), (1.0, 1.1)),
+              VPhoto(t_boo, MOSLEY, ((0.5, 0.4), (0.5, 0.35)), (1.0, 1.1)),                # fans' banners that day
+              VPhoto(t_bot, BERNIE, ((0.5, 0.4), (0.5, 0.35)), (1.0, 1.12)),
+              VPhoto(t_ms, MSC_W, ((0.5, 0.35), (0.5, 0.3)), (1.0, 1.1)),
               VPhoto(t_mon, MONT, ((0.45, 0.5), (0.55, 0.5)), (1.0, 1.12)),
-              VPhoto(t_two, INDY, ((0.3, 0.5), (0.5, 0.5)), (1.05, 1.18))]
+              VPhoto(t_pod, RESULT, ((0.5, 0.35), (0.5, 0.3)), (1.0, 1.15)),             # the scoreboard pylon
+              VPhoto(t_two, IMS_AIR, ((0.5, 0.5), (0.45, 0.5)), (1.0, 1.15))]
     ov = [Pop(0, ["ONLY SIX CARS", "STARTED"], t_ind - 0.2, y=280, size=110),
-          Tag(t_ind + 0.3, "UNITED STATES GRAND PRIX", sub="INDIANAPOLIS  ·  19 JUNE 2005", dur=t_prac - t_ind - 0.4),
-          Pop(t_prac, ["FRIDAY: A BIG CRASH", "IN THE BANKING"], t_mich - t_prac - 0.1, y=280, size=88),
+          Tag(t_ind + 0.2, "INDIANAPOLIS", sub="19 JUNE 2005", dur=t_usgp - t_ind - 0.3),
+          Tag(t_usgp + 0.2, "UNITED STATES GRAND PRIX", sub="INDIANAPOLIS MOTOR SPEEDWAY", dur=t_prac - t_usgp - 0.3),
+          Tag(t_prac + 0.4, "RALF SCHUMACHER  ·  TOYOTA", sub="FRIDAY PRACTICE  ·  TURN 13", dur=t_mich - t_prac - 0.5),
           Stamp(t_none + 0.3, "NO SAFE TYRE", (SW / 2, 400), t_sun - t_none - 0.4, 100),
-          Pop(t_six, ["2 FERRARIS · 2 JORDANS", "2 MINARDIS"], t_boo - t_six - 0.1, y=280, size=76),
-          Stamp(t_boo + 0.2, "BOOED", (SW / 2, 820), t_ms - t_boo - 0.3, 130),
-          Tag(t_ms + 0.3, "MICHAEL SCHUMACHER", sub="WINNER  ·  FERRARI", dur=t_mon - t_ms - 0.4),
-          Tag(t_mon + 0.3, "TIAGO MONTEIRO", sub="3RD  ·  JORDAN  ·  HIS ONLY PODIUM", dur=t_two - t_mon - 0.4),
+          Pop(t_six, ["SIX CARS", "RACED"], t_fer - t_six - 0.1, y=280, size=110),
+          Tag(t_fer + 0.1, "2 FERRARIS", dur=t_jor - t_fer - 0.1), Tag(t_jor + 0.1, "2 JORDANS", dur=t_min - t_jor - 0.1),
+          Tag(t_min + 0.1, "2 MINARDIS", dur=t_boo - t_min - 0.2),
+          Stamp(t_boo + 0.2, "BOOED", (SW / 2, 400), t_bot - t_boo - 0.2, 120),
+          Tag(t_ms + 0.2, "MICHAEL SCHUMACHER", sub="WINNER  ·  FERRARI", dur=t_mon - t_ms - 0.3),
+          Tag(t_mon + 0.3, "TIAGO MONTEIRO", sub="3RD  ·  JORDAN", dur=t_pod - t_mon - 0.4),
+          Pop(t_pod, ["HIS ONLY", "F1 PODIUM"], t_two - t_pod - 0.1, y=280, size=110),
           Pop(t_two, ["LAST F1 RACE", "AT INDY: 2007"], 99, y=280, size=100)]
-    return dict(n=2, name="F1-8 The race with only six cars", s=s, scenes=scenes, ov=ov, line="OMNIRA F1  ·  DID YOU KNOW?",
+    return dict(n=2, name="F1-8 The race with only six cars v2", s=s, scenes=scenes, ov=ov, line="OMNIRA F1  ·  DID YOU KNOW?",
                 slate=("Should it have gone ahead with six cars?", "FOLLOW FOR MORE F1 STORIES"), music=[MUS + "Energetic/LaFaye - Hidden.mp3"])
 
 # ================================================================ F1-9: Surtees, on this day
@@ -262,51 +303,60 @@ def standings(bg, rows, head, t0, chip_at=None, chip_txt=""):
         return cv.done()
     return fn
 
-def livery():
-    """Red crossed out, blue and white in."""
+def trio(t0):
+    """Three title contenders side by side: Surtees, Hill, Clark."""
+    rows = [(S56C, "SURTEES", "FERRARI", FERRARI, 0.0), (HILLP, "HILL", "BRM", GREEN, 0.35), (CLARKP, "CLARK", "LOTUS", (240, 200, 60), 0.7)]
     def fn(t, dur):
-        cv = Canvas(F158, 0.7); d = ImageDraw.Draw(cv.L)
-        title(d, 600, "FERRARI  ·  MEXICO 1964", ramp(t, 0, 0.3), 46)
-        a = ramp(t, 0.2, 0.5)
-        d.rounded_rectangle((150, 740, 470, 1060), 24, fill=rgba(FERRARI, a), outline=rgba(CREAM, a), width=4)
-        x = ramp(t, 0.8, 1.1)
-        if x:
-            d.line([(170, 760), (170 + 280 * x, 760 + 280 * x)], fill=rgba(CREAM, x), width=16)
-            d.line([(450, 760), (450 - 280 * x, 760 + 280 * x)], fill=rgba(CREAM, x), width=16)
-        b = ramp(t, 1.4, 1.8)
-        if b:
-            d.rounded_rectangle((610, 740, 930, 1060), 24, fill=rgba(WHITE, b), outline=rgba(CREAM, b), width=4)
-            d.rounded_rectangle((610, 740, 770, 1060), 24, fill=rgba(NART_BLUE, b))
-            d.rectangle((740, 740, 770, 1060), fill=rgba(NART_BLUE, b))
-        tracked(d, (310, 1090), "RED", cond(40, 8), rgba(CREAM, a), 8, "center")
-        tracked(d, (770, 1090), "BLUE + WHITE", cond(40, 8), rgba(CREAM, b), 8, "center")
-        c = ramp(t, 2.4, 2.8)
-        if c: chip(d, (SW / 2, 1300), "NORTH AMERICAN RACING TEAM", c, GOLD, 48)
+        cv = Canvas(START64, 0.78); d = ImageDraw.Draw(cv.L)
+        title(d, 600, "THREE COULD WIN IT", ramp(t, 0, 0.3), 46)
+        for i, (path, n, team, col, k) in enumerate(rows):
+            p = ramp(t, k, k + 0.4)
+            if not p: continue
+            x0 = 60 + i * 330; w, h = 300, 400
+            im = Image.open(path).convert("RGB"); sc = max(w / im.width, h / im.height)
+            im = im.resize((int(im.width * sc), int(im.height * sc)))
+            im = im.crop(((im.width - w) // 2, int((im.height - h) * 0.2), (im.width - w) // 2 + w, int((im.height - h) * 0.2) + h)).convert("RGBA")
+            im.putalpha(int(255 * p)); cv.L.alpha_composite(im, (x0, 700))
+            d.rectangle((x0, 1100, x0 + w, 1110), fill=rgba(col, p))
+            centred(d, (x0 + w / 2, 1160), n, cond(52, 8), rgba(CREAM, p))
+            centred(d, (x0 + w / 2, 1220), team, cond(34, 8), rgba(col, p))
         return cv.done()
     return fn
 
 def short_surtees():
     s = section(2)
-    t_js, t_now, t_three, t_hill, t_clark, t_tm, t_red, t_enzo, t_61 = (T(s, x) for x in ("John Surtees had", "Now, at the last", "Three drivers",
-        "Hill was knocked", "Then Clark", "And the team-mate", "Oh, and his", "Enzo Ferrari", "Sixty-one years on"))
+    t_js, t_now, t_three, t_names, t_hill, t_clark, t_tm, t_one, t_red, t_bw, t_enzo, t_61 = (T(s, x) for x in ("John Surtees had", "Now, at the last",
+        "Three drivers", "Surtees, Graham", "Hill was knocked", "Then Clark", "And the team-mate", "Enough to win", "Oh, and his", "It was blue",
+        "Enzo Ferrari", "Sixty-one years on"))
     before = [("HILL", "BRM", 39, GREEN, 0.2), ("SURTEES", "FERRARI", 34, FERRARI, 0.6), ("CLARK", "LOTUS", 30, (240, 200, 60), 1.0)]
     after = [("SURTEES", "FERRARI", 40, FERRARI, 0.2), ("HILL", "BRM", 39, GREEN, 0.5)]
-    scenes = [VPhoto(0, SMV, ((0.5, 0.45), (0.55, 0.45)), (1.0, 1.15)),
-              VGraphic(t_js - 0.1, titles()),
-              VPhoto(t_now, S64, ((0.5, 0.45), (0.5, 0.4)), (1.0, 1.12)),
+    scenes = [VPhoto(0, SMV, ((0.5, 0.45), (0.55, 0.45)), (1.0, 1.15)),                 # on the MV Agusta
+              VPhoto(t_js, S56C, ((0.5, 0.3), (0.5, 0.25)), (1.0, 1.08)),                # the man himself
+              VGraphic(T(s, "John Surtees had", 1.8), titles()),
+              VPhoto(t_now, SNEW, ((0.5, 0.3), (0.5, 0.25)), (1.0, 1.08)),               # with his new Ferrari, 1964
               VGraphic(t_three - 0.1, standings(START64, before, "BEFORE THE LAST RACE", 0)),
-              VPhoto(t_hill, START64, ((0.5, 0.5), (0.45, 0.5)), (1.05, 1.18)),
+              VGraphic(t_names - 0.1, trio(0)),
+              VPhoto(t_hill, HILLBRM, ((0.5, 0.4), (0.55, 0.4)), (1.0, 1.1)),            # Hill in his BRM
               VPhoto(t_clark, CLARK, ((0.5, 0.5), (0.55, 0.5)), (1.0, 1.15)),
-              VGraphic(t_tm - 0.1, standings(S64, after, "FINAL STANDINGS  ·  1964", 0, 1.4, "BY ONE POINT")),
-              VGraphic(t_red - 0.1, livery()),
-              VPhoto(t_61, F158G, ((0.5, 0.5), (0.5, 0.45)), (1.0, 1.12))]
+              VPhoto(t_tm, S64, ((0.5, 0.45), (0.5, 0.4)), (1.0, 1.12)),
+              VGraphic(t_one - 0.1, standings(S64, after, "FINAL STANDINGS  ·  1964", 0, 1.0, "BY ONE POINT")),
+              VPhoto(t_red, F158, ((0.5, 0.5), (0.5, 0.5)), (1.0, 1.1)),                 # the red 158
+              VPhoto(t_bw, NART, ((0.5, 0.55), (0.55, 0.55)), (1.0, 1.12)),              # AI: blue and white in Mexico
+              VPhoto(t_enzo, ENZO, ((0.5, 0.3), (0.5, 0.25)), (1.0, 1.08)),
+              VPhoto(t_61, S2011, ((0.5, 0.3), (0.5, 0.25)), (1.0, 1.08)),               # Surtees at Goodwood, 2011
+              VPhoto(T(s, "Sixty-one years on", 3.2), F158G, ((0.5, 0.5), (0.55, 0.5)), (1.0, 1.1))]
     ov = [Pop(0, ["25 OCTOBER", "1964"], t_js - 0.2, y=280, size=120),
-          Tag(t_now + 0.3, "JOHN SURTEES", sub="FERRARI  ·  1964", dur=t_three - t_now - 0.4),
-          Stamp(t_hill + 0.6, "HILL: HIT FROM BEHIND", (SW / 2, 1220), t_clark - t_hill - 0.7, 76),
-          Stamp(t_clark + 0.6, "CLARK: ENGINE GONE", (SW / 2, 1220), t_tm - t_clark - 0.7, 80, rot=7),
-          Pop(t_enzo, ["ENZO v THE", "ITALIAN AUTHORITIES"], t_61 - t_enzo - 0.1, y=280, size=80),
+          Tag(t_js + 0.2, "JOHN SURTEES", sub="MOTORBIKE WORLD CHAMPION", dur=1.5),
+          Tag(t_now + 0.3, "JOHN SURTEES", sub="WITH HIS FERRARI  ·  1964", dur=t_three - t_now - 0.4),
+          Tag(t_hill + 0.2, "GRAHAM HILL", sub="BRM", dur=1.2),
+          Stamp(t_hill + 1.5, "HIT FROM BEHIND", (SW / 2, 400), t_clark - t_hill - 1.6, 84),
+          Tag(t_clark + 0.2, "JIM CLARK", sub="LOTUS  ·  LEADING", dur=1.2),
+          Stamp(t_clark + 1.5, "ENGINE GONE", (SW / 2, 400), t_tm - t_clark - 1.6, 90, rot=7),
+          Pop(t_red, ["NOT RED..."], t_bw - t_red - 0.1, y=280, size=120),
+          Pop(t_bw, ["BLUE AND WHITE"], t_enzo - t_bw - 0.1, y=280, size=110),
+          Tag(t_enzo + 0.2, "ENZO FERRARI", sub="FELL OUT WITH ITALY'S RACING AUTHORITIES", dur=t_61 - t_enzo - 0.3),
           Pop(t_61, ["CHAMPION ON TWO", "WHEELS AND FOUR"], 99, y=280, size=90)]
-    return dict(n=3, name="F1-9 Surtees, champion on two wheels and four", s=s, scenes=scenes, ov=ov, line="OMNIRA F1  ·  ON THIS DAY",
+    return dict(n=3, name="F1-9 Surtees, champion on two wheels and four (Tom)", s=s, scenes=scenes, ov=ov, line="OMNIRA F1  ·  ON THIS DAY",
                 slate=("Which MotoGP rider would you put in an F1 car?", "FOLLOW FOR MORE F1 STORIES"), music=[MUS + "Energetic/ANBR - Seasons.mp3"])
 
 ALL = [short_cota, short_indy, short_surtees]

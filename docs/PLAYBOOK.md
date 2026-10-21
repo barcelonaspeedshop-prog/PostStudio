@@ -79,3 +79,10 @@ Brawn v2 and Istanbul v2 are the reference videos. Every long video follows this
 - Sound design under key moments (crowd swell, a whistle, a camera shutter on photos), very low under the voice.
 - Real 2005-era TV graphics style for scorelines in football stories.
 - A recurring end-of-episode "what if" poll in the YouTube community tab, to feed comments.
+
+
+## Pictures follow the narration (Mike, 21 Oct 2026)
+- Before building, write the shot list line by line: the place when the place is named, the person when the person is named, the event when it's told, each car or team as it's listed.
+- No photo twice in a Short. A Short about a corner shows cars in that corner, right to the last shot.
+- If Commons has nothing that fits, make an AI still at once (real people and faces are fine) or ask Mike to find one.
+- Search Commons categories ("Category:2005 United States Grand Prix"), not just keywords: the event categories hold the best matches.
