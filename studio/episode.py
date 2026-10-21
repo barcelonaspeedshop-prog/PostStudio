@@ -143,7 +143,7 @@ def banned_end(this):
             tracked(d, (W / 2, 858), "SUBSCRIBE", cond(44, 3), rgba(CREAM, s_), 8, "center")
     return draw
 
-IMP_EPISODES = [("Brawn GP.", "THE TEAM BOUGHT FOR £1"), ("Istanbul.", "3–0 DOWN AT HALF-TIME"), ("McLaren F1.", "THE ROAD CAR THAT WON LE MANS")]
+IMP_EPISODES = [("Brawn GP.", "THE TEAM BOUGHT FOR £1"), ("Istanbul.", "3–0 DOWN AT HALF-TIME"), ("McLaren F1.", "THE ROAD CAR THAT WON LE MANS"), ("Leicester.", "5000–1")]
 def impossible_end(this):
     """IMPOSSIBLE end card: the mark, the tagline, the other episodes, then the subscribe button."""
     others = [e for e in IMP_EPISODES if e[0] != this][:3]
@@ -252,6 +252,47 @@ def gof_sfx(path, length=5.0, sr=48000):
     return path
 
 # ---------------------------------------------------------------- render + mix
+MIN_SHOT = 1.5          # Mike 10-21: a picture up for less than this reads as a glitch
+
+def shot_check(scenes, out):
+    """The picture-to-narration check for a long video (Mike 10-21), like vshort.shot_check: one row per scene with a frame
+    from its middle, its time in the video, how long it's up, the words said over it, flagged red under MIN_SHOT.
+    Word times are spread evenly across each sentence (good to a word or two). Returns the flagged rows."""
+    scenes = sorted([s for s in scenes if s is not None], key=lambda s: s.start)
+    end = vt(SENTS[-1]["out_end"]) + 3.0
+    for a, b in zip(scenes, scenes[1:]): a.dur = b.start - a.start
+    scenes[-1].dur = end - scenes[-1].start
+    words = []
+    for e in SENTS:
+        ws = e["text"].split(); a, b = vt(e["out_start"]), vt(e["out_end"])
+        words += [(a + (b - a) * i / max(1, len(ws)), w) for i, w in enumerate(ws)]
+    def name(s):
+        p = getattr(s, "path", None) or getattr(getattr(s, "bgfn", None), "__name__", "")
+        if p: return os.path.splitext(os.path.basename(p))[0].replace("_", " ")[:80]
+        fn = getattr(s, "draw", None) or getattr(s, "fn", None)
+        return "graphic: " + (getattr(fn, "__qualname__", "?").split(".")[0] if fn else type(s).__name__)
+    def mmss(t): return f"{int(t // 60)}:{t % 60:04.1f}"
+    Wd, Hr = 1500, 230; rows, flagged = [], []
+    for k, s in enumerate(scenes):
+        a, b = s.start, s.start + s.dur
+        said = " ".join(w for t, w in words if a - XFADE / 2 <= t < b - XFADE / 2)
+        short = s.dur < MIN_SHOT
+        th = frame_at(scenes, a + s.dur / 2).convert("RGB").resize((320, 180))
+        rows.append((k + 1, mmss(a), mmss(b), s.dur, name(s), said, short, th))
+        if short: flagged.append(f"#{k + 1} {mmss(a)} {s.dur:.1f}s {name(s)}")
+    sheet = Image.new("RGB", (Wd, Hr * len(rows) + 80), (245, 242, 235)); d = ImageDraw.Draw(sheet)
+    d.text((20, 22), f"SHOT CHECK  ·  {os.path.basename(STORY.rstrip('/'))}  ·  red = under {MIN_SHOT}s on screen", font=cond(38, 8), fill=NAVY_D)
+    for i, (n, ta, tb, du, nm, said, short, th) in enumerate(rows):
+        y = 80 + i * Hr
+        if short: d.rectangle((0, y, Wd, y + Hr - 6), fill=(250, 214, 214))
+        sheet.paste(th, (16, y + 20))
+        x = 360; d.text((x, y + 14), f"#{n}   {ta} – {tb}   ({du:.1f} s){'   TOO SHORT' if short else ''}", font=cond(36, 8), fill=RED if short else NAVY_D)
+        d.text((x, y + 62), nm, font=cond(28, 2), fill=(70, 70, 70))
+        for j, ln in enumerate(wrap("SAID: " + (said or "(nothing)"), cond(30, 2), Wd - x - 30)[:3]):
+            d.text((x, y + 104 + j * 38), ln, font=cond(30, 2), fill=(20, 20, 20))
+    os.makedirs(os.path.dirname(out), exist_ok=True); sheet.save(out, quality=82)
+    return flagged
+
 def main(scenes, final, music_gain=0.35):
     scenes = [x for x in scenes if x is not None]
     os.makedirs(OUT, exist_ok=True)
