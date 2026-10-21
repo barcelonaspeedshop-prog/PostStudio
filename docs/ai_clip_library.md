@@ -35,4 +35,6 @@ How each clip is made: a still start frame first (cheap, about 20 credits, check
 | 21 Oct | Hazard curler #2 | gen-4-turbo, start frame, "moving to the RIGHT" | 25 | Ball went past the top of the bar |
 | 21 Oct | Hazard curler #3 | seedance-2-mini, start + end frame | 75 | Net bulged but the ball passed OUTSIDE the near post (0.4-0.7 s); Hazard's shirt became No. 9. Missed by 1-fps check |
 | 21 Oct | Hazard, players only (ball removed) | gen-4-turbo | 25 | People morphed; the hand-animated ball over it looked like a comic (Mike) |
-| next | Hazard curler #4 | seedance-2.5 draft 480p, start + end frame, path stated as "between the posts, under the bar" | ~100 draft | to try; enhance to 1080p only if the 10-fps check passes |
+| 21 Oct | Hazard curler #4 | seedance-2.5 draft 480p, 4 s, start + end frame, path spelled out ("between the posts, under the bar, never above") | 80 | FAIL at 0.8-1.5 s: ball goes over the bar and out of frame, then pops up in the net at 3.5 s (the end frame forcing it). Not finished |
+
+**What the four Hazard attempts teach:** from a side-on angle with the goal at the frame's edge, every model loses the ball near the frame edge and the crossbar. Next time, set the shot up so it can't: start still from BEHIND the shooter (or behind the goal), goal in the middle of the frame with space round it, ball path fully inside the picture; shorter path (ball already near the goal at frame 1); 3 s clips. Draft that first.
