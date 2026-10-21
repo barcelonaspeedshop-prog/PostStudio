@@ -262,7 +262,7 @@ def short_indy():
           Tag(t_mon + 0.3, "TIAGO MONTEIRO", sub="3RD  ·  JORDAN", dur=t_pod - t_mon - 0.4),
           Pop(t_pod, ["HIS ONLY", "F1 PODIUM"], t_two - t_pod - 0.1, y=280, size=110),
           Pop(t_two, ["LAST F1 RACE", "AT INDY: 2007"], 99, y=280, size=100)]
-    return dict(n=2, name="F1-8 The race with only six cars v2", s=s, scenes=scenes, ov=ov, line="OMNIRA F1  ·  DID YOU KNOW?",
+    return dict(n=2, name="F1-8 The race with only six cars (Malachi)", s=s, scenes=scenes, ov=ov, line="OMNIRA F1  ·  DID YOU KNOW?",
                 slate=("Should it have gone ahead with six cars?", "FOLLOW FOR MORE F1 STORIES"), music=[MUS + "Energetic/LaFaye - Hidden.mp3"])
 
 # ================================================================ F1-9: Surtees, on this day

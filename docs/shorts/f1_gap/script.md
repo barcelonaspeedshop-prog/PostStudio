@@ -52,7 +52,7 @@ Watch the start on Sunday. Count how many places change at the top of the hill.
 
 ---
 
-## F1-8. The race with six cars (Did you know · voice: Kirk)
+## F1-8. The race with six cars (Did you know · voice: Malachi)
 
 **Facts, checked 21 Oct:** United States Grand Prix, Indianapolis, 19 June 2005. Michelin found its tyres could fail through the banked Turn 13 after Ralf Schumacher's crash in Friday practice. The 14 Michelin cars pulled into the pits after the formation lap; only the 6 Bridgestone cars (Ferrari, Jordan, Minardi) raced. Michael Schumacher won from Rubens Barrichello; Tiago Monteiro (Jordan) was third, his only F1 podium. The crowd booed. Indianapolis held its last F1 race in 2007. Sources: Wikipedia, Motorsport Magazine, RaceFans, Autosport.
 
