@@ -13,12 +13,12 @@ import math, os, sys
 VDIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(VDIR, "..", "..", "..", "studio"))
 import episode as E
-E.init("/Volumes/PostDrive/Stories/Omnira F1/02 Superclipping/", series="f1", narration="audio/v2/")
+E.init("/Volumes/PostDrive/Stories/Omnira F1/02 Superclipping/", series="f1", narration="audio/v3/")   # v3 = one continuous take (Mike 21 Oct: separately voiced sections changed voice)
 from episode import *
 from factcard import FactCard
 E.AI_RATE = 0.6                                                               # AI clips at 60% speed (Mike 20 Oct)
 
-FINAL = "F1 Explained - Superclipping v3.mp4"
+FINAL = "F1 Explained - Superclipping v4.mp4"
 # Mike 21 Oct: an F1 engine sound under the engine-note graphic. Runway SFX (audio/sfx): rises for 1.5 s, full revs to
 # ~3.6 s, then the note drops away by ~5.5 s, so the drop lands on "If it drops away".
 ENGINE, ENGINE_DROP = E.STORY + "audio/sfx/engine_note_fade.mp3", 3.6
