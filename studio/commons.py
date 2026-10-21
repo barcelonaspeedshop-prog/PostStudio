@@ -3,7 +3,7 @@
     python studio/commons.py search "Michael Schumacher 2010 Mercedes" [n]
     python studio/commons.py get "File:Michael_Schumacher_Hockenheim_2010.jpg" "Schumacher 2010" ".../media/commons/"
 
-`get` downloads a 2400 px copy into the folder and adds author / licence / url / query to its credits.json
+`get` downloads a 1920 px copy (a standard thumbnail width: Commons refuses odd sizes with 429 since Oct 2026) into the folder and adds author / licence / url / query to its credits.json
 (the query is what build.py's CP(snip, query) looks up). Only free licences (CC BY, CC BY-SA, CC0, public domain).
 """
 import json, os, re, sys, time, urllib.error, urllib.parse, urllib.request
@@ -27,7 +27,7 @@ def api(**p):
 def clean(html): return re.sub(r"<[^>]+>", "", html or "").strip()
 
 def info(titles):
-    r = api(action="query", titles="|".join(titles), prop="imageinfo", iiprop="url|size|extmetadata", iiurlwidth=2400)
+    r = api(action="query", titles="|".join(titles), prop="imageinfo", iiprop="url|size|extmetadata", iiurlwidth=1920)
     out = []
     for pg in r.get("query", {}).get("pages", {}).values():
         if "imageinfo" not in pg: continue
