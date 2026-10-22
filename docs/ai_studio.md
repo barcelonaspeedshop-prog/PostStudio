@@ -82,3 +82,13 @@ Settings note: the connector resolves "High 2K" GPT Image 2.5 to medium 1K and S
 | Veo 3.1 Lite | 400 | 720p, 4 s, silent | PASS but plain: barely moves. Fine for background, 720p only |
 
 No morphing at 10 fps on any of the four: a parked car with walkers is an easy shot. **Lesson:** for realistic street/period scenes, any premium model works, so pick on price and resolution. **Veo 3.1 is the value pick** (1080p, 1,000 cr). Pay for Luma only when we want a real camera move. The hard tests (fast cars, ball physics, people's faces up close) are where the models will separate.
+
+**22 Oct, hard test: racing car at speed (4,740 credits incl. start still).** Start still: GPT Image 2.5 Flare High 2K (140 cr), a red late-60s single-seater with a white 7 at a corner apex, no logos (library: motorsport/1960s-f1, reusable). Prompt: car sweeps past camera, camera pans to follow, one continuous shot. Side-by-side: PostDrive/Library/_shootouts/2026-10-22_f1_corner_clips_compare.mp4.
+
+| Model | Credits | Result |
+|---|---|---|
+| **Kling 4.0** | 1,375 | **WINNER.** One continuous move: the car comes at the camera, sweeps past, and the camera swings round to follow it away down the straight. Real race-film feel. The car gains detail as it turns (side vents, side roundel) but stays the same car. 1080p |
+| Veo 3.1 | 1,000 | PASS. Clean side-on tracking pan, the classic TV shot. The nose shape drifts slightly (wide intake turns pointed). 1080p. Good value |
+| Luma Ray 3.2 | 2,225 | WEAK. Steady, no morphing, but the car crawls towards the camera: not racing speed. 720p and the dearest |
+
+**Lesson:** for motion, Kling 4.0 leads; Veo 3.1 is the cheaper safe option; Luma is for slow cinematic moves only (E-Type test), not speed. House picks so far: **stills = GPT Image 2.5 Flare; slow/period scenes = Veo 3.1; speed and action = Kling 4.0.**
