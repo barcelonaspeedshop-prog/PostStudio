@@ -92,3 +92,12 @@ No morphing at 10 fps on any of the four: a parked car with walkers is an easy s
 | Luma Ray 3.2 | 2,225 | WEAK. Steady, no morphing, but the car crawls towards the camera: not racing speed. 720p and the dearest |
 
 **Lesson:** for motion, Kling 4.0 leads; Veo 3.1 is the cheaper safe option; Luma is for slow cinematic moves only (E-Type test), not speed. House picks so far: **stills = GPT Image 2.5 Flare; slow/period scenes = Veo 3.1; speed and action = Kling 4.0.**
+
+## How we work (from 22 Oct)
+
+"Unlimited" models are free in the Artlist website but charged through the Claude connector (Nano Banana 2: 0 credits in the website, 130 through Claude). So:
+
+1. **Claude** writes the shot list and prompts (model, settings, start frame).
+2. **Mike** generates the unlimited-model shots in the Artlist website and drops the files in `PostDrive/Library/_inbox`.
+3. **Claude** frame-checks them, files them in the library (0 credits) and flags any re-dos.
+4. **Credits through Claude** only for premium shots no unlimited model can do: action (Kling 4.0), period realism (Veo 3.1), hero stills (GPT Image 2.5).
