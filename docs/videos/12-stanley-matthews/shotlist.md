@@ -120,3 +120,8 @@ Rough cuts in `media/ai/goals_v2/`: **Freekick_rough.mp4** (12 s) and **Winner_r
 ### Goals v2 with drawn ball + sound (22 Oct): `goals_v2/Freekick_v2.mp4` (8.8 s), `goals_v2/Winner_v2.mp4` (16 s)
 - Ball and flight streak drawn by `studio/ball_overlay.py` (no credits). Free-kick: the ball leads the flying camera, curls right of the wall into the top corner (tracked right post), cut at 2.5 s before the post leaves frame, then the ball-in-the-corner shot. Winner: push-in on the frozen ball's-eye still, real ball painted out, drawn ball skims under the sliding defender's hand into the bottom corner.
 - Sound (Artlist SFX, now in Library/sound/sfx): crowd anticipation into goal roar timed to the ball hitting the net, kick thud on contact, whoosh on the flight, big cheer layered after. "AI reconstruction" label bottom left.
+
+### Goals v3 (22 Oct, Mike's rule): AI video to the strike, then a drawn moving-camera graphic only
+- `goals_v2/Freekick_v3.mp4` (10.1 s): FK1 set-up + FK2 run-up to just before contact, 0.25 s dissolve, then `goals_graphic.py fk`: graphic kicker strikes, drone camera follows the ball past the wall into the top corner (keeper left standing), pull back wide, "MORTENSEN · 89' · 3–3".
+- `goals_v2/Winner_v3.mp4` (10.05 s): P1a cut-back video, dissolve, then `goals_graphic.py win`: ball rolls back just behind Mortensen to Perry, camera swings behind Perry, follows the low shot past the diving keeper, pull back wide showing the pass (cream) and shot (gold), "PERRY · 90+2' · 4–3".
+- v2 (drawn ball over AI footage) rejected by Mike: "really bad".
