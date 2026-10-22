@@ -110,3 +110,13 @@ Brawn v2 and Istanbul v2 are the reference videos. Every long video follows this
 - Scoreboards and timing screens recreated in the era's style (AI background, our numbers).
 - Backgrounds and textures are made free in the Artlist website and filed in the Library under `graphics/` so every video can reuse them.
 - Long features run in chapters (title card + one-line hook + matching YouTube chapters), so a 14–20 minute film feels like episodes.
+
+## AI video: what it is for (Mike, 22 Oct 2026)
+
+AI video must follow the narration to the end and add to the story; a clip that looks wrong cheapens the film.
+Tested 22 Oct on Matthews: 14 of 16 free atmosphere clips worked first time; both paid match-action clips failed (ball moved before the kick, scene morphed to reach the end frame).
+
+- **Use AI video for the world around the story:** crowds, streets, weather, rooms, one person doing one simple thing.
+- **Never for the key sporting moment** (a goal, a pass, a free-kick, an overtake): the models do not understand rules, cause and effect, or the ball.
+- **Key moments instead:** real archive footage or photos where we can license them, our drawn animated explainer (exact), or an AI still of the moment with a slow move, crowd sound and narration.
+- No paid video test without Mike's OK, and only for one simple motion.

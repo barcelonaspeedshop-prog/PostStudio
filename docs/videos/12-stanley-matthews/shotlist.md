@@ -59,7 +59,7 @@ Website tip: uploading a start frame from disk stopped working on 22 Oct; pick t
 
 **Premium total: about 3,300 credits.** Everything else is free.
 
-**Made 22 Oct on Kling v3 Pro, start + end frames, 1080p, 5 s, no audio: 500 each, 1,000 total (Mike approved; balance 166,401).**
+**REJECTED by Mike 22 Oct (moved to `_rejected`): clips cheapen the story. Made on Kling v3 Pro, start + end frames, 1080p, 5 s, no audio: 500 each, 1,000 total (Mike approved; balance 166,401).**
 
 | Clip | What works | Problem | Edit note |
 |---|---|---|---|
