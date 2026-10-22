@@ -125,3 +125,6 @@ Rough cuts in `media/ai/goals_v2/`: **Freekick_rough.mp4** (12 s) and **Winner_r
 - `goals_v2/Freekick_v3.mp4` (10.1 s): FK1 set-up + FK2 run-up to just before contact, 0.25 s dissolve, then `goals_graphic.py fk`: graphic kicker strikes, drone camera follows the ball past the wall into the top corner (keeper left standing), pull back wide, "MORTENSEN · 89' · 3–3".
 - `goals_v2/Winner_v3.mp4` (10.05 s): P1a cut-back video, dissolve, then `goals_graphic.py win`: ball rolls back just behind Mortensen to Perry, camera swings behind Perry, follows the low shot past the diving keeper, pull back wide showing the pass (cream) and shot (gold), "PERRY · 90+2' · 4–3".
 - v2 (drawn ball over AI footage) rejected by Mike: "really bad".
+
+### Goals, final approach (22 Oct): stills + reactions, no AI match action
+v3 graphics scrapped by Mike ("rabbit hole"). `goals_v2/Freekick_stills.mp4` (8.4 s): set-up still push-in → ball-in-the-top-corner still → F10 crowd erupts. `goals_v2/Winner_stills.mp4` (10.6 s): P1a cut-back (2.9 s) → ball-in-the-net still → F07 front room cheers → team mobs Matthews and Perry. 0.3 s dissolves, crowd/kick/roar from Library/sound/sfx, AI reconstruction label.
