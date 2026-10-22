@@ -1,5 +1,31 @@
 # Narration voices (Mike, 20 Oct 2026)
 
+## 22 Oct: ONE voice per content type (Artlist, replaces everything below)
+
+Runway voices (Kirk, Malachi, Tom and the rest) are retired; we now voice on Artlist. One voice per content type, so every channel sounds consistent. Long video and its Shorts use the same voice.
+
+| Content type | Voice (Artlist) |
+|---|---|
+| F1 tech explainers | Keen |
+| F1 classic / history | Shadow |
+| F1 modern / race news | Vision |
+| GoF classic | Gravity |
+| GoF modern | Keen |
+| GoF tech | Keen |
+| Football stories / tech | Mentor, Northern (see settings below) |
+| Football history | Boss, London (see settings below) |
+
+Settings for F1 and GoF: model **ElevenLabs Multilingual v2**, accent **British**, stability **0.6**, effect none. About 57 credits per 18-second read.
+
+Settings for Football (the accent comes from a tag at the very start of the text):
+- **Mentor:** model **Eleven v4**, accent British, stability **0.5**, text starts `[Northern English accent]`.
+- **Boss:** model **Eleven v4**, accent British, stability **0.5**, text starts `[London accent]`.
+- These models have drifted before, so Mike listens to every football read; a read that loses the accent is re-voiced. Test reads: PostDrive › voice_tests › artlist_2026-10-22. Before any full read, make a 10-second test on the real script.
+
+---
+
+*Older Runway notes, kept for history:*
+
 **21 Oct: Bernard dropped ("sounds very AI").**
 
 **21 Oct: the model changes the voice.** All the chosen samples were made on the default model (eleven_v3). On eleven_multilingual_v2 Malachi turns into an over-the-top action voice (Mike). Use the model the sample was made on unless that voice is known to drift (Kirk drifted American on v3 → Kirk on multilingual_v2). Before any full read, make a 10-second test and compare it with the sample.
