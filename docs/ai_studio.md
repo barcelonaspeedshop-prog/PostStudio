@@ -60,3 +60,14 @@ The ledger (`python3 scripts/ailib.py ledger`) shows credits by day, channel and
 ## Never stop improving
 
 After every video, add what worked and what failed to the attempt log in `docs/ai_clip_library.md`, and any lasting rule to `docs/PLAYBOOK.md`.
+
+## Shoot-out results
+
+**22 Oct, stills (2,040 credits).** Grids in PostDrive/Library/_shootouts. Order in each grid: GPT Image 2.0 · GPT Image 2.5 Flare / Nano Banana 2 · Seedream 5.0 Pro.
+
+| Test | Winner | Why | Lesson |
+|---|---|---|---|
+| E-Type, 1965 Carnaby Street | **GPT Image 2.5 Flare** (140 cr); Seedream 5.0 Pro close second (150) | Most photoreal; the car is right | GPT Image 2.0 makes 4K for 600 cr: not 4× better. Watch the signage: models write real shop names (Biba, Dandie Fashions, Lady Jane, partly real but in the wrong street) and fake plates (CAR 1965). Groups of four young men in suits come out looking like the Beatles: prompt them away. |
+| Ferrari V12 cutaway | **none passed** | All four drew an inline engine (one row of pistons), not a V12. Nano Banana 2 has the best illustration style | AI makes cutaways that look right and are wrong. Engineering diagrams need a real reference image as input (image-to-image), or we draw the structure ourselves and use AI only for finish. Next test: a reference-led V12. |
+
+Settings note: the connector resolves "High 2K" GPT Image 2.5 to medium 1K and Seedream 5 Pro to 1K. Ask for the size explicitly next time.
