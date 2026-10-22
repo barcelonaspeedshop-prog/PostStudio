@@ -17,3 +17,4 @@ docs/videos/*/audio/*.wav
 docs/videos/*/audio/*.m4a
 docs/videos/*/audio/*.mp3
 .DS_Store
+.upload/

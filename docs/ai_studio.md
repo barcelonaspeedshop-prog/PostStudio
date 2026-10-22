@@ -101,3 +101,14 @@ No morphing at 10 fps on any of the four: a parked car with walkers is an easy s
 2. **Mike** generates the unlimited-model shots in the Artlist website and drops the files in `PostDrive/Library/_inbox`.
 3. **Claude** frame-checks them, files them in the library (0 credits) and flags any re-dos.
 4. **Credits through Claude** only for premium shots no unlimited model can do: action (Kling 4.0), period realism (Veo 3.1), hero stills (GPT Image 2.5).
+
+**22 Oct, free-model test in the Artlist website (0 credits; balance 167,401 before and after).** Start still: Nano Banana 2 (free) 1970s terrace. Same prompt on two unlimited video models. Side-by-side: PostDrive/Library/_shootouts/2026-10-22_terrace_free_models.mp4.
+
+| Model | Delivered | Result |
+|---|---|---|
+| **Kling 2.5 Turbo Pro** | 1080p, 5 s | PASS. Lively crowd, steam, a checked flag waving. The flag drops out of frame and a new one appears mid-clip: fine for b-roll. Good enough for library background |
+| Seedance 2.0 Mini | **480p only** when unlimited (720p costs credits), 4 s | PASS on motion: natural crowd gestures and a slow pull-back that reveals the match. Too low-res except as a small or background shot |
+
+**Unlimited video models in the website (∞ in the model list):** Kling 2.5 Turbo Pro, Veo 3.1 Lite, Seedance 2.0 Mini (480p), Seedance 1.0 Pro Fast, Wan 3.0, LTX 2.3 Pro, MiniMax H3 Max, Gemini Omni 1.1 Flash. Switch "Unlimited" on next to Generate; the button then shows ∞. Some models are unlimited only at certain settings (the ∞ shows beside the allowed resolution).
+
+**How Claude drives it:** Claude in Chrome opens toolkit.artlist.io, picks the ∞ model, uploads the start frame (file must be in the project folder: `.upload/`), types the prompt, generates; then downloads through the connector (website generations appear there) and files them at 0 credits.
