@@ -59,6 +59,15 @@ Website tip: uploading a start frame from disk stopped working on 22 Oct; pick t
 
 **Premium total: about 3,300 credits.** Everything else is free.
 
+**Made 22 Oct on Kling v3 Pro, start + end frames, 1080p, 5 s, no audio: 500 each, 1,000 total (Mike approved; balance 166,401).**
+
+| Clip | What works | Problem | Edit note |
+|---|---|---|---|
+| P1_winner_pullback.mp4 | 0–2.9 s: the winger reaches the line and pulls the ball back across the box, camera follows | From about 3 s it jumps to a wide side view; the runner never shoots and the end frame is not reached | Use 0–2.9 s; narration carries the finish |
+| P2_freekick.mp4 | 0–3.2 s: run-up and strike; 4.2–5 s: the keeper dives and is beaten | 3.2–4.2 s the kicker walks into his own wall; the ball is never seen in the net | Two cuts: 0–3.2 s, then 4.2–5 s |
+
+Lesson: Kling v3 Pro holds about 3 s of real action, then morphs to hit the end frame. For a full goal, try a longer duration (8 s) or Kling 4.0.
+
 ## Graphics (the "next level" brief)
 
 - Chapter title cards: an AI-made period texture behind each (newsprint, a Wembley programme cover, a 1950s match ticket), our type on top.
