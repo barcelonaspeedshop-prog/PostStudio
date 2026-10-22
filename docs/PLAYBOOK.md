@@ -103,3 +103,10 @@ Brawn v2 and Istanbul v2 are the reference videos. Every long video follows this
   Approved template for goals (Mike 21 Oct, "that's the release"): camera behind the shooter, goal centred with space round it (docs/ai_clip_library.md).
 - **Check every AI clip at 10 frames a second through the moment that matters**: `studio/clip_check.py <clip> t0 t1 --crop ...` writes <clip>_check.jpg. One frame a second missed a ball passing outside the post. No clip goes to Mike without its check sheet read.
 - **Football goals from the side**: anything beyond the near post is the side-netting outside the goal. The ball has to stay between the posts and under the bar.
+
+## AI graphics: the next level (Mike, 22 Oct 2026)
+- **Structure is drawn, surface is AI.** Anything that must be right (a pitch diagram, a cutaway, a score timeline) is drawn by us; AI supplies the world it sits in: period paper, a muddy 1950s pitch, a programme cover, a floodlit stadium, a wind-tunnel haze. The V12 test showed AI draws convincing but wrong engineering.
+- Chapter title cards on AI period textures (newsprint, tickets, programmes); fact cards on AI period paper, not plain navy.
+- Scoreboards and timing screens recreated in the era's style (AI background, our numbers).
+- Backgrounds and textures are made free in the Artlist website and filed in the Library under `graphics/` so every video can reuse them.
+- Long features run in chapters (title card + one-line hook + matching YouTube chapters), so a 14–20 minute film feels like episodes.
