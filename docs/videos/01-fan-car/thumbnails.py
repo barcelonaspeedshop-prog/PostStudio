@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from storykit import pf, cond, tracked, text_top, place_stamp, NAVY, NAVY_D, RED, GOLD, CREAM
 from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
 import numpy as np
-S = "/Volumes/PostDrive/Stories/BANNED series/01 Fan Car/"; O = S + "thumbnails/"; TW, TH = 1280, 720
+S = "/Volumes/PostDrive/Omnira F1/Videos/Fan Car (BANNED)/"; O = S + "thumbnails/"; TW, TH = 1280, 720
 
 def cover(path, focus=(0.5, 0.5), zoom=1.0):
     im = Image.open(path).convert("RGB"); s = max(TW / im.width, TH / im.height) * zoom

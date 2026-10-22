@@ -15,9 +15,9 @@ from storykit import pf, cond, ramp, ease, rgba, tracked, wrap, load, NAVY_D, GO
 
 B1 = "/Volumes/PostDrive/Shorts/batch01/"; NA = B1 + "audio/edit/"; M = B1 + "conv/"; C = B1 + "commons/"
 OUT = B1 + "video/"
-IMP = "/Volumes/PostDrive/Stories/IMPOSSIBLE series/"
-BR = IMP + "01 Brawn GP/media/"; IST = IMP + "02 Istanbul/media/"
-MUS = "/Volumes/PostDrive/Music/"
+IMP = "/Volumes/PostDrive/"
+BR = IMP + "Omnira F1/Videos/Brawn GP (IMPOSSIBLE)/media/"; IST = IMP + "Omnira Football/Videos/Istanbul (IMPOSSIBLE)/media/"
+MUS = "/Volumes/PostDrive/Audio/Music/"
 SENTS = json.load(open(NA + "sentences.json"))
 GREEN, BLUE = (70, 190, 110), (90, 170, 255)
 

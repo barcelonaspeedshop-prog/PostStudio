@@ -12,7 +12,7 @@ from storykit import pf, NAVY_D, GOLD, CREAM
 import episode as E
 E.SERIES = "f1"
 
-STORY = "/Volumes/PostDrive/Stories/Omnira F1/02 Superclipping/"
+STORY = "/Volumes/PostDrive/Omnira F1/Videos/Superclipping/"
 AI, OUT = STORY + "media/ai/", STORY + "thumbnails/"
 
 def mark(im, cx, cy, h):

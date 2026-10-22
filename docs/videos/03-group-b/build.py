@@ -7,7 +7,7 @@ import math, os, sys
 VDIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(VDIR, "..", "..", "..", "studio"))
 import episode as E
-E.init("/Volumes/PostDrive/Stories/BANNED series/03 Group B/")
+E.init("/Volumes/PostDrive/Gentlemen of Fuel/Videos/Group B (BANNED)/")
 from episode import *
 
 FINAL = "BANNED 03 - Group B.mp4"

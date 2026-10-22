@@ -8,7 +8,7 @@ import math, os
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 from storykit import W, H, GOLD, CREAM, RED, NAVY_D, ramp, ease, rgba, tracked, cond, pf, load
 
-AI = "/Volumes/PostDrive/Stories/BANNED series/05 Monte Carlo Minis/media/ai/"
+AI = "/Volumes/PostDrive/Gentlemen of Fuel/Videos/Monte Carlo Minis (BANNED)/media/ai/"
 WARM, HOT, BLUE, GREEN = (255, 190, 90), (255, 244, 220), (120, 170, 255), (80, 200, 120)
 
 _bg = {}

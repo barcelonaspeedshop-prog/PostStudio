@@ -9,7 +9,7 @@ VDIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(VDIR, "..", "..", "..", "studio"))
 from storykit import *
 
-STORY = "/Volumes/PostDrive/Stories/BANNED series/02 Gijon/"
+STORY = "/Volumes/PostDrive/Omnira Football/Videos/Gijon (BANNED)/"
 C, M, G, A, AI = (STORY + p for p in ("media/commons/", "media/mike/", "graphics/", "audio/", "media/ai/"))
 OUT = STORY + "video/"; FINAL = "BANNED 02 - The Disgrace of Gijon.mp4"
 TRACKS = [A + "Mi Dispiace - Mini Vandals.mp3", A + "To Loom Is to Love - Mini Vandals.mp3"]   # YouTube Audio Library

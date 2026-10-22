@@ -23,7 +23,8 @@ LIB = "/Volumes/PostDrive/Library"
 CAT = os.path.join(LIB, "catalog.json")
 LEDGER = os.path.join(LIB, "ledger.csv")
 THUMBS = os.path.join(LIB, "_thumbs")
-STORIES = "/Volumes/PostDrive/Stories"
+CHANNELS = ["/Volumes/PostDrive/Gentlemen of Fuel/Videos", "/Volumes/PostDrive/Omnira F1/Videos",
+            "/Volumes/PostDrive/Omnira Football/Videos"]
 KINDS = {"image": {".png", ".jpg", ".jpeg", ".webp"},
          "video": {".mp4", ".mov", ".webm"},
          "sound": {".mp3", ".wav", ".aac", ".m4a"}}
@@ -56,9 +57,9 @@ def channel_of(path):
     p = path.lower()
     if "gentlemen of fuel" in p or "/gof/" in p:
         return ["GoF"]
-    if "omnira f1" in p or "brawn" in p or "mclaren" in p or "fan car" in p:
+    if "omnira f1" in p:
         return ["F1"]
-    if any(k in p for k in ("istanbul", "leicester", "gijon", "back-pass", "football")):
+    if "omnira football" in p:
         return ["Football"]
     return []
 
@@ -68,7 +69,7 @@ def cmd_scan(a):
     known = {e["file"] for e in entries}
     added = 0
     old_clips = os.path.join(LIB, "ai_clips")
-    walk = [(r, d, f) for top in (STORIES, old_clips) for r, d, f in os.walk(top)]
+    walk = [(r, d, f) for top in CHANNELS + [old_clips] for r, d, f in os.walk(top)]
     for root, dirs, files in walk:
         if re.search(r"_frames(/|$)|/\.", root):
             continue  # 10-fps check frames and hidden folders are not library material

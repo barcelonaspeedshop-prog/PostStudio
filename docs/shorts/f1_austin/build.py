@@ -15,7 +15,7 @@ B1 = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(B1)
 chip, title, tick = B1.chip, B1.title, B1.tick
 
 R = "/Volumes/PostDrive/Shorts/f1_austin/"; NA = R + "audio/"; C = R + "commons/"; OUT = R + "video/"
-MUS = "/Volumes/PostDrive/Music/"
+MUS = "/Volumes/PostDrive/Audio/Music/"
 CELEB = C + "2026 Chinese GP - Mercedes - Kimi Antonelli - Post Race Celebration.jpg"
 CAR = C + "2026 Chinese GP - Mercedes - Kimi Antonelli - Qualifying.jpg"
 FACE = C + "Kimi Antonelli at the Melbourne Walk during the 2026 Australian Grand Prix (028A7923) cropped.jpg"

@@ -5,7 +5,7 @@ import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "studio"))
 import thumbs as T
 
-STORY = "/Volumes/PostDrive/Stories/BANNED series/05 Monte Carlo Minis/"
+STORY = "/Volumes/PostDrive/Gentlemen of Fuel/Videos/Monte Carlo Minis (BANNED)/"
 OUT = STORY + "thumbnails/"
 
 if __name__ == "__main__":

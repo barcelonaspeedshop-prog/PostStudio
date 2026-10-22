@@ -5,7 +5,7 @@ import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "05-brawn-gp"))
 import thumbnails as T
 
-STORY = "/Volumes/PostDrive/Stories/IMPOSSIBLE series/03 McLaren Le Mans/"
+STORY = "/Volumes/PostDrive/Gentlemen of Fuel/Videos/McLaren Le Mans (IMPOSSIBLE)/"
 OUT = STORY + "thumbnails/"
 
 if __name__ == "__main__":

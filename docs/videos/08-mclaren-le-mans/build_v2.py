@@ -14,7 +14,7 @@ _argv = sys.argv; sys.argv = ["build"]
 import build as V1                                   # the v1 graphics (builds its own v1 timeline on import, unused)
 sys.argv = _argv
 import episode as E
-E.init("/Volumes/PostDrive/Stories/IMPOSSIBLE series/03 McLaren Le Mans/", series="impossible", narration="audio/v2/")
+E.init("/Volumes/PostDrive/Gentlemen of Fuel/Videos/McLaren Le Mans (IMPOSSIBLE)/", series="impossible", narration="audio/v2/")
 from episode import *
 import explainers as X
 from factcard import FactCard

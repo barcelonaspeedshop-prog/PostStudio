@@ -11,7 +11,7 @@ import math, os, sys
 VDIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, VDIR); sys.path.insert(0, os.path.join(VDIR, "..", "..", "..", "studio"))
 import episode as E
-E.init("/Volumes/PostDrive/Stories/Gentlemen of Fuel/01 Chrysler Turbine/", series="gof", narration=os.environ.get("NARR", "audio/v2/"))
+E.init("/Volumes/PostDrive/Gentlemen of Fuel/Videos/Chrysler Turbine/", series="gof", narration=os.environ.get("NARR", "audio/v2/"))
 from episode import *
 import explainers as X
 from factcard import FactCard

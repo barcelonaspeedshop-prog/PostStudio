@@ -13,7 +13,7 @@ import math, os, sys
 VDIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(VDIR, "..", "..", "..", "studio"))
 import episode as E
-E.init("/Volumes/PostDrive/Stories/Omnira F1/02 Superclipping/", series="f1", narration="audio/v4/")   # v4 = Kirk, eleven_multilingual_v2 (Mike 21 Oct: v2 only; voiced in two halves, cut at pauses)
+E.init("/Volumes/PostDrive/Omnira F1/Videos/Superclipping/", series="f1", narration="audio/v4/")   # v4 = Kirk, eleven_multilingual_v2 (Mike 21 Oct: v2 only; voiced in two halves, cut at pauses)
 from episode import *
 from factcard import FactCard
 E.AI_RATE = 0.6                                                               # AI clips at 60% speed (Mike 20 Oct)

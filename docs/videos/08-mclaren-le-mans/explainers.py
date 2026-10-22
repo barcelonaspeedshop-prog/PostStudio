@@ -11,8 +11,8 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
 from storykit import W, H, GOLD, CREAM, RED, NAVY_D, ramp, ease, rgba, tracked, cond, pf, load
 
-AI = "/Volumes/PostDrive/Stories/IMPOSSIBLE series/03 McLaren Le Mans/media/ai/"
-MK = "/Volumes/PostDrive/Stories/IMPOSSIBLE series/03 McLaren Le Mans/media/mike/"
+AI = "/Volumes/PostDrive/Gentlemen of Fuel/Videos/McLaren Le Mans (IMPOSSIBLE)/media/ai/"
+MK = "/Volumes/PostDrive/Gentlemen of Fuel/Videos/McLaren Le Mans (IMPOSSIBLE)/media/mike/"
 BLUE, HOT, CARBON = (110, 170, 255), (255, 170, 60), (60, 64, 72)
 
 def tag(d, xy, text, a, colour=GOLD, size=40):

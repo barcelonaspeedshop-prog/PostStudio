@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.join(VDIR, "..", "..", "..", "studio")); sys.path.ins
 from storykit import *
 import airflow as AF
 
-STORY = "/Volumes/PostDrive/Stories/IMPOSSIBLE series/01 Brawn GP/"
+STORY = "/Volumes/PostDrive/Omnira F1/Videos/Brawn GP (IMPOSSIBLE)/"
 IMG = STORY + "media/ai/ai_cutaway_side.png"
 GAP = 0.45
 

@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 from storykit import W, H, GOLD, CREAM, RED, NAVY_D, ramp, ease, rgba, tracked, cond, pf, load
 
-STORY = "/Volumes/PostDrive/Stories/Gentlemen of Fuel/01 Chrysler Turbine/media/"
+STORY = "/Volumes/PostDrive/Gentlemen of Fuel/Videos/Chrysler Turbine/media/"
 BLUE, HOT, STEEL = (110, 170, 255), (255, 150, 50), (150, 158, 172)
 BRONZE = (196, 120, 70)
 

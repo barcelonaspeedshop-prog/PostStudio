@@ -9,7 +9,7 @@ import math, os, subprocess, sys
 VDIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(VDIR, "..", "..", "..", "studio"))
 import episode as E
-STORY = "/Volumes/PostDrive/Stories/IMPOSSIBLE series/03 McLaren Le Mans/"
+STORY = "/Volumes/PostDrive/Gentlemen of Fuel/Videos/McLaren Le Mans (IMPOSSIBLE)/"
 E.init(STORY, series="impossible")
 
 # ---------------------------------------------------------------- voice fix (render-time only; narration.wav is untouched)

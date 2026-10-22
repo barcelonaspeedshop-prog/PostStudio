@@ -11,7 +11,7 @@ import math, os, sys
 VDIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(VDIR, "..", "..", "..", "studio"))
 import episode as E
-E.init("/Volumes/PostDrive/Stories/IMPOSSIBLE series/04 Leicester/", series="impossible", narration="audio/v2/")
+E.init("/Volumes/PostDrive/Omnira Football/Videos/Leicester (IMPOSSIBLE)/", series="impossible", narration="audio/v2/")
 from episode import *
 from factcard import FactCard
 E.AI_RATE = 0.6                                                               # AI clips at 60% speed (Mike 20 Oct)

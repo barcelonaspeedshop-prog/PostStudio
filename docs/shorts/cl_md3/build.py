@@ -17,7 +17,7 @@ B1 = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(B1)
 chip, title = B1.chip, B1.title
 
 R = "/Volumes/PostDrive/Shorts/cl_md3/"; NA = R + "audio/"; C = R + "commons/"; OUT = R + "video/"
-MUS = "/Volumes/PostDrive/Music/"
+MUS = "/Volumes/PostDrive/Audio/Music/"
 LAKE = C + "The Stadio Sinigaglia with Lago di Como in the background during a Serie B match between Como and Reggina in 1914 (2022).jpg"
 GATE = C + "Estadio Giuseppe Sinigaglia 2026.jpg"
 SERIEA = C + "Como 1907-Lazio Serie A 24 agosto 2025.jpg"

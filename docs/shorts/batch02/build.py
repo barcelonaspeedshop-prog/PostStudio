@@ -23,8 +23,8 @@ class Canvas:
     def done(self): self.bg.alpha_composite(self.L); return self.bg
 
 B2 = "/Volumes/PostDrive/Shorts/batch02/"; NA = B2 + "audio/edit/"; C = B2 + "commons/"; M = B2 + "media/"; OUT = B2 + "video/"
-MCL = "/Volumes/PostDrive/Stories/IMPOSSIBLE series/03 McLaren Le Mans/media/ai/"
-MUS = "/Volumes/PostDrive/Music/"
+MCL = "/Volumes/PostDrive/Gentlemen of Fuel/Videos/McLaren Le Mans (IMPOSSIBLE)/media/ai/"
+MUS = "/Volumes/PostDrive/Audio/Music/"
 SENTS = json.load(open(NA + "sentences.json"))
 BLUE, GREEN, RUBBER = (90, 170, 255), (70, 190, 110), (26, 26, 30)
 

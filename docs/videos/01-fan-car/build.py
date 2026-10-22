@@ -12,11 +12,11 @@ sys.path.insert(0, os.path.join(VDIR, "..", "..", "..", "studio"))
 from storykit import *
 
 # all media, audio and renders live on the PostDrive; this folder holds only the code and the script
-STORY = "/Volumes/PostDrive/Stories/BANNED series/01 Fan Car/"
+STORY = "/Volumes/PostDrive/Omnira F1/Videos/Fan Car (BANNED)/"
 C, M, G, A, AI = (STORY + p for p in ("media/commons/", "media/mike/", "graphics/", "audio/", "media/ai/"))
 OUT = STORY + "video/"
 FINAL = "BANNED 01 - The Fan Car.mp4"                      # the one published file; intermediates are deleted after a render
-MUSIC, MUSIC_GAIN = "/Volumes/PostDrive/Music/", 0.35     # FanCar1/2.mp3 = Mike's soundtracks
+MUSIC, MUSIC_GAIN = "/Volumes/PostDrive/Audio/Music/", 0.35     # FanCar1/2.mp3 = Mike's soundtracks
 # Scene times are written against the first recording. A new recording (made with
 # studio/narration.py, which writes audio/sentences.json) stretches them sentence by sentence.
 REF = json.load(open(A + "reference_sentences.json"))

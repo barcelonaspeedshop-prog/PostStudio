@@ -11,7 +11,7 @@ import math, os, sys
 VDIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(VDIR, "..", "..", "..", "studio")); sys.path.insert(0, VDIR)
 import episode as E
-E.init("/Volumes/PostDrive/Stories/IMPOSSIBLE series/01 Brawn GP/", series="impossible", narration="audio/v2/")
+E.init("/Volumes/PostDrive/Omnira F1/Videos/Brawn GP (IMPOSSIBLE)/", series="impossible", narration="audio/v2/")
 from episode import *
 import airflow as AF
 

@@ -11,7 +11,7 @@ import math, os, sys
 VDIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(VDIR, "..", "..", "..", "studio"))
 import episode as E
-E.init("/Volumes/PostDrive/Stories/IMPOSSIBLE series/02 Istanbul/", series="impossible")
+E.init("/Volumes/PostDrive/Omnira Football/Videos/Istanbul (IMPOSSIBLE)/", series="impossible")
 from episode import *
 
 FINAL = "IMPOSSIBLE 02 - Istanbul.mp4"

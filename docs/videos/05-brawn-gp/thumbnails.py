@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw, ImageFilter
 from thumbs import cover, grade, big, TW, TH
 from storykit import pf, impossible_mark, NAVY_D, GOLD, CREAM
 
-STORY = "/Volumes/PostDrive/Stories/IMPOSSIBLE series/01 Brawn GP/"
+STORY = "/Volumes/PostDrive/Omnira F1/Videos/Brawn GP (IMPOSSIBLE)/"
 OUT = STORY + "thumbnails/"
 
 def mark(im, cx, cy, size):

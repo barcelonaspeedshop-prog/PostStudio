@@ -10,7 +10,7 @@ from thumbs import cover, grade, big, TW, TH
 from storykit import pf, NAVY_D, GOLD, CREAM
 import episode as E
 
-STORY = "/Volumes/PostDrive/Stories/Gentlemen of Fuel/01 Chrysler Turbine/"
+STORY = "/Volumes/PostDrive/Gentlemen of Fuel/Videos/Chrysler Turbine/"
 OUT = STORY + "thumbnails/"
 
 def mark(im, cx, cy, h):

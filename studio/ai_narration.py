@@ -1,7 +1,7 @@
 """ai_narration: turn AI voice files (one per script section, in order) into narration.wav + sentences.json.
 
     ~/.venvs/poststudio/bin/python studio/ai_narration.py docs/videos/10-chrysler-turbine/script_v2.md \
-        "/Volumes/PostDrive/Stories/.../audio/v2/parts" "/Volumes/PostDrive/Stories/.../audio/v2"
+        "/Volumes/PostDrive/Omnira F1/Videos/.../audio/v2/parts" "/Volumes/PostDrive/Omnira F1/Videos/.../audio/v2"
 
 An AI read has no retakes, so (unlike narration.py) nothing is cut: each section file is transcribed with word
 timings and the script's sentences are mapped onto the words in order (difflib over normalised tokens, so "1963"

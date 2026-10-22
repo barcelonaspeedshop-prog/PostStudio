@@ -4,7 +4,7 @@
 # permission: System Settings > Privacy & Security > Screen Recording > Terminal on; the first run may ask).
 cd "$(dirname "$0")/.."
 PY=~/.venvs/poststudio/bin/python
-VIDEO="/Volumes/PostDrive/Stories/IMPOSSIBLE series/01 Brawn GP/shorts/v2/short_7_one_season.mp4"
+VIDEO="/Volumes/PostDrive/Omnira F1/Videos/Brawn GP (IMPOSSIBLE)/shorts/v2/short_7_one_season.mp4"
 step() { echo; echo "==> $1"; sleep 2; }
 OUT="$HOME/Desktop/YouTube API demo.mov"; rm -f "$OUT"
 screencapture -v -V 60 "$OUT" &          # whole screen, 75 seconds

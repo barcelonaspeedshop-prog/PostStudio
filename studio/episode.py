@@ -3,7 +3,7 @@
     IMPOSSIBLE: E.init(".../IMPOSSIBLE series/01 Brawn GP/", series="impossible") — opening() then strikes out "IM"
     instead of stamping, main() mixes the marker sound, and the end card is impossible_end(this).
 
-    import episode as E; E.init("/Volumes/PostDrive/Stories/BANNED series/03 Group B/")
+    import episode as E; E.init("/Volumes/PostDrive/Gentlemen of Fuel/Videos/Group B (BANNED)/")
     from episode import *          # after init: S, at, PS, AS, OPT, CaS, CuS, CH, ...
     scenes = [opening(...), ..., CuS("So here's the question", what_if(...)), CuS("This was Banned", banned_end)]
     if __name__ == "__main__": main(scenes, FINAL)
@@ -171,8 +171,8 @@ def impossible_end(this):
     return draw
 
 # ---------------------------------------------------------------- Gentlemen of Fuel (one-off stories, no series)
-GOF_LOGO = "/Volumes/PostDrive/GOF/Logos/GOF Profile.png"
-LOGOS = {"gof": (GOF_LOGO, 0.425), "f1": ("/Volumes/PostDrive/Omnira/F1/Logos/F1 Profile.png", 0.365)}   # badge, mask radius (inside its ring)
+GOF_LOGO = "/Volumes/PostDrive/Gentlemen of Fuel/Brand and media/Logos/GOF Profile.png"
+LOGOS = {"gof": (GOF_LOGO, 0.425), "f1": ("/Volumes/PostDrive/Omnira F1/Brand and media/Logos/F1 Profile.png", 0.365)}   # badge, mask radius (inside its ring)
 _gof = {}
 def gof_mark(h):
     """The Omnira / Gentlemen of Fuel mark (emblem, wordmark, tagline) lifted off its black badge, h pixels high.

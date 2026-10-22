@@ -18,7 +18,7 @@ B1 = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(B1)
 chip, title, arrow = B1.chip, B1.title, B1.arrow
 
 R = "/Volumes/PostDrive/Shorts/f1_gap/"; NA = R + "audio/"; C = R + "commons/"; OUT = R + "video/"
-MUS = "/Volumes/PostDrive/Music/"
+MUS = "/Volumes/PostDrive/Audio/Music/"
 AI = R + "media/ai/"
 def U(n): return C + f"2021_United_States_Grand_Prix_{n}.jpg"      # the 2021 race, shot from the Turn 1 grandstand
 HILL = C + "Main_straight_and_turn_1_hill,_Circuit_of_the_Americas.jpg"
