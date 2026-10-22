@@ -1,4 +1,4 @@
-# IMPOSSIBLE: Stanley Matthews, the man who never got old (feature cut, v2)
+# IMPOSSIBLE: Stanley Matthews, the man who never got old (feature cut, v3: Mike's edits + end screen)
 
 **Working title (YouTube):** He Won the First Ballon d'Or at 41. Then He Played Until 50.
 **Alternative:** The Footballer Who Refused to Get Old | Sir Stanley Matthews
@@ -36,7 +36,7 @@ His name was Stanley Matthews. Pelé said he was the man who taught the world ho
 
 He played through a world war. He was sold because he was too old. He lost two Cup finals, and then won the most famous one ever played, at thirty-eight.
 
-And he did it all for a maximum of a few pounds a week.
+And he did it all for a few pounds a week.
 
 This is the story of the man who refused to get old.
 
@@ -50,7 +50,7 @@ This was the Potteries. Hundreds of bottle-shaped kilns, smoke over everything, 
 
 His father, Jack, ran a barber's shop. He was also a boxer, known around Hanley as the Fighting Barber. He was strict, he was fit, and he wanted his son in the ring.
 
-Stanley wanted football.
+But Stanley's passion wasn't boxing. It was football.
 
 He'd dribble a ball through the streets on his way to school. Later he'd say he learned to beat defenders by beating lamp-posts, kerbs and anyone who stood still long enough.
 
@@ -104,7 +104,7 @@ That's why they called him the Wizard of the Dribble.
 
 By his early twenties, Matthews was playing for England. He won his first cap in 1934, and in only his second game, against Wales in Cardiff, he scored.
 
-But at Stoke, things weren't happy. In February 1938, after a falling-out with the manager, he asked for a transfer.
+But at Stoke, things weren't going as well as he'd hoped. In February 1938, after a falling-out with the manager, he asked for a transfer.
 
 What happened next tells you what he meant to the town.
 
@@ -114,7 +114,7 @@ The local pottery owners joined in. Some of them said their workers were so upse
 
 Stoke turned the request down. Matthews stayed, and wrote to the local paper to thank the fans.
 
-He was twenty-three, and a whole industrial town had just gone on strike in its head to keep him.
+He was twenty-three, and a whole industrial town had almost gone on strike to keep him.
 
 ## Chapter 4: Berlin
 
@@ -166,13 +166,13 @@ At Blackpool, he got to the FA Cup final.
 
 In 1948, they lost it, four–two, to Manchester United.
 
-That same year, the football writers created a new award, Footballer of the Year. The first winner was Stanley Matthews.
+That same year, the football writers created a new award, Footballer of the Year. And who was its first winner? Stanley Matthews.
 
 In 1950, England went to their first World Cup, in Brazil. Matthews was in the squad. But he'd arrived late, after a tour with another England party, and the selectors kept him back for the bigger games.
 
 So he was sitting with the reserves when England lost one–nil to the United States. One of the biggest shocks the game has ever seen.
 
-In 1951, Blackpool reached the Cup final again. They lost again, to Newcastle.
+In 1951, Blackpool reached the Cup final again, but once again they lost, this time to Newcastle.
 
 Matthews was thirty-six. The FA Cup was the one trophy every English player wanted, and the country had started to accept he was never going to win it.
 
@@ -256,7 +256,7 @@ But Matthews kept going.
 
 In 1956, a French football magazine invented a new award for the best player in Europe. They called it the Ballon d'Or.
 
-The first winner was Stanley Matthews.
+And once again, who was the first winner of this new award? Stanley Matthews.
 
 He was forty-one.
 
@@ -312,7 +312,7 @@ In 1975, in apartheid South Africa, he set up a team of black schoolboys in Sowe
 
 He kept fit into his seventies and his eighties.
 
-Stanley Matthews died in February 2000, aged eighty-five.
+Sir Stanley Matthews died in February 2000, aged eighty-five.
 
 On the day of his funeral, more than a hundred thousand people lined the streets of Stoke-on-Trent.
 
@@ -331,6 +331,14 @@ Players today have sports scientists, data, diets and recovery plans Matthews co
 Could anyone today play top-flight football at fifty? And who's the oldest player you've ever seen who was still the best on the pitch?
 
 Tell us in the comments.
+
+## End screen
+
+[End screen, 20 seconds: subscribe button, the next IMPOSSIBLE video and the latest Omnira Football video. Narration runs over it.]
+
+This was IMPOSSIBLE, on Omnira Football.
+
+If you love the stories behind football's greatest moments, and the people who made them, subscribe, and we'll see you next week.
 
 ---
 
