@@ -107,3 +107,12 @@ No archive licence. Each goal is cut into short shots that each do ONE thing; th
 | W4 | Matthews and Perry mobbed by team-mates; crowd | AI clip + F10 | |
 
 All of these carry the "AI reconstruction" label.
+
+### Goals v2 results (22 Oct, all free: Kling 2.5 Turbo + Nano Banana 2)
+Rough cuts in `media/ai/goals_v2/`: **Freekick_rough.mp4** (12 s) and **Winner_rough.mp4** (18 s); all takes in `goals_v2/takes`, stills in `goals_v2/stills`.
+- FK1 set-up (0–2.4 s): good, ball still. FK2 strike: take 1 good, ball still until the boot meets it, cut at 3.96 s on contact (take 2 kept the ball still too, spare).
+- FK3 ball-cam take 2 (0–3.1 s): camera flies at the wall, past it and at the goal; after 3.1 s the net turns into a white blob, trimmed. No visible ball in flight: add our drawn ball/flight line in the edit.
+- FK4: ball in the top corner, keeper's head drops, number 9 arms up. Good.
+- W1 P1a cutback, W2 Perry runs onto the rolling ball (good; some defenders share numbers in the last second, cut at 4.6 s).
+- W3: neither take flew the camera; the keeper and defender dive while the ball sits still (0–2.9 s used), then a slow push on the ball-in-the-net still. Ball flight needs our drawn line, or a third try.
+- W4 celebration: good.
