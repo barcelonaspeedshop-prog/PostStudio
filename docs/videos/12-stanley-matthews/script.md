@@ -4,7 +4,7 @@
 **Alternative:** The Footballer Who Refused to Get Old | Sir Stanley Matthews
 **Thumbnail idea:** an AI portrait of a grey-haired winger in a 1960s kit, ball at his feet, a huge "50" beside him, a small Ballon d'Or. Text: "AGE 50. STILL PLAYING."
 **Channel:** Omnira Football, Tuesday 3 November 2026, 7pm. Series: IMPOSSIBLE.
-**Voice:** Boss, London accent (football history). Eleven v4, stability 0.5, each section's text starts with `[London accent]`.
+**Voice:** Boss, London accent (Mike 22 Oct, after testing Mentor and his own clone). Eleven v4, stability 0.5, each section's text starts with `[London accent]`.
 **Format:** feature length, about 2,050 spoken words, roughly 14 minutes (v1 was 1,225 words, 8½ minutes), in 10 chapters plus a cold open and epilogue. Each chapter opens with a title card and a one-line hook, and YouTube chapters match them, so viewers can jump in and the long runtime feels like episodes.
 **AI studio test project:** "people of the game" + "club history with AI footage back in the day".
 
