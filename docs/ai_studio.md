@@ -71,3 +71,14 @@ After every video, add what worked and what failed to the attempt log in `docs/a
 | Ferrari V12 cutaway | **none passed** | All four drew an inline engine (one row of pistons), not a V12. Nano Banana 2 has the best illustration style | AI makes cutaways that look right and are wrong. Engineering diagrams need a real reference image as input (image-to-image), or we draw the structure ourselves and use AI only for finish. Next test: a reference-led V12. |
 
 Settings note: the connector resolves "High 2K" GPT Image 2.5 to medium 1K and Seedream 5 Pro to 1K. Ask for the size explicitly next time.
+
+**22 Oct, E-Type clips (5,000 credits).** Same start still (GPT Image 2.5 winner), same prompt: slow push-in, car parked, people walk, bunting moves. Seedance 2.5 left out (5,000 credits alone at 1080p). Side-by-side in PostDrive/Library/_shootouts/2026-10-22_etype_clips_compare.mp4.
+
+| Model | Credits | Delivered | Result |
+|---|---|---|---|
+| Kling 4.0 | 1,375 | 1080p, 5 s, with sound | PASS. Natural walking crowd, car and plate rock-steady. Best all-round street scene |
+| Veo 3.1 | 1,000 | 1080p, 4 s, with sound | PASS. Same quality as Kling for less; a little less movement |
+| Luma Ray 3.2 | 2,225 | **720p** (asked 1080p), 5 s, silent | PASS and the most cinematic: real dolly-in to a close-up of the car. Dearest, and lower resolution than asked |
+| Veo 3.1 Lite | 400 | 720p, 4 s, silent | PASS but plain: barely moves. Fine for background, 720p only |
+
+No morphing at 10 fps on any of the four: a parked car with walkers is an easy shot. **Lesson:** for realistic street/period scenes, any premium model works, so pick on price and resolution. **Veo 3.1 is the value pick** (1080p, 1,000 cr). Pay for Luma only when we want a real camera move. The hard tests (fast cars, ball physics, people's faces up close) are where the models will separate.
