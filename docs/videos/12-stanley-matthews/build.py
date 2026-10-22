@@ -18,7 +18,7 @@ from episode import *
 from factcard import FactCard
 E.AI_RATE = 0.6                                                               # AI clips at 60% speed (Mike 20 Oct)
 
-FINAL = "IMPOSSIBLE - Stanley Matthews v1.mp4"
+FINAL = "IMPOSSIBLE - Stanley Matthews v2.mp4"
 TANGERINE, BOLTON_W, STOKE_R, ENG_W = (236, 120, 40), (235, 235, 230), (200, 30, 45), (240, 240, 240)
 MANU, NEWC, USA, GER, HUN = (218, 41, 28), (30, 30, 30), (20, 50, 120), (30, 30, 30), (200, 30, 45)
 SFX = "/Volumes/PostDrive/Library/sound/sfx/"
@@ -476,14 +476,16 @@ scenes = [
            scorers=[(("With twenty-two minutes left", 2.6), "MORTENSEN 68'")]), bg=bga(CROWD53, 0.88)),
     CuS("The minutes went.", clock, bg=bga(CROWD53, 0.9)),
     # the free-kick: set-up still, then the ball in the top corner, then the crowd
-    AR("In the eighty-ninth minute", FK_SETUP, zoom=(1.0, 1.1), focus=((0.45, 0.6), (0.5, 0.55))),
-    AR("Mortensen hit it, hard and high", FK_NET, off=0.6, zoom=(1.0, 1.08), focus=((0.3, 0.3), (0.3, 0.25)), texts=[(1.4, "Blackpool 3–3 Bolton", "big")]),
+    # the goals (Mike 22 Oct): real-look AI video up to the strike, then the hologram finish (free model)
+    VR("In the eighty-ninth minute", "G_freekick", recon=True, min_rate=1.0, max_rate=1.0),
+    Custom(S("Three–three.", -0.15), scoreboard("89 MINUTES", [(0, 2, 3), (0.2, 3, 3)], "BLACKPOOL", "BOLTON", TANGERINE, BOLTON_W,
+           scorers=[(0.2, "MORTENSEN 89'")], sub=("HIS HAT-TRICK", ("It completed his hat-trick", 0.2))), bg=bga(CROWD53, 0.88)),
     PS("It's still the only hat-trick", MORTY_STATUE, zoom=(1.0, 1.12), focus=((0.5, 0.35), (0.5, 0.3)), strap=("Stan Mortensen", "THE ONLY CUP FINAL HAT-TRICK AT THE OLD WEMBLEY", 0.6)),
     # the winner: the pull-back (AI clip, clean first 2.9 s), the ball in the net, the front room, the mob
     AR("And then, in stoppage time", WINGER, zoom=(1.0, 1.12), focus=((0.5, 0.55), (0.6, 0.55))),
-    VR("He reached the goal line.", "P1a_cutback", recon=True, end=2.9),
-    AR("It ran behind Mortensen", W_NET, zoom=(1.0, 1.08), focus=((0.2, 0.75), (0.25, 0.7)), texts=[(S("Four–three.") - S("It ran behind Mortensen", -0.15), "Blackpool 4–3 Bolton", "big")]),
-    VR("Wembley went mad.", ERUPTS, end=3.0),
+    VR("And he pulled the ball back", "G_winner", recon=True, min_rate=1.0, max_rate=1.0),
+    Custom(S("Four–three.", -0.15), scoreboard("90+2 MINUTES", [(0, 3, 3), (0.2, 4, 3)], "BLACKPOOL", "BOLTON", TANGERINE, BOLTON_W,
+           scorers=[(0.2, "PERRY 90+2'")], sub=("WEMBLEY WENT MAD", ("Wembley went mad.", 0.0))), bg=bga(ERUPTS, 0.8)),
     VR("In front rooms all over the country", ROOM_CHEER),
     AR("Mortensen had scored three.", W_MOB, zoom=(1.0, 1.1), focus=((0.5, 0.45), (0.5, 0.4))),
     PS("But from that day to this", GRIN57, zoom=(1.0, 1.12), texts=[(1.6, "The Matthews Final", "big")]),
@@ -524,8 +526,8 @@ scenes = [
 ]
 scenes = [s for s in scenes if s is not None]
 # sound under the two goals (library/sfx): kick on the strike, the roar as it goes in
-EFFECTS = [(S("Mortensen hit it, hard and high", 0.3), SFX + "football_kick_thud.wav", -6), (S("Mortensen hit it, hard and high", 0.9), SFX + "crowd_cheer_huge.wav", -14),
-           (S("It ran behind Mortensen", 0.4), SFX + "football_kick_thud.wav", -6), (S("Four–three.", -0.1), SFX + "crowd_cheer_huge.wav", -12)]
+EFFECTS = [(S("In the eighty-ninth minute", -0.15 + 3.6), SFX + "football_kick_thud.wav", -6), (S("In the eighty-ninth minute", -0.15 + 5.6), SFX + "crowd_cheer_huge.wav", -14),
+           (S("And he pulled the ball back", -0.15 + 4.6), SFX + "football_kick_thud.wav", -6), (S("And he pulled the ball back", -0.15 + 5.9), SFX + "crowd_cheer_huge.wav", -12)]
 
 if __name__ == "__main__":
     if sys.argv[1:] == ["check"]: print(shot_check(scenes, OUT.replace("video/", "sheets/") + "check.jpg"))

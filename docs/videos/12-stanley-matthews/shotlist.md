@@ -128,3 +128,8 @@ Rough cuts in `media/ai/goals_v2/`: **Freekick_rough.mp4** (12 s) and **Winner_r
 
 ### Goals, final approach (22 Oct): stills + reactions, no AI match action
 v3 graphics scrapped by Mike ("rabbit hole"). `goals_v2/Freekick_stills.mp4` (8.4 s): set-up still push-in → ball-in-the-top-corner still → F10 crowd erupts. `goals_v2/Winner_stills.mp4` (10.6 s): P1a cut-back (2.9 s) → ball-in-the-net still → F07 front room cheers → team mobs Matthews and Perry. 0.3 s dissolves, crowd/kick/roar from Library/sound/sfx, AI reconstruction label.
+
+### Goals v3: hologram finishes (Mike 22 Oct, approved idea)
+- Stills (Nano Banana 2, free): free-kick "...wireframe player standing over a glowing football... wall of five translucent wireframe defenders... The ball has not moved yet, there is no flight path or trail... blank HUD frames, no words or numbers"; winner "...winger at the goal line next to the right-hand post with the glowing ball... second wireframe player running in towards the penalty spot...".
+- Clips (Kling 2.5 Turbo, free): FK "steps forward and strikes the ball... only when his foot hits it the ball flies away, leaving a bright light trail that curls over the right edge of the wall into the top right corner... net bursts in particles; camera pushes forward". Winner "pulls the ball back... rolls low with a light trail to the player running in... strikes first time, low into the goal past the diving keeper...". Both first takes used (media/ai/hologram).
+- Cut: media/ai/G_freekick.mp4 (FK1 0–2.4 + FK2 strike 2.4–3.75 + hologram 1.3–5.0), G_winner.mp4 (P1a 0–2.9 + hologram 0.4–5.0), then 3–3 and 4–3 scoreboard cards. In build.py v2.
