@@ -1,5 +1,7 @@
 # AI clip library
 
+**22 Oct: this list is now part of the whole media library.** Search everything (images, clips, sounds, diagrams) in `PostDrive/Library/index.html` or with `python3 scripts/ailib.py find …`; test-period plan in docs/ai_studio.md.
+
 Reusable photoreal clips for any story: no club badges, no sponsor logos, no real people's faces. Each one is made once and reused wherever it fits. Files live in **PostDrive › Library › ai_clips** (one folder per clip: the start frame, the clip, the prompt).
 
 How each clip is made: a still start frame first (cheap, about 20 credits, checked and cleaned of any logos), then 8 seconds of 1080p video from it (about 160 credits). Budget about 1,000 credits per long video: three or four new clips, plus library reuse.
