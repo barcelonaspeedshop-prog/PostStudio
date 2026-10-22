@@ -81,3 +81,29 @@ Lesson: Kling v3 Pro holds about 3 s of real action, then morphs to hit the end 
 - **Online "License Film" button:** Online → Digital = **£2,825 + VAT** for the whole film, web, worldwide, 5 years, SD file (720×576). Too much for one video.
 - **Cheaper routes, quote only:** (1) per-second licence for just the seconds we use (60 s minimum, can mix clips); (2) Pathé's new **Content Creator Programme** for YouTube creators, terms not published ("enquire to see if you meet eligibility").
 - Same match also filmed by British Movietone (issue 1248), held by AP Archive: quote only.
+
+## The two goals, v2 plan (Mike, 22 Oct): short live shots + "ball-cam"
+
+No archive licence. Each goal is cut into short shots that each do ONE thing; the ball's flight is a "ball-cam" (the camera travels like the ball) instead of players acting it out. Every shot is made on the free website models first; paid only with Mike's OK.
+
+**What really happened (sources: Wikipedia 1953 FA Cup final; the42.ie; sportsclub.co.za)**
+- Free-kick, 89th minute, 3–3: Mortensen scored directly from a free-kick about 20 yards out, into the top corner; the keeper was left standing. No source says it went over the wall, so the ball-cam goes **past the wall** into the top corner, not a clear lob.
+- Winner, 90+2: Matthews went past Banks on the outside down the right, reached the byline and pulled the ball back; it passed just behind Mortensen and Perry drove it in. Perry said Matthews slipped as he crossed.
+
+### Free-kick (replaces P2)
+| # | Shot | How | Rule |
+|---|---|---|---|
+| FK1 | Ball placed on the grass, Mortensen steps back, wall lining up | AI clip from a new still | Ball does not move |
+| FK2 | From behind: run-up and strike | AI clip, start frame only (no end frame), 3–4 takes on free models | **Cut on the frame his boot meets the ball.** Reject any take where the ball moves first |
+| FK3 | **Ball-cam:** camera leaves the boot at ball height, rises and bends past the edge of the wall, dives into the top corner, net bulges | AI camera move through a frozen scene ("time frozen, players still, only the camera moves"), start still = behind the ball looking at the wall, end still = inside the top corner | Our drawn flight line and a whoosh on top. Fallback if AI fails: we build it ourselves from two stills with a parallax push (exact, free) |
+| FK4 | Net still rippling, keeper standing beaten, crowd erupts | AI still + slow move, then F10 crowd clip | |
+
+### Winner (P1)
+| # | Shot | How | Rule |
+|---|---|---|---|
+| W1 | Matthews at the byline pulls the ball back | **P1a_cutback.mp4** (first 2.9 s of the Kling v3 Pro clip, kept) | Already made |
+| W2 | Angle change: behind Perry as the ball comes across to him, goal and keeper ahead | AI still + short clip, ball rolling towards him | Cut before he strikes |
+| W3 | **Ball-cam:** from Perry's boot, low and fast past the keeper into the net | Same frozen-scene camera move as FK3 | Drawn line + whoosh |
+| W4 | Matthews and Perry mobbed by team-mates; crowd | AI clip + F10 | |
+
+All of these carry the "AI reconstruction" label.
