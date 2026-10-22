@@ -118,5 +118,5 @@ Tested 22 Oct on Matthews: 14 of 16 free atmosphere clips worked first time; bot
 
 - **Use AI video for the world around the story:** crowds, streets, weather, rooms, one person doing one simple thing.
 - **Never for the key sporting moment** (a goal, a pass, a free-kick, an overtake): the models do not understand rules, cause and effect, or the ball.
-- **Key moments instead (Mike 22 Oct):** AI video runs up to the strike, then we SWITCH to a drawn moving-camera graphic (`studio/pitch3d.py`: house-style pitch, team-colour figures with numbers, gold flight line, drone camera following the ball, pull back wide with a score label). After the switch there are no more AI images or AI shots; the narration carries on over the graphic. Never paint a drawn ball over AI footage.
+- **Key moments:** OPEN QUESTION (Mike 22 Oct). Tried and scrapped on Matthews: paid AI action clips, a drawn ball over AI footage, AI video switching to a moving-camera pitch graphic. Until we find a better approach, tell key moments with approved stills, reaction shots (crowd, families at the TV) and narration.
 - No paid video test without Mike's OK, and only for one simple motion.
