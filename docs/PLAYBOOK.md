@@ -120,3 +120,9 @@ Tested 22 Oct on Matthews: 14 of 16 free atmosphere clips worked first time; bot
 - **Never for the key sporting moment** (a goal, a pass, a free-kick, an overtake): the models do not understand rules, cause and effect, or the ball.
 - **Key moments (Mike 22 Oct, Matthews): real-look AI video up to the strike, then a HOLOGRAM finish.** A glowing blue wireframe "sports-analysis / video game tech" scene (no faces, no kit colours, no text) that completes the action: the ball's light trail into the net. Free on Kling 2.5 Turbo from a Nano Banana 2 hologram still; the still must say "the ball has not moved yet, no trails" and "no words or numbers" (it adds fake stats otherwise). Cut the real video just before boot meets ball; dissolve 0.3 s into the hologram at its wind-up; follow with a scoreboard card. Prompts: docs/videos/12-stanley-matthews/shotlist.md. Scrapped before this: paid realistic action clips, a drawn ball over AI footage, our own pitch3d graphic.
 - No paid video test without Mike's OK, and only for one simple motion.
+
+## Quality gate before a cut goes to Mike (22 Oct, after Matthews v2: 17 notes)
+- Any picture at most twice in a long video (Mike 22 Oct). The build fails a third use.
+- `studio/media_check.py` must pass (no POOR) before rendering; CHECK pictures looked at full size.
+- Every AI clip gets a written one-line verdict: is it physically possible (ball, water, slopes), true to the period (who cheers, what's on the TV) and does it match the line said over it? Glitch-free is not enough.
+- Fewer, better AI clips beat many free ones: free models for atmosphere only; anything the story leans on goes to the stronger model.
