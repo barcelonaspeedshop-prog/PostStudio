@@ -35,6 +35,21 @@ Every realistic AI scene of a real event gets an on-screen "AI reconstruction" l
 | F16 | A 1965 floodlit stadium at night, packed | 10 |
 | F17 | A period newspaper front page (text added in the edit: STOKE STAR ASKS TO LEAVE) | 3 |
 
+### Clips made 22 Oct (Kling 2.5 Turbo Pro, 1080p, 5 s, 0 credits): frame-checked at 10 fps
+
+All 16 sit in `media/ai/` as `F01_…mp4` to `F16_…mp4` beside their stills; first tries of F09 and F14 are in `_rejected/`.
+
+| Clip | Verdict | Edit note |
+|---|---|---|
+| F01 Potteries, F02 barber, F03 boots, F04 beach, F06 front room, F07 cheer, F08 Wembley crowd, F11 queue, F12 township, F13 Stoke streets, F15 stadium | Good | Full 5 s usable |
+| F05 Wembley towers | Good | Use 0–3.8 s: a rattle swings into the lens at the end. "WEMBLEY STADIUM / EMPIRE STADIUM" text is correct |
+| F09 winger | Redo good | First try lost the ball and changed shirt numbers; v2 keeps the ball at his feet (no burst past, so the beat-the-man move stays in the drawn explainer) |
+| F10 crowd erupts | Good | Use 0–3 s: rattles fill the frame after |
+| F14 public hall | Redo good | First try had puffs of smoke like an explosion; v2 is clean |
+| F16 floodlit 1965 | Check | A "SPION KOP" sign and a garbled scoreboard: Stoke's end was the Boothen End. Crop or blur the top left, or use only as a generic floodlit crowd |
+
+Website tip: uploading a start frame from disk stopped working on 22 Oct; pick the still from **Start Frame → My Library** and search a word from its prompt.
+
 ## Premium (credits, through Claude, Mike approves the total)
 
 | # | Shot | Model | Credits |
