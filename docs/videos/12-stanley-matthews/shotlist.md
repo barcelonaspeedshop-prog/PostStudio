@@ -74,3 +74,10 @@ Lesson: Kling v3 Pro holds about 3 s of real action, then morphs to hit the end 
 - The dribble explainer (Ch 2) and the minute-by-minute final (Ch 7) are drawn by us so the geometry is exactly right, set on an AI-made pitch (muddy 1950s grass, chalk lines, floodlight glow) instead of flat green.
 - Fact cards sit on AI-made period paper (a 1950s match programme page, a telegram), not plain navy.
 - Scoreboards as a recreated 1950s Wembley scoreboard (AI background, our numbers).
+
+## Real footage: British Pathé (checked 22 Oct)
+
+- Film: **"Cup Final – Blackpool 4 v Bolton 3" (1953)**, Film ID 76.07, britishpathe.com/asset/54486, 4 min 58 s, black and white with sound, SD (HD scan on request). Its shot list includes Mortensen's free-kick goal, Matthews beating Barrass and crossing, Perry's winner, Matthews mobbed, the Queen presenting the cup. Pathé also holds "Selected Originals" (extra unused material) from the same reels.
+- **Online "License Film" button:** Online → Digital = **£2,825 + VAT** for the whole film, web, worldwide, 5 years, SD file (720×576). Too much for one video.
+- **Cheaper routes, quote only:** (1) per-second licence for just the seconds we use (60 s minimum, can mix clips); (2) Pathé's new **Content Creator Programme** for YouTube creators, terms not published ("enquire to see if you meet eligibility").
+- Same match also filmed by British Movietone (issue 1248), held by AP Archive: quote only.
